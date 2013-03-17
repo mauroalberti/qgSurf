@@ -1,0 +1,9 @@
+[general]
+name=qgSurf
+description=Calculates the intersections between a geological plane and a DEM
+version=0.1.3
+qgisMinimumVersion=1.8
+email=alberti.m65@gmail.com
+author=Mauro Alberti
+category=Raster
+
