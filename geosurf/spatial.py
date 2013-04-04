@@ -8,9 +8,9 @@ import numpy as np
 
 import copy
 
-from qgSurf_data import *
-from qgSurf_errors import *
-from qgSurf_utils import *
+from geoio import *
+from errors import *
+from utils import *
 
         
 def plane_x_coeff( or_plane_attitude ):
@@ -373,7 +373,6 @@ class GDALParameters( object ):
         """
         return self._nodatavalue
 
-
     # set property for no-data value
     noDataValue = property( g_noDataValue, s_noDataValue )
 
@@ -641,7 +640,7 @@ class GDALParameters( object ):
             return True            
 
 
-class SpatialDomain(object):
+class RectangularDomain(object):
     """
     Rectangular spatial domain class.
     
@@ -656,7 +655,7 @@ class SpatialDomain(object):
         @param  pt_trc:  top-right corner of the domain.
         @type  pt_trc:  Point.
                         
-        @return:  SpatialDomain instance.
+        @return:  RectangularDomain instance.
         """     
         self._llcorner = pt_llc  
         self._trcorner = pt_trc 
@@ -746,7 +745,7 @@ class Grid(object):
             pt_llc = None
             pt_trc = None
            
-        self._grid_domain = SpatialDomain(pt_llc, pt_trc)          
+        self._grid_domain = RectangularDomain(pt_llc, pt_trc)          
 
         if grid_data is not None: 
             self._grid_data = grid_data.copy() 
@@ -759,7 +758,7 @@ class Grid(object):
         Set spatial domain.
         
         @param  domain:  Spatial domain to be attributed to the current Grid instance.
-        @type  domain:  class SpatialDomain.
+        @type  domain:  class RectangularDomain.
         
         @return: self
         """        
@@ -771,7 +770,7 @@ class Grid(object):
         """
         Get spatial domain.
         
-        @return: the spatial domain of the current Grid instance - class SpatialDomain.
+        @return: the spatial domain of the current Grid instance - class RectangularDomain.
         """        
         return self._grid_domain
     
@@ -824,6 +823,45 @@ class Grid(object):
     data = property( g_grid_data, s_grid_data, d_grid_data )
       
 
+    def grid_extent( self ):
+        """
+        Return the xmin, xmax and ymin, ymax values as a dictionary
+        """
+        
+        return dict(xmin=self.domain.g_llcorner().x, 
+                    xmax=self.domain.g_trcorner().x,
+                    ymin=self.domain.g_llcorner().y,
+                    ymax=self.domain.g_trcorner().y )
+        
+        
+    def _xmin(self):
+        
+        return self.grid_extent()['xmin']
+    
+    xmin = property( _xmin )
+    
+    
+    def _xmax(self):
+        
+        return self.grid_extent()['xmax']
+    
+    xmax = property( _xmax )
+        
+        
+    def _ymin(self):
+        
+        return self.grid_extent()['ymin']
+    
+    ymin = property( _ymin )
+        
+        
+    def _ymax(self):
+        
+        return self.grid_extent()['ymax']   
+            
+    ymax = property( _ymax )
+    
+                
     def row_num( self ):
         """
         Get row number of the grid domain.     
@@ -1036,4 +1074,70 @@ class Grid(object):
                         ycoords_y[i,j] = np.NaN
                                                          
             return xcoords_x, xcoords_y, ycoords_x, ycoords_y
+
+    """
+    def intersection_within_searchradius( self, surf_type, srcPt, srcPlaneAttitude ):
+
+        
+        if surf_type == 'plane': 
+                        
+            # lambdas to compute the geographic coordinates (in x- and y-) of a cell center 
+            coord_grid2geog_x = lambda j : self.domain.g_llcorner().x + self.cellsize_x() * ( 0.5 + j )
+            coord_grid2geog_y = lambda i : self.domain.g_trcorner().y - self.cellsize_y() * ( 0.5 + i )
+             
+            # arrays storing the geographical coordinates of the cell centers along the x- and y- axes    
+            x_values = self.x()
+            y_values = self.y()      
+
+            ycoords_x, xcoords_y  = np.broadcast_arrays( x_values, y_values )
+                        
+            #### x-axis direction intersections
+            
+            # 2D array of DEM segment parameters                         
+            x_dem_m = self.grad_forward_x()            
+            x_dem_q = self.data - x_values * x_dem_m            
+            
+            # equation for the planar surface that, given (x,y), will be used to derive z  
+            plane_z = plane_from_geo( srcPt, srcPlaneAttitude )
+            
+            # 2D array of plane segment parameters
+            x_plane_m = plane_x_coeff( srcPlaneAttitude )            
+            x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, coord_grid2geog_y, plane_z )
+
+            # 2D array that defines denominator for intersections between local segments
+            x_inters_denomin =  np.where( x_dem_m != x_plane_m, x_dem_m-x_plane_m, np.NaN )            
+            coincident_x = np.where( x_dem_q != x_plane_q, np.NaN, ycoords_x )            
+            xcoords_x = np.where( x_dem_m != x_plane_m , (x_plane_q - x_dem_q ) / x_inters_denomin, coincident_x )
+            
+            xcoords_x = np.where( xcoords_x < ycoords_x , np.NaN, xcoords_x )           
+            xcoords_x = np.where( xcoords_x >= ycoords_x + self.cellsize_x() , np.NaN, xcoords_x )  
+                        
+            
+            #### y-axis direction intersections
+
+            # 2D array of DEM segment parameters  
+            y_dem_m = self.grad_forward_y()            
+            y_dem_q = self.data - y_values * y_dem_m
+ 
+            # 2D array of plane segment parameters
+            y_plane_m = plane_y_coeff( srcPlaneAttitude )            
+            y_plane_q = array_from_function( 1, self.col_num(), coord_grid2geog_x , lambda i: 0, plane_z )
+
+            # 2D array that defines denominator for intersections between local segments
+            y_inters_denomin =  np.where( y_dem_m != y_plane_m, y_dem_m - y_plane_m, np.NaN )
+            coincident_y = np.where( y_dem_q != y_plane_q, np.NaN, xcoords_y )
+                        
+            ycoords_y = np.where( y_dem_m != y_plane_m, (y_plane_q - y_dem_q ) / y_inters_denomin, coincident_y )            
+
+            # filter out cases where intersection is outside cell range
+            ycoords_y = np.where( ycoords_y < xcoords_y , np.NaN, ycoords_y )           
+            ycoords_y = np.where( ycoords_y >= xcoords_y + self.cellsize_y() , np.NaN, ycoords_y )            
+
+            for i in xrange(xcoords_x.shape[0]):
+                for j in xrange(xcoords_x.shape[1]):
+                    if abs(xcoords_x[i,j]-ycoords_x[i,j])<1.0e-5 and abs(ycoords_y[i,j]-xcoords_y[i,j])<1.0e-5:
+                        ycoords_y[i,j] = np.NaN
+                                                         
+            return xcoords_x, xcoords_y, ycoords_x, ycoords_y
+        """
 

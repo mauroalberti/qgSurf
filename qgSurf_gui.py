@@ -1,48 +1,77 @@
 
-# Import the PyQt and QGIS libraries
+
+"""
+Some code modified after: profiletool, script: profileplugin.py
+
+#-----------------------------------------------------------
+# 
+# Profile
+# Copyright (C) 2008  Borys Jurgiel
+# Copyright (C) 2012  Patrice Verchere
+#-----------------------------------------------------------
+# 
+# licensed under the terms of GNU GPL 2
+# 
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# 
+#---------------------------------------------------------------------
+"""
+
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
-
-from qgis.core import *
-
-# Initialize Qt resources from file resources.py
+#from qgis.core import *
+#from qgis.gui import *
 import resources
-
-# Import the code for the dialog
 from qgSurf_dialog import qgSurfDialog
+# from qgs_tools.ptmaptool import PointMapTool
 
 
-class qgSurf_gui(object):
+class qgSurf_gui(object):    
 
-    def __init__(self, iface):
-        # Save reference to the QGIS interface
-        self.iface = iface
+    def __init__( self, interface ):
+
+        self.interface = interface
+        self.main_window = self.interface.mainWindow()
+        self.canvas = self.interface.mapCanvas()
 
 
-    def initGui(self):
-        # Create action that will start plugin configuration
-        self.action = QAction(QIcon(":/plugins/qgSurf/icon.png"), "qgSurf", self.iface.mainWindow())
-                   
-        # connect the action to the run method
-        QObject.connect(self.action, SIGNAL("triggered()"), self.run)
+    def initGui( self ):
 
-        # Add toolbar button and menu item
-        self.iface.addToolBarIcon(self.action)
-        self.iface.addPluginToMenu("&qgSurf", self.action)
+        self.plugin = QAction( QIcon( ":/plugins/qgSurf/icons/qgsurf.png" ), "qgSurf", self.main_window )
+        self.plugin.setWhatsThis( "Calculate intersection between DEM and plane" )                   
+        QObject.connect( self.plugin, SIGNAL("triggered()"), self.run )
+
+        self.interface.addToolBarIcon( self.plugin )
+        self.interface.addPluginToMenu( "&qgSurf", self.plugin )
+
+   
+    def run(self):
+     
+        dlg = qgSurfDialog( self.canvas, self.plugin )
+        dlg.show()
+        dlg.exec_()
 
 
     def unload(self):
-        # Remove the plugin menu item and icon
-        self.iface.removePluginMenu("&qgSurf",self.action)
-        self.iface.removeToolBarIcon(self.action)
+
+        self.interface.removePluginMenu( "&qgSurf", self.plugin )
+        self.interface.removeToolBarIcon( self.plugin )
 
 
-    # run method that performs all the real work
-    def run(self):
 
-        # create and show the dialog
-        dlg = qgSurfDialog()        
-        dlg.show()
-        dlg.exec_()
+
         
 

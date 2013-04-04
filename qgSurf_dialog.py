@@ -1,30 +1,26 @@
 # -*- coding: utf-8 -*-
 
-
 import os
-import sys
+from math import floor
+import numpy as np
 
-import webbrowser
-
-import qgis.core as QgsCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
+from qgis.core import *
+#import qgis.core as QgsCore
+from qgis.gui import *
 
-from matplotlib.offsetbox import AnchoredOffsetbox, AuxTransformBox, VPacker,\
-     TextArea, DrawingArea
-     
+from qgs_tools.ptmaptool import PointMapTool
+    
 try:
     from osgeo import ogr
 except: 
     import ogr
-    
-from qgSurf_mplwidget import MplWidget
-from qgSurf_data import *
-from qgSurf_utils import *
 
+from geosurf import geoio, spatial, utils
+from geosurf.intersections import * 
 
-      
         
 class qgSurfDialog( QDialog ):
     """
@@ -32,174 +28,124 @@ class qgSurfDialog( QDialog ):
     
     """
 
-    # static attributes
     colormaps = ["jet", "gray", "bone", "hot","autumn", "cool","copper", "hsv", "pink", "spring", "summer", "winter", "spectral", "flag", ] 
-    trace_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
-    original_extent = [0,100]
+    line_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
+
+
+    def __init__( self, canvas, plugin ):
+
+        super( qgSurfDialog, self ).__init__() 
+
+        QObject.connect( self, SIGNAL( " rejected ( ) " ), self.onClose )
+        
+        self.canvas = canvas
+        self.plugin = plugin   
+            
+        self.initialize_parameters()                 
+        self.setup_commandwin_gui() 
+                
+        self.setWindowFlags( Qt.WindowStaysOnTopHint )       
+
     
-    def __init__( self ):
+    def get_layers_from_qgis(self):        
 
-        super( qgSurfDialog, self ).__init__()
+        curr_map_layers = QgsMapLayerRegistry.instance().mapLayers()
+        mapLayers = zip(unicode(curr_map_layers.keys()), curr_map_layers.values())       
+        rasterLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.RasterLayer, mapLayers )
+        vectorLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.VectorLayer, mapLayers )
+        pointvectLayers = filter( lambda layer: layer[1].geometryType() == QGis.Point, vectorLayers )
+        return rasterLayers, pointvectLayers
 
-        self.initializations() 
+
+    def initialize_parameters(self):
                 
-        self.setupUI()
-        
-        self.linkQGIS()
-        
-        self.setConnections()   
-        
-
-
-    def initializations(self):
-
-        # dem and map extent settings      
-        self.dem_extent_x = self.dem_extent_y = qgSurfDialog.original_extent
-        self.map_extent_x = self.map_extent_y = qgSurfDialog.original_extent
-        
-        # colormaps
-        self.dem_colormap = qgSurfDialog.colormaps[0]
-        self.intersection_color = qgSurfDialog.trace_colors[0]        
-        
-        # initialize intersection drawing
-        self.valid_intersections = False
-        
-        # initialize spdata
-        self.spdata = GeoData() 
+        self.dem = self.input_points = None
+        self.sourcePointTool = None
+        self.marker = None 
+        self.inters_mrk_list = None
+        self.intersections = self.valid_intersections = False
+        self.intersection_color = qgSurfDialog.line_colors[0]
+        self.current_directory = os.path.dirname( __file__ )
+        self.rasterLayers, self.pointvectLayers = self.get_layers_from_qgis()
                 
-             
 
-    def setupUI( self ):
-        
-        self.setWindowTitle( 'qgSurf' )
-        
-        # set layout for dialog
-        self.dialogSplitter = QSplitter( Qt.Horizontal, self )
-        
-        # define left widget and layout
-        leftWidget = QWidget()
-        leftLayout = QVBoxLayout()
-        leftWidget.setLayout( leftLayout )
+    def setup_commandwin_gui( self ):
 
-        # define right widget and layout        
-        rightWidget = QWidget()
-        rightLayout = QVBoxLayout()
-        rightWidget.setLayout( rightLayout )
-        
-        # setup input data
-        inputGroupBox = self.setupInput()
-        leftLayout.addWidget(inputGroupBox)
-
-        # setup source point
-        sourcepointGroupBox = self.setupSourcePoint()
-        leftLayout.addWidget( sourcepointGroupBox )        
-        
-        # setup plane settings
-        planeGroupBox = self.setupPlane()
-        leftLayout.addWidget( planeGroupBox )
-        
-        # setup intersection settings
-        intersectionGroupBox = self.setupIntersection()
-        leftLayout.addWidget( intersectionGroupBox )
-
-        # setup output settings
-        outputGroupBox = self.setupOutput()
-        leftLayout.addWidget( outputGroupBox )
-        
-        # map
-        self.mplwidget = MplWidget( self.map_extent_x, self.map_extent_y )
-        rightLayout.addWidget( self.mplwidget )
-
-        # add left and right widgets to dialog layout
-        self.dialogSplitter.addWidget( leftWidget )
-        self.dialogSplitter.addWidget( rightWidget )
-        
-        self.resize( 1150, 750 )
+        self.dialog_layout = QVBoxLayout()
+        self.main_widget = QTabWidget()        
+        self.setup_geographicdata_tab()
+        self.setup_geologicdata_tab()
+        self.setup_output_tab() 
+        self.setup_about_tab()       
+        self.dialog_layout.addWidget( self.main_widget )                             
+        self.setLayout( self.dialog_layout )            
+        self.adjustSize()               
+        self.setWindowTitle( 'qgSurf' )   
 
 
-    def setupInput(self):        
-
-        # input data        
-        inputGroupBox = QGroupBox( "Input layers" )       
-        inputLayout = QGridLayout()
-        inputGroupBox.setLayout(inputLayout)
+    def setup_geographicdata_tab(self):        
         
-        inputLayout.addWidget(QLabel( "DEM" ), 0, 0)
+        inputWidget = QWidget()  
+        inputLayout = QGridLayout( )
         
+        inputLayout.addWidget(QLabel( "Source DEM" ), 0, 0, 1, 2)        
+        dem_default_text = '--  required  --'
         self.DEM_comboBox = QComboBox()
-        inputLayout.addWidget(self.DEM_comboBox, 0, 1)
-                
-        self.show_DEM_checkBox = QCheckBox("show")
-        self.show_DEM_checkBox.setChecked(False)
-        inputLayout.addWidget(self.show_DEM_checkBox, 0, 2)
-
-        inputLayout.addWidget( QLabel( "DEM colormap" ), 1, 0)
+        self.DEM_comboBox.addItem(dem_default_text)
+        for (name,layer) in self.rasterLayers:
+            self.DEM_comboBox.addItem(layer.name())
+        QObject.connect( self.DEM_comboBox, SIGNAL( " currentIndexChanged (int) " ), self.get_dem )
+        inputLayout.addWidget(self.DEM_comboBox, 1, 0, 1, 2)
         
-        self.DEM_cmap_comboBox = QComboBox()
-        self.DEM_cmap_comboBox.addItems(qgSurfDialog.colormaps)
-        inputLayout.addWidget(self.DEM_cmap_comboBox, 1, 1)
-
-        inputLayout.addWidget( QLabel( "Lineaments" ), 2, 0)        
-
-        self.Trace_comboBox = QComboBox()
-        inputLayout.addWidget(self.Trace_comboBox, 2, 1)        
-
-        self.show_Lineament_checkBox = QCheckBox("show")
-        self.show_Lineament_checkBox.setChecked(False) 
-        inputLayout.addWidget(self.show_Lineament_checkBox, 2, 2)        
+        inputLayout.addWidget( QLabel( "Source point" ), 2, 0, 1, 1) 
         
-        return inputGroupBox
-    
-        
-    def setupSourcePoint(self):      
-        
-        sourcepointGroupBox = QGroupBox( "Plane source point" )
-        sourcepointLayout = QGridLayout()
-        sourcepointGroupBox.setLayout(sourcepointLayout)
-       
-        sourcepointLayout.addWidget( QLabel("X"), 0, 0 )
-        self.Pt_spinBox_x = QSpinBox()
-        self.Pt_spinBox_x.setRange(-1000000000, 1000000000)
-        self.Pt_spinBox_x.setSingleStep(50)
-        sourcepointLayout.addWidget( self.Pt_spinBox_x, 0, 1 )
-        
-        sourcepointLayout.addWidget( QLabel("Y"), 1, 0 )
-        self.Pt_spinBox_y = QSpinBox()
-        self.Pt_spinBox_y.setRange(-1000000000, 1000000000)
-        self.Pt_spinBox_y.setSingleStep(50)
-        sourcepointLayout.addWidget( self.Pt_spinBox_y, 1, 1 )
+        self.defineSrcPoint_pushButton = QPushButton( "Set source point in map" )
+        self.defineSrcPoint_pushButton.setEnabled( False )
+        inputLayout.addWidget( self.defineSrcPoint_pushButton, 2, 1, 1, 1 )        
+                       
+        inputLayout.addWidget( QLabel("X"), 3, 0, 1, 1 )
+        self.Pt_x_spinBox = QSpinBox()
+        self.Pt_x_spinBox.setRange(-1000000000, 1000000000)
+        self.Pt_x_spinBox.setSingleStep(50)
+        #QObject.connect( self.Pt_x_spinBox, SIGNAL( " valueChanged (int) " ), self.set_z )
+        inputLayout.addWidget( self.Pt_x_spinBox, 3, 1, 1, 1 )  
+              
+        inputLayout.addWidget( QLabel("Y"), 4, 0, 1, 1 )
+        self.Pt_y_spinBox = QSpinBox()
+        self.Pt_y_spinBox.setRange(-1000000000, 1000000000)
+        self.Pt_y_spinBox.setSingleStep(50)
+        #QObject.connect( self.Pt_y_spinBox, SIGNAL( " valueChanged (int) " ), self.set_z )
+        inputLayout.addWidget( self.Pt_y_spinBox, 4, 1, 1, 1 ) 
+                      
+        inputLayout.addWidget( QLabel("Z"), 5, 0, 1, 1 )
+        self.Pt_z_spinBox = QSpinBox()
+        self.Pt_z_spinBox.setRange(-10000000, 10000000)
+        self.Pt_z_spinBox.setSingleStep(5)
+        #QObject.connect( self.Pt_z_spinBox, SIGNAL( " valueChanged (int) " ), self.set_z )
+        inputLayout.addWidget( self.Pt_z_spinBox, 5, 1, 1, 1 ) 
                
-        sourcepointLayout.addWidget( QLabel("Z"), 2, 0 )
-        self.Pt_spinBox_z = QSpinBox()
-        self.Pt_spinBox_z.setRange(-10000000, 10000000)
-        self.Pt_spinBox_z.setSingleStep(5)
-        sourcepointLayout.addWidget( self.Pt_spinBox_z, 2, 1 )
-        
-        self.fixz2dem_checkBox = QCheckBox("fix  to DEM")
+        self.fixz2dem_checkBox = QCheckBox("fix z value to DEM")
         self.fixz2dem_checkBox.setChecked(True)
-        sourcepointLayout.addWidget( self.fixz2dem_checkBox, 3, 0 )
+        QObject.connect( self.fixz2dem_checkBox, SIGNAL( " stateChanged (int) " ), self.set_z )
+        inputLayout.addWidget( self.fixz2dem_checkBox, 6, 0, 1, 1 )        
         
-        self.show_SrcPt_checkBox = QCheckBox("show")
-        self.show_SrcPt_checkBox.setChecked(True)
-        sourcepointLayout.addWidget( self.show_SrcPt_checkBox, 3, 1 )
+        inputWidget.setLayout(inputLayout)              
+        self.main_widget.addTab( inputWidget, "Geographic data" )              
 
-        return sourcepointGroupBox
-        
 
-    def setupPlane(self):
+                
+    def setup_geologicdata_tab(self):
 
-        planeGroupBox = QGroupBox("Plane orientation")
-        planeGroupBox.setFixedHeight ( 230 )
-        planeLayout = QGridLayout()
-        planeGroupBox.setLayout(planeLayout)
+        planeorientationWidget = QWidget()  
+        planeorientationLayout = QGridLayout( )
         
         dip_dir_label = QLabel("Dip direction")
         dip_dir_label.setAlignment ( Qt.AlignCenter )       
-        planeLayout.addWidget( dip_dir_label, 0, 0 )
+        planeorientationLayout.addWidget( dip_dir_label, 0, 0, 1, 2 )
 
         dip_ang_label = QLabel("Dip angle")
         dip_ang_label.setAlignment ( Qt.AlignCenter )       
-        planeLayout.addWidget( dip_ang_label, 0, 1 )
+        planeorientationLayout.addWidget( dip_ang_label, 0, 2, 1, 1 )
         
         self.DDirection_dial = QDial()
         self.DDirection_dial.setRange(0,360)
@@ -210,9 +156,9 @@ class qgSurfDialog( QDialog ):
         self.DDirection_dial.setOrientation(Qt.Vertical)
         self.DDirection_dial.setWrapping(True)
         self.DDirection_dial.setNotchTarget(30.0)
-        self.DDirection_dial.setNotchesVisible(True)       
-        planeLayout.addWidget( self.DDirection_dial, 1, 0 )
-        
+        self.DDirection_dial.setNotchesVisible(True)   
+        QObject.connect( self.DDirection_dial, SIGNAL( " valueChanged (int) " ), self.update_dipdir_spinbox )    
+        planeorientationLayout.addWidget( self.DDirection_dial, 1, 0, 1, 2 )        
                 
         self.DAngle_verticalSlider = QSlider()
         self.DAngle_verticalSlider.setRange(0,90)
@@ -221,392 +167,247 @@ class qgSurfDialog( QDialog ):
         self.DAngle_verticalSlider.setInvertedAppearance(True)
         self.DAngle_verticalSlider.setTickPosition(QSlider.TicksBelow)
         self.DAngle_verticalSlider.setTickInterval(15)
-        planeLayout.addWidget( self.DAngle_verticalSlider, 1, 1 )
+        QObject.connect( self.DAngle_verticalSlider, SIGNAL( " valueChanged (int) " ), self.update_dipang_spinbox )
+        planeorientationLayout.addWidget( self.DAngle_verticalSlider, 1, 2, 1, 1 )
 
         self.DDirection_spinBox = QSpinBox()
         self.DDirection_spinBox.setRange(0,360)
         self.DDirection_spinBox.setSingleStep(1)
-        planeLayout.addWidget( self.DDirection_spinBox, 2, 0 )        
+        QObject.connect( self.DDirection_spinBox, SIGNAL( " valueChanged (int) " ), self.update_dipdir_slider )
+        planeorientationLayout.addWidget( self.DDirection_spinBox, 2, 0, 1, 2 )        
          
         self.DAngle_spinBox = QSpinBox()
         self.DAngle_spinBox.setRange(0,90)
         self.DAngle_spinBox.setSingleStep(1)
         self.DAngle_spinBox.setProperty("value", 45) 
-        planeLayout.addWidget( self.DAngle_spinBox, 2, 1 )
-                
-        return planeGroupBox  
-
-      
-    def setupIntersection(self):
-        
-        intersectionGroupBox = QGroupBox( "Intersections" )
-        intersectionLayout = QGridLayout()
-        intersectionGroupBox.setLayout(intersectionLayout)      
-        
-        self.Intersection_color_comboBox = QComboBox(intersectionGroupBox)
-        self.Intersection_color_comboBox.addItems( qgSurfDialog.trace_colors)
-        intersectionLayout.addWidget( self.Intersection_color_comboBox, 0, 0 )
-                
-        self.Intersection_show_checkBox = QCheckBox( "show" )
-        self.Intersection_show_checkBox.setChecked(True)
-        intersectionLayout.addWidget( self.Intersection_show_checkBox, 0, 1 )        
-
-        self.Intersection_calculate_pushButton = QPushButton( "Calculate" )
-        intersectionLayout.addWidget( self.Intersection_calculate_pushButton, 0, 2 )
-        
-        return intersectionGroupBox     
+        QObject.connect( self.DAngle_spinBox, SIGNAL( " valueChanged (int) " ), self.update_dipang_slider )
+        planeorientationLayout.addWidget( self.DAngle_spinBox, 2, 2, 1, 1 )
  
+        self.Intersection_calculate_pushButton = QPushButton( "Calculate intersection" )
+        QObject.connect( self.Intersection_calculate_pushButton, SIGNAL( " clicked( bool ) " ), self.calculate_intersection )
+        planeorientationLayout.addWidget( self.Intersection_calculate_pushButton, 3, 0, 1, 3 )
+                                       
+        planeorientationWidget.setLayout(planeorientationLayout)              
+        self.main_widget.addTab( planeorientationWidget, "Geological data" ) 
+
         
-    def setupOutput(self):
- 
-        outputGroupBox = QGroupBox( "Output" )
-        outputLayout = QGridLayout()
-        outputGroupBox.setLayout(outputLayout)         
+    def setup_output_tab(self):
+
+        outputWidget = QWidget()  
+        outputLayout = QGridLayout( )
                
-        # load output
-        self.Load_output_checkBox = QCheckBox("load output in project")
-        outputLayout.addWidget( self.Load_output_checkBox, 0, 0 )
-
+        self.Save_pushButton = QPushButton("Save intersections")
+        QObject.connect( self.Save_pushButton, SIGNAL( " clicked() " ), self.write_results )
+        outputLayout.addWidget( self.Save_pushButton, 0, 0, 1, 2 )
+        
         self.Output_FileName_Input = QLineEdit()
-        outputLayout.addWidget( self.Output_FileName_Input, 0, 1 )
+        outputLayout.addWidget( self.Output_FileName_Input, 1, 0, 1, 1 )
 
         self.Output_Browse = QPushButton(".....")
-        outputLayout.addWidget( self.Output_Browse, 0, 2 )
- 
-        self.Save_points_radioButton = QRadioButton("points")
-        self.Save_points_radioButton.setChecked(True)
-        outputLayout.addWidget( self.Save_points_radioButton, 1, 0 )
-        
-        self.Save_lines_radioButton = QRadioButton("lines")
-        outputLayout.addWidget( self.Save_lines_radioButton, 1, 1 )
- 
-        self.Save_pushButton = QPushButton("Save")
-        outputLayout.addWidget( self.Save_pushButton, 1, 2 )
-               
-        return outputGroupBox
-
-        
-    def linkQGIS(self):        
-        
-        # filter raster and vector layers
-        curr_map_layers = QgsCore.QgsMapLayerRegistry.instance().mapLayers()
-        self.mapLayers = zip(unicode(curr_map_layers.keys()), curr_map_layers.values())       
-        self.rasterLayers = filter( lambda layer: layer[1].type() == QgsCore.QgsMapLayer.RasterLayer, self.mapLayers )
-        self.vectorLayers = filter( lambda layer: layer[1].type() == QgsCore.QgsMapLayer.VectorLayer, self.mapLayers )
-        self.linevectLayers = filter( lambda layer: layer[1].geometryType() == QgsCore.QGis.Line, self.vectorLayers )
- 
-        # fill layer combo boxes
-        dem_default_text = '--  required  --'
-        trace_default_text = '--  optional  --'
-        self.DEM_comboBox.addItem(dem_default_text)
-        self.Trace_comboBox.addItem(trace_default_text)     
-        
-        for (name,layer) in self.rasterLayers:
-            self.DEM_comboBox.addItem(layer.name())
-            
-        for (name,layer) in self.linevectLayers:
-            self.Trace_comboBox.addItem(layer.name())
-
-
-    def setConnections(self):
-
-        # DEM
-        QObject.connect( self.DEM_comboBox, SIGNAL( " currentIndexChanged (int) " ), self.selected_dem )
-        QObject.connect( self.show_DEM_checkBox, SIGNAL( " stateChanged (int) " ), self.redraw_map )
-        
-        QObject.connect( self.DEM_cmap_comboBox, SIGNAL( " currentIndexChanged (QString) " ), self.set_dem_colormap )        
-        QObject.connect( self.DEM_cmap_comboBox, SIGNAL( " currentIndexChanged (QString) " ), self.redraw_map )
- 
-        # Lineament traces
-        QObject.connect( self.Trace_comboBox, SIGNAL( " currentIndexChanged (int) " ), self.reading_traces )                
-        QObject.connect( self.show_Lineament_checkBox, SIGNAL( " stateChanged (int) " ), self.redraw_map )
-
-        # Limits
-        QObject.connect( self.mplwidget.canvas, SIGNAL( " zoom_to_full_view " ), self.zoom_to_full_view )
-        QObject.connect( self.mplwidget.canvas, SIGNAL( " updated_limits " ), self.update_map_limits )
-                         
-        # Source point
-        QObject.connect( self.mplwidget.canvas, SIGNAL( " map_press " ), self.update_srcpt ) # event from matplotlib widget
-                
-        QObject.connect( self.Pt_spinBox_x, SIGNAL( " valueChanged (int) " ), self.set_z )
-        QObject.connect( self.Pt_spinBox_y, SIGNAL( " valueChanged (int) " ), self.set_z )
-        QObject.connect( self.fixz2dem_checkBox, SIGNAL( " stateChanged (int) " ), self.set_z )         
-        QObject.connect( self.Pt_spinBox_z, SIGNAL( " valueChanged (int) " ), self.set_z )
-                                           
-        QObject.connect( self.Pt_spinBox_x, SIGNAL( " valueChanged (int) " ), self.redraw_map )
-        QObject.connect( self.Pt_spinBox_y, SIGNAL( " valueChanged (int) " ), self.redraw_map ) 
-        QObject.connect( self.Pt_spinBox_z, SIGNAL( " valueChanged (int) " ), self.redraw_map ) 
-        QObject.connect( self.show_SrcPt_checkBox, SIGNAL( " stateChanged (int) " ), self.redraw_map )
-
-        # Plane orientation              
-        QObject.connect( self.DDirection_dial, SIGNAL( " valueChanged (int) " ), self.update_dipdir_spinbox )
-        QObject.connect( self.DDirection_spinBox, SIGNAL( " valueChanged (int) " ), self.update_dipdir_slider )
-               
-        QObject.connect( self.DAngle_verticalSlider, SIGNAL( " valueChanged (int) " ), self.update_dipang_spinbox )
-        QObject.connect( self.DAngle_spinBox, SIGNAL( " valueChanged (int) " ), self.update_dipang_slider )
-
-        # Intersections    
-        QObject.connect( self.Intersection_calculate_pushButton, SIGNAL( " clicked( bool ) " ), self.calculate_intersection )
-        QObject.connect( self.Intersection_show_checkBox, SIGNAL( " stateChanged (int) " ), self.redraw_map )
-        
-        QObject.connect( self.Intersection_color_comboBox, SIGNAL( " currentIndexChanged (QString) " ), self.set_intersection_colormap )  
-        QObject.connect( self.Intersection_color_comboBox, SIGNAL( " currentIndexChanged (QString) " ), self.redraw_map )     
-          
-        # Write result
         QObject.connect( self.Output_Browse, SIGNAL( "clicked()" ), self.selectOutputVectorFile )
-        QObject.connect( self.Save_pushButton, SIGNAL( " clicked() " ), self.write_results )
- 
-      
-    def set_dem_colormap(self):
-        
-        self.dem_colormap = str( self.DEM_cmap_comboBox.currentText() )
-        
+        outputLayout.addWidget( self.Output_Browse, 1, 1, 1, 1 )        
 
-    def set_intersection_colormap(self):
+        saveGroup = QButtonGroup( outputWidget )
+
+        self.Save_points_rButt = QRadioButton("points")
+        self.Save_points_rButt.setChecked(True)
+        saveGroup.addButton(self.Save_points_rButt, 0)
+        outputLayout.addWidget( self.Save_points_rButt, 2, 0, 1, 1 )
         
-        self.intersection_color = str( self.Intersection_color_comboBox.currentText() )
-
-
-    def update_map_limits(self, limits ):
-    
-        self.map_extent_x = limits[0]
-        self.map_extent_y = limits[1]
-                         
-        
-    def redraw_map( self ):            
-        """
-        Draw map content.
-               
-        """  
-              
-        self.mplwidget.canvas.ax.cla()
-        
-        # show DEM
-        if self.spdata.dem is not None and self.show_DEM_checkBox.isChecked(): # DEM check is on                
-                 
-                dem_extent = self.dem_extent_x + self.dem_extent_y                       
-                self.mplwidget.canvas.ax.imshow(
-                                                self.spdata.dem.data, 
-                                                extent = dem_extent,  
-                                                cmap = self.dem_colormap,
-                                                )
-   
-        # show lineaments
-        if self.spdata.traces.lines_x is not None and self.spdata.traces.lines_y is not None \
-           and self.show_Lineament_checkBox.isChecked(): # Lineament check is on 
-
-            try:
-                for currLine_x, currLine_y in zip(self.fault_lines_x, self.fault_lines_y):                                
-                    self.mplwidget.canvas.ax.plot(currLine_x, currLine_y,'-')
-            except:
-                pass
-         
-        # show intersections
-        if self.Intersection_show_checkBox.isChecked() and self.valid_intersections == True:
-                        
-            intersections_x = list( self.spdata.inters.xcoords_x[ np.logical_not(np.isnan(self.spdata.inters.xcoords_x)) ] ) + \
-                              list( self.spdata.inters.ycoords_x[ np.logical_not(np.isnan(self.spdata.inters.ycoords_y)) ] )
-        
-            intersections_y = list( self.spdata.inters.xcoords_y[ np.logical_not(np.isnan(self.spdata.inters.xcoords_x)) ] ) + \
-                              list( self.spdata.inters.ycoords_y[ np.logical_not(np.isnan(self.spdata.inters.ycoords_y)) ] )
-                        
-            self.mplwidget.canvas.ax.plot( intersections_x, intersections_y,  "w+",  ms=2,  mec=self.intersection_color,  mew=2 )
-                                
-            legend_text = "Plane dip dir., angle: (%d, %d)\nSource point x, y, z: (%d, %d, %d)" % \
-                (self.spdata.inters.parameters._srcPlaneAttitude._dipdir, self.spdata.inters.parameters._srcPlaneAttitude._dipangle, \
-                 self.spdata.inters.parameters._srcPt.x, self.spdata.inters.parameters._srcPt.y, self.spdata.inters.parameters._srcPt.z) 
-                                             
-            at = AnchoredText(legend_text,
-                          loc=2, frameon=True)  
-            
-            at.patch.set_boxstyle("round,pad=0.,rounding_size=0.2")
-            at.patch.set_alpha(0.5)
-            self.mplwidget.canvas.ax.add_artist(at) 
-
-        # show source point          
-        if self.show_SrcPt_checkBox.isChecked(): 
-            self.mplwidget.canvas.ax.plot( self.Pt_spinBox_x.value(), self.Pt_spinBox_y.value(), "ro")                                        
-
-        self.mplwidget.canvas.ax.set_xlim( self.map_extent_x ) 
-        self.mplwidget.canvas.ax.set_ylim( self.map_extent_y ) 
-        self.mplwidget.canvas.draw()         
- 
-            
-    def zoom_to_full_view( self ):
-        """
-        Update map view to the DEM extent or otherwise, if available, to the shapefile extent.
+        self.Save_lines_rButt = QRadioButton("lines")
+        saveGroup.addButton(self.Save_lines_rButt, 1)
+        outputLayout.addWidget( self.Save_lines_rButt, 2, 1, 1, 1 )        
                 
-        """      
-       
-        try:
-            self.map_extent_x = [ self.spdata.dem.domain.g_llcorner().x, self.spdata.dem.domain.g_trcorner().x ]
-            self.map_extent_y = [ self.spdata.dem.domain.g_llcorner().y, self.spdata.dem.domain.g_trcorner().y ]
-        except:
-            try:
-                self.map_extent_x = self.lnLayer.GetExtent()[:2]               
-                self.map_extent_y = self.lnLayer.GetExtent()[2:]   
-            except:
-                self.map_extent_x = qgSurfDialog.original_extent               
-                self.map_extent_y = qgSurfDialog.original_extent
-        finally:
-            self.redraw_map( )
+        self.Load_output_checkBox = QCheckBox("load output in project")
+        outputLayout.addWidget( self.Load_output_checkBox, 3, 0, 1, 2 )
+                
+        outputWidget.setLayout(outputLayout)              
+        self.main_widget.addTab( outputWidget, "Output" ) 
 
 
-
-    def selected_dem( self, ndx_DEM_file ): 
+    def setup_about_tab(self):
         
+        aboutWidget = QWidget()  
+        aboutLayout = QVBoxLayout( )
+        
+        htmlText = """
+        <h3>qgSurf release 0.2.0 (2013-04-03, experimental)</h3>
+        Created by M. Alberti. 
+        <br />Licensed under the terms of GNU GPL 3.
+        <br />Plugin for determining the topographic intersection of geological planes. 
+        <br /><br />For info see www.malg.eu.        
+        """
+        
+        aboutQTextBrowser = QTextBrowser( aboutWidget )        
+        aboutQTextBrowser.insertHtml( htmlText ) 
+        aboutLayout.addWidget( aboutQTextBrowser )  
+        aboutWidget.setLayout(aboutLayout)              
+        self.main_widget.addTab( aboutWidget, "About" ) 
+        
+              
+    def get_dem( self, ndx_DEM_file ): 
+        
+        self.reset_all_markers()
+                        
         # no DEM layer defined  
         if ndx_DEM_file == 0:
-            return         
-         
-        # get DEM full name 
-        dem_name = self.rasterLayers[ndx_DEM_file -1][1].source()  
+            self.dem = None
+            self.disableSrcPointDef()
+            self.disableSrcPointMaptool()
+            self.resetSrcPointSpinBoxes()           
+            return
         
+        dem_name = self.rasterLayers[ndx_DEM_file-1][1].source()          
         try:
-            self.spdata.dem = self.spdata.read_dem( dem_name )
+            self.dem = geoio.read_dem( dem_name )               
         except:
             QMessageBox.critical( self, "DEM", "Unable to read file" )
+            self.dem = None
             return
-        
-        self.dem_extent_x = [ self.spdata.dem.domain.g_llcorner().x, self.spdata.dem.domain.g_trcorner().x ]
-        self.dem_extent_y = [ self.spdata.dem.domain.g_llcorner().y, self.spdata.dem.domain.g_trcorner().y ]
-            
-        self.map_extent_x = [ self.spdata.dem.domain.g_llcorner().x, self.spdata.dem.domain.g_trcorner().x ]
-        self.map_extent_y = [ self.spdata.dem.domain.g_llcorner().y, self.spdata.dem.domain.g_trcorner().y ]
+        if self.dem is None: QMessageBox.critical( self, "DEM", "DEM was not read" )
 
+        # activate point definition in QgsCanvas        
+        self.enableSrcPointButton()
+        
         # set intersection validity to False
         self.valid_intersections = False        
-             
-        # set DEM visibility on        
-        if self.show_DEM_checkBox.checkState() == 2:
-            self.redraw_map()
-        else: 
-            self.show_DEM_checkBox.setCheckState( 2 )
 
-
-           
-    def reading_traces( self, ndx_Traces_file ):
-                
+        
+    """               
+    def get_points( self, ndx_input_points ):
+        
+        return
+ 
         # no trace layer defined
-        if ndx_Traces_file == 0: 
+        if ndx_input_points == 0: 
+            self.input_points = None
+            #self.show_Lineament_checkBox.setCheckState( 0 )
+            #self.draw_map()
+            return       
+         
+        # get input point full name 
+        input_points_name = self.pointvectLayers[ ndx_input_points - 1 ][ 1 ].source()  
+
+        try:
+            success, answer = geoio.read_line_shapefile( input_points_name )
+        except:
+            QMessageBox.critical( self, "Input points", "Unable to read shapefile" )
+            self.input_points = None
+            #self.show_Lineament_checkBox.setCheckState( 0 )
+            #self.draw_map()
             return
-         
-        # get traces full name 
-        traces_name = self.linevectLayers[ ndx_Traces_file -1 ][ 1 ].source()              
-        
-        # open input vector layer
-        shape_driver = ogr.GetDriverByName( "ESRI Shapefile" )
+        else:        
+            if not success:
+                QMessageBox.critical( self, "Input points", answer )
+                self.input_points = None
+                #self.show_Lineament_checkBox.setCheckState( 0 )
+                #self.draw_map()
+                return
 
-        in_shape = shape_driver.Open( str( traces_name ), 0 )
+        self.input_points = dict( extent=answer['extent'], data=answer['data'] )
 
-        # layer not read
-        if in_shape is None: 
-            QMessageBox.critical( self, 
-                                  "Lineament traces", 
-                                  "Unable to open shapefile" 
-                                )
-          
-        # get internal layer
-        self.lnLayer = in_shape.GetLayer(0) 
-         
-        # set vector layer extent   
-        vectlayer_extent_x = self.lnLayer.GetExtent()[:2]
-        vectlayer_extent_y = self.lnLayer.GetExtent()[2:]
         
-        if self.dem_extent_x == qgSurfDialog.original_extent and \
-           self.dem_extent_y == qgSurfDialog.original_extent:
-            self.map_extent_x = vectlayer_extent_x
-            self.map_extent_y = vectlayer_extent_y
-                    
-        # initialize lists storing line coordinates
-        self.fault_lines_x = []
-        self.fault_lines_y = []
-                                 
-        # start reading layer features              
-        curr_line = self.lnLayer.GetNextFeature()
+        # set layer visibility on and draw the map        
+        #self.draw_map()
+    """
+
+
+    def enableSrcPointButton( self ):
         
-        # loop in layer features       
-        while curr_line:        
-                    
-            line_vert_x = []
-            line_vert_y = []
-                        
-            line_geom = curr_line.GetGeometryRef()
-            
-            for i in range( line_geom.GetPointCount() ):
-                                
-                x, y = line_geom.GetX(i), line_geom.GetY(i)
-                            
-                line_vert_x.append(x)
-                line_vert_y.append(y)                
-                                
-            self.fault_lines_x.append(line_vert_x)    
-            self.fault_lines_y.append(line_vert_y)
-                        
-            curr_line = self.lnLayer.GetNextFeature()
-                    
-        in_shape.Destroy()
-        
-        # set layer visibility on        
-        if self.show_Lineament_checkBox.checkState() == 2:
-            self.redraw_map()
-        else:
-            self.show_Lineament_checkBox.setCheckState( 2 ) 
+        self.defineSrcPoint_pushButton.setEnabled( True )
+        QObject.connect( self.defineSrcPoint_pushButton, SIGNAL( " clicked( bool ) " ), self.activateMapTool )
+       
                 
- 
- 
-    def update_srcpt (self, pos_values):
+    def activateMapTool(self):
+                
+        self.sourcePointTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
+        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
+        QObject.connect( self.sourcePointTool, SIGNAL("leftClicked"), self.set_srcPoint_from_map )
+        self.sourcePointTool.setCursor( Qt.CrossCursor )        
+        self.canvas.setMapTool( self.sourcePointTool )
+        QMessageBox.information( self, "Source point", "Now you can define the source point in the map" )
+
+
+    def set_srcPoint_from_map( self, position ): # Add point to analyze
+        
+        self.reset_all_markers()
+                
+        mapPos = self.canvas.getCoordinateTransform().toMapCoordinates( position["x"], position["y"] )
+        self.marker = QgsVertexMarker( self.canvas )
+        self.marker.setIconType( 1 )
+        self.marker.setIconSize( 18 )
+        self.marker.setPenWidth( 2 )    
+
+        self.marker.setCenter(QgsPoint( mapPos.x(), mapPos.y() ))
+        self.canvas.refresh()
+        
+        self.update_srcpt( mapPos.x(), mapPos.y() )      
+        
+        
+    def update_srcpt ( self, x, y ):
         """
         Update the source point position from user input (click event in map).
-          
-        @param pos_values: location of clicked point.
-        @type: list of two float values.      
+  
         """         
-        x = pos_values[0]
-        y = pos_values[1]
         
-        self.Pt_spinBox_x.setValue(int(x))
-        self.Pt_spinBox_y.setValue(int(y))
-        
-        # set intersection validity to False
-        self.valid_intersections = False
-
+        self.Pt_x_spinBox.setValue(int(x))
+        self.Pt_y_spinBox.setValue(int(y))
+        self.set_z()
 
 
     def set_z (self):
         """
         Update z value.
         
-        """ 
-        
+        """         
         # set intersection validity to False
         self.valid_intersections = False        
         
-        if self.spdata.dem is None: return
+        if self.dem is None: return
         
         if self.fixz2dem_checkBox.isChecked():    
-   
-            curr_x = self.Pt_spinBox_x.value()
-            curr_y = self.Pt_spinBox_y.value()
+
+            curr_x = self.Pt_x_spinBox.value()
+            curr_y = self.Pt_y_spinBox.value()
             
-            if curr_x <= self.spdata.dem.domain.g_llcorner().x or curr_x >= self.spdata.dem.domain.g_trcorner().x or \
-               curr_y <= self.spdata.dem.domain.g_llcorner().y or curr_y >= self.spdata.dem.domain.g_trcorner().y:
+            if curr_x <= self.dem.xmin or curr_x >= self.dem.xmax or \
+               curr_y <= self.dem.ymin or curr_y >= self.dem.ymax:
                 return
            
-            curr_point = Point( curr_x, curr_y )
-            currArrCoord = self.spdata.dem.geog2array_coord(curr_point)
+            curr_point = spatial.Point( curr_x, curr_y )
+            currArrCoord = self.dem.geog2array_coord(curr_point)
+            
+            z = floor(self.dem.interpolate_bilinear(currArrCoord))            
+            self.Pt_z_spinBox.setValue(int(z))  
+                        
+            
+    def disableSrcPointDef(self):
+        
+        self.defineSrcPoint_pushButton.setEnabled( False )
+        QObject.disconnect( self.defineSrcPoint_pushButton, SIGNAL( " clicked( bool ) " ), self.activateMapTool )
+        
     
-            z = floor(self.spdata.dem.interpolate_bilinear(currArrCoord))
-    
-            self.Pt_spinBox_z.setValue(int(z))        
-  
+    def disableSrcPointMaptool(self):
+        
+        QObject.disconnect( self.sourcePointTool, SIGNAL("leftClicked"), self.set_srcPoint_from_map) 
+        self.canvas.unsetMapTool(self.sourcePointTool)
+        self.canvas.setMapTool(self.previousTool)
+        
+        self.canvas.scene().removeItem(self.marker)
+        
       
-      
+    def resetSrcPointSpinBoxes(self):
+        
+        self.Pt_x_spinBox.clear()
+        self.Pt_y_spinBox.clear()
+        self.Pt_z_spinBox.clear()
+        
+        
     def update_dipdir_slider(self):
         """
         Update the value of the dip direction in the slider.""
         """
-
+        
         real_dipdirection = self.DDirection_spinBox.value()
         transformed_dipdirection = real_dipdirection + 180.0
         if transformed_dipdirection > 360.0:
@@ -614,8 +415,7 @@ class qgSurfDialog( QDialog ):
         self.DDirection_dial.setValue( transformed_dipdirection ) 
  
         # set intersection validity to False
-        self.valid_intersections = False
-  
+        self.valid_intersections = False        
   
            
     def update_dipdir_spinbox(self):            
@@ -632,7 +432,6 @@ class qgSurfDialog( QDialog ):
         # set intersection validity to False
         self.valid_intersections = False
 
-
                  
     def update_dipang_slider(self):
         """
@@ -642,7 +441,6 @@ class qgSurfDialog( QDialog ):
                   
         # set intersection validity to False
         self.valid_intersections = False
- 
  
                   
     def update_dipang_spinbox(self):            
@@ -655,64 +453,125 @@ class qgSurfDialog( QDialog ):
         self.valid_intersections = False
 
                
-       
+    def set_intersection_colormap(self):
+        
+        self.intersection_color = str( self.Intersection_color_comboBox.currentText() )
+
+
+    def reset_srcPt_marker(self):
+
+        if self.marker is not None:
+            self.canvas.scene().removeItem( self.marker )
+                    
+
+    def reset_inters_markers(self):
+
+        if self.inters_mrk_list is not None and len(self.inters_mrk_list)>0:
+            for mrk in self.inters_mrk_list:
+                self.canvas.scene().removeItem( mrk )          
+        
+        
+    def reset_all_markers(self):
+        
+        self.reset_srcPt_marker()
+        self.reset_inters_markers()
+      
+               
     def calculate_intersection( self ):
         """
         Calculate intersection points.
         """                
-                      
-        curr_x = self.Pt_spinBox_x.value()
-        curr_y = self.Pt_spinBox_y.value()
-        curr_z = self.Pt_spinBox_z.value()
-                
-        self.srcPt = Point(curr_x, curr_y, curr_z)
+
+        self.reset_inters_markers()
+                    
+        sourcePoint = spatial.Point(self.Pt_x_spinBox.value(), 
+                           self.Pt_y_spinBox.value(), 
+                           self.Pt_z_spinBox.value())
 
         srcDipDir = self.DDirection_spinBox.value()
         srcDipAngle = self.DAngle_verticalSlider.value()
 
-        self.srcPlaneAttitude = StructPlane( srcDipDir, srcDipAngle )
+        self.srcPlaneAttitude = spatial.StructPlane( srcDipDir, srcDipAngle )
 
         # intersection arrays
-        self.spdata.set_intersections_default()
         
-        intersection_results = self.spdata.dem.intersection_with_surface('plane', self.srcPt, self.srcPlaneAttitude )
+        self.inters = Intersections()
         
-        self.spdata.inters.xcoords_x = intersection_results[0]
-        self.spdata.inters.xcoords_y = intersection_results[1]
-        self.spdata.inters.ycoords_x = intersection_results[2]
-        self.spdata.inters.ycoords_y = intersection_results[3]
+        intersection_results = self.dem.intersection_with_surface('plane', 
+                                                                         sourcePoint,  
+                                                                         self.srcPlaneAttitude )
+        
+        self.inters.xcoords_x = intersection_results[0]
+        self.inters.xcoords_y = intersection_results[1]
+        self.inters.ycoords_x = intersection_results[2]
+        self.inters.ycoords_y = intersection_results[3]
             
-        self.spdata.inters.parameters = Intersection_Parameters(self.spdata.dem._sourcename, self.srcPt, self.srcPlaneAttitude)
+        self.inters.parameters = Intersection_Parameters(self.dem._sourcename, sourcePoint, self.srcPlaneAttitude)
+
+
+        self.intersections_x = list( self.inters.xcoords_x[ np.logical_not(np.isnan(self.inters.xcoords_x)) ] ) + \
+                          list( self.inters.ycoords_x[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )
+    
+        self.intersections_y = list( self.inters.xcoords_y[ np.logical_not(np.isnan(self.inters.xcoords_x)) ] ) + \
+                          list( self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )
+                          
+        intersection_data = dict( x=self.intersections_x, y=self.intersections_y ) 
+         
+        intersection_plane = dict( dipdir=self.inters.parameters._srcPlaneAttitude._dipdir, 
+                                   dipangle= self.inters.parameters._srcPlaneAttitude._dipangle )
         
+        intersection_point = dict( x=self.inters.parameters._srcPt.x, 
+                                   y=self.inters.parameters._srcPt.y, 
+                                   z=self.inters.parameters._srcPt.z )
+        
+        intersection_color = self.intersection_color
+        
+        self.intersections = dict(data=intersection_data,
+                                  plane=intersection_plane,
+                                  point=intersection_point,
+                                  color=intersection_color)
+                
         self.valid_intersections = True
 
-        self.redraw_map( )
-
+        self.plot_intersections()
         
+        
+    def plot_intersections(self):
+        
+        self.inters_mrk_list = []
+        for x, y in zip( self.intersections_x, self.intersections_y ): 
+            marker = QgsVertexMarker( self.canvas )
+            marker.setIconType( 1 )
+            marker.setColor( QColor(0, 0, 255 ) )
+            marker.setIconSize( 8 )
+            marker.setPenWidth( 1 )
+            marker.setCenter( QgsPoint( x, y) )
+            self.inters_mrk_list.append(marker)
+            
+        self.canvas.refresh()
+
+
     def selectOutputVectorFile( self ):
             
-        output_filename = QFileDialog.getSaveFileName( 
-                                                              self, 
-                                                              self.tr( "Save shapefile" ), 
-                                                              "*.shp", 
-                                                              "shp (*.shp *.SHP)" )
-        
+        output_filename = QFileDialog.getSaveFileName(self, 
+                                                      self.tr( "Save shapefile" ), 
+                                                      "*.shp", 
+                                                      "shp (*.shp *.SHP)" )        
         if output_filename.isEmpty():
             return
         self.Output_FileName_Input.setText( output_filename ) 
-            
                 
         
-    def write_results(self):
+    def write_results( self ):
         """
         Write intersection results in the output shapefile.
         """
  
         # check for result existence        
-        if self.spdata.inters.xcoords_x == [] and \
-           self.spdata.inters.xcoords_y == [] and \
-           self.spdata.inters.ycoords_x == [] and \
-           self.spdata.inters.ycoords_y == [] :
+        if self.inters.xcoords_x == [] and \
+           self.inters.xcoords_y == [] and \
+           self.inters.ycoords_x == [] and \
+           self.inters.ycoords_y == [] :
             QMessageBox.critical(self, "Save results", "No results available") 
             return
 
@@ -722,7 +581,7 @@ class qgSurfDialog( QDialog ):
             return
                            
         # set output type
-        if self.Save_points_radioButton.isChecked():
+        if self.Save_points_rButt.isChecked():
             self.result_geometry = 'points'
         else:
             self.result_geometry = 'lines'        
@@ -744,9 +603,9 @@ class qgSurfDialog( QDialog ):
             return
         
         # set analysis parameters
-        self.srcPt = self.spdata.inters.parameters._srcPt
-        self.srcPlaneAttitude = self.spdata.inters.parameters._srcPlaneAttitude
-        self.plane_z = plane_from_geo( self.srcPt, self.srcPlaneAttitude )  
+        sourcePoint = self.inters.parameters._srcPt
+        self.srcPlaneAttitude = self.inters.parameters._srcPlaneAttitude
+        self.plane_z = spatial.plane_from_geo( sourcePoint, self.srcPlaneAttitude )  
               
         # add fields to the output shapefile  
         id_fieldDef = ogr.FieldDefn('id', ogr.OFTInteger)
@@ -785,25 +644,24 @@ class qgSurfDialog( QDialog ):
         # add theme to QGis project
         if self.Load_output_checkBox.isChecked():
             try:
-                intersection_layer = QgsCore.QgsVectorLayer(self.output_filename, QFileInfo(self.output_filename).baseName(), "ogr")                    
-                QgsCore.QgsMapLayerRegistry.instance().addMapLayer( intersection_layer )
+                intersection_layer = QgsVectorLayer(self.output_filename, QFileInfo(self.output_filename).baseName(), "ogr")                    
+                QgsMapLayerRegistry.instance().addMapLayer( intersection_layer )
             except:            
                 QMessageBox.critical( self, "Result", "Unable to load layer in project" )
                 return
-        
                          
         
-    def write_intersections_as_points(self):
+    def write_intersections_as_points( self ):
         """
         Write intersection results in the output shapefile.
         """
                                 
-        x_filtered_coord_x = self.spdata.inters.xcoords_x[ np.logical_not(np.isnan(self.spdata.inters.xcoords_x)) ] 
-        x_filtered_coord_y = self.spdata.inters.xcoords_y[ np.logical_not(np.isnan(self.spdata.inters.xcoords_x)) ]            
+        x_filtered_coord_x = self.inters.xcoords_x[ np.logical_not(np.isnan(self.inters.xcoords_x)) ] 
+        x_filtered_coord_y = self.inters.xcoords_y[ np.logical_not(np.isnan(self.inters.xcoords_x)) ]            
         x_filtered_coord_z = self.plane_z( x_filtered_coord_x, x_filtered_coord_y )
 
-        y_filtered_coord_x = self.spdata.inters.ycoords_x[ np.logical_not(np.isnan(self.spdata.inters.ycoords_y)) ] 
-        y_filtered_coord_y = self.spdata.inters.ycoords_y[ np.logical_not(np.isnan(self.spdata.inters.ycoords_y)) ]             
+        y_filtered_coord_x = self.inters.ycoords_x[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] 
+        y_filtered_coord_y = self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ]             
         y_filtered_coord_z = self.plane_z( y_filtered_coord_x, y_filtered_coord_y )        
         
         intersections_x = list( x_filtered_coord_x ) + list( y_filtered_coord_x )    
@@ -828,9 +686,9 @@ class qgSurfDialog( QDialog ):
             curr_Pt_shape.SetField('y', curr_Pt[1]) 
             curr_Pt_shape.SetField('z', curr_Pt[2]) 
 
-            curr_Pt_shape.SetField('srcPt_x', self.srcPt.x)
-            curr_Pt_shape.SetField('srcPt_y', self.srcPt.y) 
-            curr_Pt_shape.SetField('srcPt_z', self.srcPt.z)
+            curr_Pt_shape.SetField('srcPt_x', self.intersections['point']['x'])
+            curr_Pt_shape.SetField('srcPt_y', self.intersections['point']['y']) 
+            curr_Pt_shape.SetField('srcPt_z', self.intersections['point']['z'])
 
             curr_Pt_shape.SetField('dip_dir', self.srcPlaneAttitude._dipdir)
             curr_Pt_shape.SetField('dip_ang', self.srcPlaneAttitude._dipangle)             
@@ -844,52 +702,52 @@ class qgSurfDialog( QDialog ):
                             
         # destroy output geometry
         self.out_shape.Destroy() 
-        
 
-    def write_intersections_as_lines(self):
+
+    def write_intersections_as_lines( self ):
         """
         Write intersection results in a line shapefile.
         """
                 
         # create dictionary of cell with intersection points        
-        self.spdata.inters.links = self.spdata.get_intersections()
-        self.spdata.inters.neighbours = self.spdata.set_neighbours( ) 
-        self.spdata.define_paths( )  
+        self.inters.links = self.inters.get_intersections()
+        self.inters.neighbours = self.inters.set_neighbours( ) 
+        self.inters.define_paths( )  
         
         # networks of connected intersections
-        self.spdata.inters.networks = self.spdata.define_networks()   
+        self.inters.networks = self.inters.define_networks()   
         
-        for curr_path_id, curr_path_points in self.spdata.inters.networks.iteritems():
+        for curr_path_id, curr_path_points in self.inters.networks.iteritems():
                                     
-            line = ogr.Geometry(ogr.wkbLineString)
+            line = ogr.Geometry( ogr.wkbLineString )
             
             for curr_point_id in curr_path_points:  
                           
-                curr_intersection = self.spdata.inters.links[curr_point_id-1]
+                curr_intersection = self.inters.links[ curr_point_id-1 ]
                            
                 i, j, direct = curr_intersection['i'], curr_intersection['j'], curr_intersection['pi_dir']
                 
-                if direct == 'x': x, y = self.spdata.inters.xcoords_x[i,j], self.spdata.inters.xcoords_y[i,j]
-                if direct == 'y': x, y = self.spdata.inters.ycoords_x[i,j], self.spdata.inters.ycoords_y[i,j] 
+                if direct == 'x': x, y = self.inters.xcoords_x[ i, j ], self.inters.xcoords_y[ i, j ]
+                if direct == 'y': x, y = self.inters.ycoords_x[ i, j ], self.inters.ycoords_y[ i, j ] 
                                        
-                z = self.plane_z(x,y)
+                z = self.plane_z( x, y )
  
-                line.AddPoint(x,y,z)            
+                line.AddPoint( x, y, z )            
                                        
             # create a new feature
-            line_shape = ogr.Feature(self.outshape_featdef)
-            line_shape.SetGeometry(line)   
+            line_shape = ogr.Feature( self.outshape_featdef )
+            line_shape.SetGeometry( line )   
 
-            line_shape.SetField('id', curr_path_id)
-            line_shape.SetField('srcPt_x', self.srcPt.x)
-            line_shape.SetField('srcPt_y', self.srcPt.y) 
-            line_shape.SetField('srcPt_z', self.srcPt.z)
+            line_shape.SetField( 'id', curr_path_id )
+            line_shape.SetField( 'srcPt_x', self.intersections['point']['x'] )
+            line_shape.SetField( 'srcPt_y', self.intersections['point']['y'] ) 
+            line_shape.SetField( 'srcPt_z', self.intersections['point']['z'] )
     
-            line_shape.SetField('dip_dir', self.srcPlaneAttitude._dipdir)
-            line_shape.SetField('dip_ang', self.srcPlaneAttitude._dipangle)             
+            line_shape.SetField( 'dip_dir', self.srcPlaneAttitude._dipdir )
+            line_shape.SetField( 'dip_ang', self.srcPlaneAttitude._dipangle )             
     
             # add the feature to the output layer
-            self.out_layer.CreateFeature(line_shape)            
+            self.out_layer.CreateFeature( line_shape )            
             
             # destroy no longer used objects
             line.Destroy()
@@ -897,23 +755,12 @@ class qgSurfDialog( QDialog ):
                             
         # destroy output geometry
         self.out_shape.Destroy() 
-
-
-         
-class AnchoredText(AnchoredOffsetbox):
-    """
-    Creation of an info box in the plot
+        
     
-    """
-    def __init__(self, s, loc, pad=0.4, borderpad=0.5, prop=None, frameon=True):
-
-        self.txt = TextArea( s, minimumdescent=False )
-
-        super(AnchoredText, self).__init__(loc, pad=pad, borderpad=borderpad,
-                                           child=self.txt,
-                                           prop=prop,
-                                           frameon=frameon)
+    def onClose(self):
+             
+        self.reset_all_markers()
 
 
-            
+     
  

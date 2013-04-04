@@ -5,11 +5,13 @@
  DEM - planes intersections
                               -------------------
         begin                : 2011-12-21
-        version              : 0.1.3 for QuantumGIS - 2012-10-7
-        copyright            : (C) 2011-2012 by Mauro Alberti - www.malg.eu
+        version              : 0.2.0 for QuantumGIS 
+        copyright            : (C) 2011-2013 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         
  ***************************************************************************/
+
+# licensed under the terms of GNU GPL 3
 
 /***************************************************************************
  *                                                                         *
@@ -22,8 +24,6 @@
 """
 
 
-from qgSurf_gui import qgSurf_gui
-
 
 def name():
     return "qgSurf"
@@ -32,7 +32,10 @@ def description():
     return "Compute intersections between DEM and planes"
 
 def version():
-    return "0.1.3"
+    return "0.2.0"
+
+def authorName():
+    return "Mauro Alberti"
 
 def author():
     return "Mauro Alberti"
@@ -40,15 +43,18 @@ def author():
 def email():
     return "alberti.m65@gmail.com"
 
+def homepage():
+    return "https://bitbucket.org/mauroalberti/qgsurf"
+
 def icon():
-    return "icon.png"
+    return "icons/qgsurf.png"
 
 def qgisMinimumVersion():
     return "1.8"
 
-def classFactory(iface):    
-    # create qgSurf_gui class   
-    return qgSurf_gui(iface)
+def classFactory( iface ):    
+    from qgSurf_gui import qgSurf_gui 
+    return qgSurf_gui( iface )
 
 
 
