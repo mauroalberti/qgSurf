@@ -1,7 +1,7 @@
 [general]
 name=qgSurf
-description=Calculates the intersections between a geological plane and a DEM
-version=version 0.2.0
+description=Calculates geological planes from DEMs and georeferenced points
+version=version 0.2.1
 qgisMinimumVersion=1.8
 author=Mauro Alberti
 email=alberti.m65@gmail.com
@@ -9,15 +9,12 @@ category=Raster
 
 ; start of optional metadata
 changelog=
-    0.2.0 : map display/interaction is now through the QGis map window 
+    0.2.0: map display/interaction is now through the QGis map window
+    0.2.1: calculate best-fit plane orientation given points drawn in the QGis map window
 
 ; tags are in comma separated value format, spaces are allowed
 tags=raster,dem,intersection,structural geology
 
-; these metadata can be empty
-; in a future version of the web application it will
-; be probably possible to create a project on redmine
-; if they are not filled
 homepage=https://bitbucket.org/mauroalberti/qgsurf
 tracker=https://bitbucket.org/mauroalberti/qgsurf/issues
 repository=https://bitbucket.org/mauroalberti/qgsurf

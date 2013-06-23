@@ -5,7 +5,7 @@
  DEM - planes intersections
                               -------------------
         begin                : 2011-12-21
-        version              : 0.2.0 for QuantumGIS 
+        version              : 0.2.1 for QuantumGIS 
         copyright            : (C) 2011-2013 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         
@@ -32,7 +32,7 @@ def description():
     return "Compute intersections between DEM and planes"
 
 def version():
-    return "0.2.0"
+    return "0.2.1"
 
 def authorName():
     return "Mauro Alberti"

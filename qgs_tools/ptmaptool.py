@@ -55,6 +55,7 @@ class PointMapTool( QgsMapTool ):
 		signal = "leftClicked"
 		if event.button() == Qt.RightButton: signal = "rightClicked"						
 		self.emit( SIGNAL( signal ), {'x': event.pos().x(), 'y': event.pos().y()} )
+		
 
 	def canvasDoubleClickEvent( self, event ):
 		

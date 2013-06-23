@@ -7,6 +7,13 @@ class Raster_Parameters_Errors(Exception):
     pass  
 
 
+class Vector_Input_Errors(Exception):
+    """
+    Exception for vector input parameters.
+    """
+    pass  
+
+
 class FunInp_Err(Exception):
     """
     Exception for function input errors.
@@ -20,5 +27,7 @@ class Output_Errors(Exception):
     """
     pass
     
+    
 class ConnectionError:
     pass
+

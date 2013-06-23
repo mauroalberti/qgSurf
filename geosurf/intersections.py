@@ -4,8 +4,10 @@ from __future__  import division
 
 from math import *
 
-from spatial import *
-   
+import numpy as np
+
+#from .spatial import *
+from .errors import ConnectionError  
 
 class Intersection_Parameters(object):
     """
