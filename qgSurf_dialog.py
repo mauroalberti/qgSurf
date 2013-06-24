@@ -320,44 +320,52 @@ class qgSurfDialog( QDialog ):
         
         htmlText = """
         <h3>Help</h3>
-This plugin allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
-to calculate the intersections of the plane with the DEM.
-<h4>Known limitations</h4>
-- This plugin does not handle on-the-fly reprojection. So if you need to use it, make sure that you set the 
-project projection to be the same as that of the DEM
-<br />- Rotation angles for input rasters (DEM) is not supported. Errors could be silent, so please check this detail with QGis or other tools.
-  
-<h4>Known bugs</h4>
-- Very large DEM can originate memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
-<br />- If you try to define source points outside DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM), 
-a message warning can be repeated more that once.
+        
+        See web version at: http://bitbucket.org/mauroalberti/qgsurf/wiki/Help
+
+<br /><br />This plugin allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
+to calculate the intersections of the plane with the DEM. Since this plugin does not 
+handle on-the-fly reprojection, if you have to use it for instance for displaying background images 
+with OpenLayers, make sure that you set the project projection to be the same as that of the DEM.
 
 <h4>Loading of DEM data</h4>
-<br /><b>a)</b> Load in the QGis project the required DEM(s) layers and whatsoever vector or image layers needed for your analysis
-<br /><b>b)</b> Use "Get current raster layers" in qgSurf plugin: this will allow the plugin to know which raster layers are currently loaded
-<br /><b>c)</b> From the "Use DEM" combo box, choose the required DEM and make sure that the QGis project and the DEM have the same projection
+<b>a)</b> Load in the QGis project the required DEM(s) layers and whatsoever vector or image layers needed for your analysis.
+<br /><b>b)</b> Use "Get current raster layers" in qgSurf plugin: this will allow the plugin to know which raster layers are currently loaded.
+<br /><b>c)</b> From the "Use DEM" combo box, choose the required DEM and make sure that the QGis project and the DEM have the same projection.
 
 <h4>Best-fit plane calculation</h4>
 The basis of the algorithm is the application of singular value decomposition to derive the eigenvectors of a set of measures. 
 <br />The best-fit plane processing sequence is:
 <br /><b>d)</b> from the "Best-fit-plane calculation", press "Define points in map": this will allow you to define in the canvas at least three, 
 and possibly more points, whose coordinates will be listed in the plugin widget.
-<br /><b>e)</b> with at least three points defined, you can calculate the best-fit plane by pressing "Calculate best-fit-plane": a message box will report the dip direction and dip angle of the calculated plane
+<br /><b>e)</b> with at least three points defined, you can calculate the best-fit plane by pressing "Calculate best-fit-plane": 
+a message box will report the dip direction and dip angle of the calculated plane.
 <br /><b>f)</b> you can add even more points and again calculate the best-fit plane; otherwise, 
 if you want to start a new analysis on the same DEM, go to <b>e)</b>, or if you want to use another DEM, 
-go to <b>c)</b> if it is already loaded in the project, or load it in the project and then go to <b>b)</b>
+go to <b>c)</b> if it is already loaded in the project, or load it in the project and then go to <b>b)</b>.
  
 <h4>Plane-DEM intersection</h4>
 <b>g)</b> You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section. 
-You can erase it with "Reset source point" or put a new one by simply clicking in the map
+You can erase it with "Reset source point" or put a new one by simply clicking in the map.
 <br /><b>h)</b> In the X, Y and Z spinboxes, you will see the coordinates of the source point. You can modify them within the spinboxes themselves.
 You can also use Z values not fixed to the DEM surfaces.
 <br /><b>i)</b> In the "Geological parameters" section, you can set the dip direction and the dip angle, and then calculate the
 theoretical intersections by pressing "Calculate intersection".
 <br /><b>j)</b> You can change the last intersection color by choosing a color from the "Intersection color" combo box, and delete all the intersections
-with "Cancel intersections"
+with "Cancel intersections".
 <br /><b>k)</b> In the "Output" section, you can save the last intersections as a point or line shapefile, also loading it 
-within the current project
+within the current project.
+
+<h4>Known limitations</h4>
+- This plugin does not handle on-the-fly reprojection. So if you need to use it, make sure that you set the 
+project projection to be the same as that of the DEM.
+<br />- Rotation angles for input rasters (DEM) are not supported. Errors could be silent, so please check this detail with QGis or other tools.
+  
+<h4>Known bugs</h4>
+- Very large DEM can originate memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
+<br />- If you try to define source points outside DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM), 
+a message warning can be repeated more that once.
+
         """
         
         helpQTextBrowser = QTextBrowser( helpWidget )        
