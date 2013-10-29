@@ -2,10 +2,11 @@
 /***************************************************************************
  qgSurf - plugin for Quantum GIS
 
- DEM - planes intersections
+ geological planes operations
+ 
                               -------------------
         begin                : 2011-12-21
-        version              : 0.2.1 for QuantumGIS 
+        version              : 0.2.2 for QuantumGIS 2.0, released 2013-10-23 
         copyright            : (C) 2011-2013 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         
@@ -23,34 +24,6 @@
  ***************************************************************************/
 """
 
-
-
-def name():
-    return "qgSurf"
-
-def description():
-    return "Compute intersections between DEM and planes"
-
-def version():
-    return "0.2.1"
-
-def authorName():
-    return "Mauro Alberti"
-
-def author():
-    return "Mauro Alberti"
-
-def email():
-    return "alberti.m65@gmail.com"
-
-def homepage():
-    return "https://bitbucket.org/mauroalberti/qgsurf"
-
-def icon():
-    return "icons/qgsurf.png"
-
-def qgisMinimumVersion():
-    return "1.8"
 
 def classFactory( iface ):    
     from qgSurf_gui import qgSurf_gui 

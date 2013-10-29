@@ -3,13 +3,16 @@
 
 from __future__  import division
 
-from math import sqrt, asin, atan, atan2, degrees, floor, ceil
+from math import sqrt
+from math import floor, ceil
+from math import sin, cos, tan, radians, asin, atan, atan2, degrees
+
 import numpy as np
 
 import copy
 
-from .struct_geol import Axis
-from .function_utils import array_from_function
+from .utils import array_from_function
+from .algebr_utils import point_solution
 
 
 MINIMUM_SEPARATION_THRESHOLD = 1e-10
@@ -118,18 +121,33 @@ class Point(object):
     z = property( g_z, s_z )
     
   
-    def distance( self, other_pt ):
+    def distance( self, another ):
         """
         Calculate Euclidean distance between two points.
 
-        @param  other_pt:  the Point instance for which the distance should be calculated
-        @type  other_pt:  Point.
+        @param  another:  the Point instance for which the distance should be calculated
+        @type  another:  Point.
         
         @return:  distance between the two points - float.        
         """
-        return sqrt( ( self.x - other_pt.x ) ** 2 + ( self.y - other_pt.y ) ** 2 + ( self.z - other_pt.z ) ** 2 )
+        
+        assert self.z != np.nan
+        assert another.z != np.nan
+        return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 + ( self.z - another.z ) ** 2 )
     
     
+    def hor_distance( self, another ):
+        """
+        Calculate Euclidean horizontal distance between two points.
+
+        @param  another:  the Point instance for which the distance should be calculated
+        @type  another:  Point.
+        
+        @return:  horizontal distance between the two points - float.        
+        """
+        return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 )
+    
+        
     def movedby( self, sx = 0.0 , sy = 0.0 , sz = 0.0 ):
         """
         Create a new point shifted by given amount from the self instance.
@@ -151,6 +169,16 @@ class Point(object):
         return Point( self.x + displacement_vector.x , self.y + displacement_vector.y, self.z + displacement_vector.z )
         
 
+    def to_vector(self, end_pt):
+        
+        dx = end_pt.x - self.x
+        dy = end_pt.y - self.y
+        if self.z == np.nan or end_pt == np.nan: dz = 0.0            
+        else: dz = end_pt.z - self.z 
+        
+        return Vector( dx, dy, dz )        
+        
+        
     def distance_uvector(self, end_pt):
         
         d_x = end_pt.x - self.x
@@ -165,7 +193,13 @@ class Point(object):
             return 0.0, 0.0, Vector( 0.0, 0.0, 0.0 ), Vector( 0.0, 0.0, 0.0 )
         else:
             return length_2d, lenght_3d, Vector( d_x/length_2d, d_y/length_2d, 0.0 ), Vector( d_x/lenght_3d, d_y/lenght_3d, d_z/lenght_3d )
+
+
+    def as_vector( self ):
         
+        return Vector(self.x,
+                      self.y,
+                      self.z )
         
         
 class Point4D( Point ):
@@ -236,11 +270,22 @@ class Vector( Point ):
         return Vector(self.x*scale_factor, 
                       self.y*scale_factor, 
                       self.z*scale_factor)
-  
+
+
+    def to_down_vector(self):
+        
+        if self.z > 0.0:
+            return self.scale(-1.0)
+        else:
+            return self
+        
   
     def to_unit_vector(self):
         
         scale_factor = self.lenght_3d()
+        
+        assert scale_factor is not None
+        assert scale_factor > 1.0e-4
         
         return self.scale( 1.0 / scale_factor )
     
@@ -267,15 +312,286 @@ class Vector( Point ):
         
         unit_vect = self.to_unit_vector()
         
-        plunge = - degrees( asin( unit_vect.z ) ) # upward negative, downward postive
+        plunge = - degrees( asin( unit_vect.z ) ) # upward negative, downward positive
         
         trend = 90.0 - degrees( atan2( unit_vect.y, unit_vect.x ) )
         if trend < 0.0: trend += 360.0
-        if trend > 360.0: trend -= 360.0
+        elif trend > 360.0: trend -= 360.0
+        
+        assert 0.0 <= trend < 360.0
+        assert -90.0 <= plunge <= 90.0
+         
+        return Axis( trend, plunge )
+    
+    
+    def scalar_product( self, another ):
+        
+        return self.x * another.x + self.y * another.y + self.z * another.z
+
+
+    def vectors_cos_angle( self, another ):
+ 
+        try:
+            return self.scalar_product( another ) / ( self.lenght_3d() * another.lenght_3d() )
+        except ZeroDivisionError:
+            return None
+        
+
+    def vector_product( self, another ):
+        
+        x = (self.y*another.z) - (self.z*another.y)
+        y = (self.z*another.x) - (self.x*another.z)
+        z = (self.x*another.y) - (self.y*another.x)
+
+        return Vector( x, y, z )
+
+
+    def by_matrix( self, matrix3x3 ):
+        
+        vx = matrix3x3[0,0]*self.x + matrix3x3[0,1]*self.y + matrix3x3[0,2]*self.z 
+        vy = matrix3x3[1,0]*self.x + matrix3x3[1,1]*self.y + matrix3x3[1,2]*self.z 
+        vz = matrix3x3[2,0]*self.x + matrix3x3[2,1]*self.y + matrix3x3[2,2]*self.z 
+        
+        return Vector( vx, vy, vz )
+        
+
+    def as_point( self ):
+        
+        return Point( self.x, self.y, self.z )
+        
+
+class Axis( object ):
+    """
+    Structural axis,
+    defined by trend and plunge (both in degrees)
+    Trend range: [0.0, 360.0[  clockwise, from 0 (North) 
+    Plunge: [-90.0, 90.0], negative value: upward axis, positive values: downward axis
+    """
+    
+    def __init__(self, srcTrend, srcPlunge ):
+        
+        assert 0.0 <= float( srcTrend ) < 360.0
+        assert -90.0 <= float( srcPlunge ) <= 90.0
+        
+        self._trend = float( srcTrend )
+        self._plunge = float( srcPlunge )        
+        
+
+    def to_versor( self ):
+        
+        north_coord = cos( radians( self._plunge ) ) * cos( radians( self._trend ) )
+        east_coord = cos( radians( self._plunge ) ) * sin( radians( self._trend ) )
+        down_coord = sin( radians( self._plunge ) )
+        
+        return Vector( east_coord, north_coord, -down_coord )
+        
+             
+    def to_down_axis( self ): 
+        
+        trend, plunge = self._trend, self._plunge
+        if plunge < 0.0:
+            trend += 180.0
+            if trend > 360.0: trend -= 360.0
+            plunge = - plunge
         
         return Axis( trend, plunge )
+
+
+    def to_normal_geolplane( self ):
+        
+        down_axis = self.to_down_axis()
+        
+        dipdir = down_axis._trend + 180.0
+        if dipdir >= 360.0: dipdir -= 360.0
+        dipangle = 90.0 - down_axis._plunge
+        
+        return GeolPlane( dipdir, dipangle ) 
+
+
+
+class CartesianPlane(object):
+    """
+    Cartesian plane, expressed by equation:
+    ax + by + cz + d = 0
+
+    """
+
+    def __init__(self, a=None, b=None, c=None, d = 0.0 ):
+
+        self._a = a
+        self._b = b        
+        self._c = c        
+        self._d = d
+                
+
+    def from_points(self, pt1, pt2, pt3):
+        
+        matr_a = np.array([[pt1.y, pt1.z, 1], 
+                           [pt2.y, pt2.z, 1],
+                           [pt3.y, pt3.z, 1] ])
+
+        matr_b = - np.array([[pt1.x, pt1.z, 1], 
+                           [pt2.x, pt2.z, 1],
+                           [pt3.x, pt3.z, 1] ])  
+        
+        matr_c = np.array([[pt1.x, pt1.y, 1], 
+                           [pt2.x, pt2.y, 1],
+                           [pt3.x, pt3.y, 1] ])
+        
+        matr_d = - np.array([[pt1.x, pt1.y, pt1.z], 
+                           [pt2.x, pt2.y, pt2.z],
+                           [pt3.x, pt3.y, pt3.z] ])
+         
+        self._a = np.linalg.det(matr_a)
+        self._b = np.linalg.det(matr_b)        
+        self._c = np.linalg.det(matr_c)        
+        self._d = np.linalg.det(matr_d)
+        
+        return self
+        
+        
+    def to_normal_versor(self):
+        """
+        return the normal versor to the cartesian plane
+        """
+        
+        assert self._a is not None
+        assert self._b is not None        
+        assert self._c is not None
+                
+        return Vector(self._a,self._b,self._c).to_unit_vector()
+        
+        
+    def to_geolplane_and_point(self):
+        """
+        converts a cartesian plane into a geological plane
+        and a point lying in the plane (non-unique solution)
+        """
+
+        geol_plane = self.to_normal_versor().to_axis().to_normal_geolplane()
+               
+        point = Point( point_solution(np.array([[self._a,self._b,self._c]]),
+                                      np.array([-self._d])))
+        
+        return geol_plane, point
+    
+        
+    def intersect(self, another):
+        """
+        return intersection versor and point on intersection (non-unique solution)
+        for two intersecting planes
+        """
+
+        # find the intersection vector 
+        
+        self_plane_normal = self.to_normal_versor()
+        another_plane_normal = another.to_normal_versor()
+    
+        intersection_versor = self_plane_normal.vector_product(another_plane_normal).to_unit_vector()
+
+
+        # find a point lying on the intersection line (this is a non-unique solution)    
+        a = np.array([[self._a,self._b,self._c],[another._a,another._b,another._c]])
+        b = np.array([-self._d,-another._d]) 
+        x, y, z = point_solution( a, b ) 
+              
+        inters_point = Point( x, y, z )
+        
+        return intersection_versor, inters_point
+        
+        
+class GeolPlane(object):
+    """
+    Structural plane, following geological conventions:
+    dip direction and dip angle.
+    
+    """
+    
+    def __init__( self, srcDipDir, srcDipAngle ):
+        """
+        Class constructor
+        
+        @param  srcDipDir:  Dip direction of the plane (0-360�).
+        @type  srcDipDir:  number or string convertible to float.
+        @param  srcDipAngle:  Dip angle of the plane (0-90�).
+        @type  srcDipAngle:  number or string convertible to float.
+           
+        @return:  GeolPlane.
+    
+        """
+        
+        assert 0.0 <= float( srcDipDir ) < 360.0
+        assert 0.0 <= float( srcDipAngle ) <= 90.0
   
-  
+        self._dipdir = float( srcDipDir )
+        self._dipangle = float( srcDipAngle )
+        
+        
+    def to_normal_axis( self ):
+        
+        trend = self._dipdir + 180.0
+        if trend >= 360.0:
+            trend -= 360.0            
+        plunge = 90.0 - self._dipangle
+        
+        return Axis( trend, plunge )
+        
+        
+    def plane_x_coeff( self ):
+        """
+        Calculate the slope of a given plane along the x direction.
+        The plane orientation  is expressed following the geological convention. 
+               
+        @return:  slope - float.    
+        """ 
+        return - sin( radians( self._dipdir ) ) * tan( radians( self._dipangle ) )
+
+
+    def plane_y_coeff( self ):
+        """
+        Calculate the slope of a given plane along the y direction.
+        The plane orientation  is expressed following the geological convention. 
+               
+        @return:  slope - float.     
+        """ 
+        return - cos( radians( self._dipdir ) ) * tan( radians( self._dipangle ) )
+
+       
+    def plane_from_geo( self, or_Pt ):
+        """
+        Closure that embodies the analytical formula for a given, non-vertical plane.
+        This closure is used to calculate the z value from given horizontal coordinates (x, y).
+    
+        @param  or_Pt:  Point instance expressing a location point contained by the plane.
+        @type  or_Pt:  Point.    
+        
+        @return:  lambda (closure) expressing an analytical formula for deriving z given x and y values.    
+        """
+    
+        x0 =  or_Pt.x     
+        y0 =  or_Pt.y
+        z0 =  or_Pt.z
+    
+        # slope of the line parallel to the x axis and contained by the plane
+        a = self.plane_x_coeff(  ) 
+               
+        # slope of the line parallel to the y axis and contained by the plane    
+        b = self.plane_y_coeff(  )
+                        
+        return lambda x, y : a * ( x - x0 )  +  b * ( y - y0 )  +  z0
+ 
+ 
+    def to_cartes_plane(self, point):
+        
+        normal_versor = self.to_normal_axis().to_down_axis().to_versor()
+        
+        a, b, c = normal_versor.x, normal_versor.y, normal_versor.z
+        
+        d = - ( a * point.x + b * point.y + c * point.z )
+        
+        return CartesianPlane( a, b, c, d )
+    
+      
 class ArrCoord(object):
     """
     2D Array coordinates.
@@ -725,7 +1041,7 @@ class Grid(object):
         @param srcPt: point, expressed in geographical coordinates, that the plane must contain.
         @type srcPt: Point.
         @param srcPlaneAttitude: orientation of the surface (currently only planes).
-        @type srcPlaneAttitude: class StructPlane.
+        @type srcPlaneAttitude: class GeolPlane.
         
         @return: tuple of six arrays
         """

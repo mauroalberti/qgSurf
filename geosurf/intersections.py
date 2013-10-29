@@ -6,8 +6,84 @@ from math import *
 
 import numpy as np
 
-#from .spatial import *
+from .spatial import Point, GeolPlane, CartesianPlane, Vector 
 from .errors import ConnectionError  
+
+
+def calculate_point_distance( projected_point, section_init_pt, section_vector ):
+
+    assert projected_point.z != np.nan
+    assert projected_point.z is not None            
+    
+    projected_vector = section_init_pt.to_vector( projected_point )            
+    cos_alpha = section_vector.vectors_cos_angle( projected_vector )
+    
+    return projected_vector.lenght_3d() * cos_alpha
+    
+  
+def map_point_onto_section( structural_pt, structural_plane, structural_pt_id, section_init_pt, section_cartes_plane, section_vector ):
+
+        # transform geological plane attitude into cartesian plane      
+        point_cartes_plane = structural_plane.to_cartes_plane( structural_pt ) 
+        
+        ## intersection between two planes (structural and section plane)
+        ## this intersection gives also the orientation of the 
+        ## segment to plot on the cross-section   
+        
+        intersection_versor, inters_point = section_cartes_plane.intersect( point_cartes_plane )
+    
+        slope_radians = abs( intersection_versor.slope_radians() )
+        scalar_product_for_downward_sense = section_vector.scalar_product( intersection_versor.to_down_vector() )
+        if scalar_product_for_downward_sense > 0.0:
+            intersection_downward_sense = "right"
+        elif scalar_product_for_downward_sense == 0.0:
+            intersection_downward_sense = "vertical"
+        else:
+            intersection_downward_sense = "left"  
+            
+        ## shortest distance between a 3D point and a 3D line
+        ## (both lying in a structural plane)
+        ## i.e., perpendicular projection of a point onto a line (3D)
+        ## gives the position where the segment lies => intersection point
+        
+        structural_vector = inters_point.to_vector( structural_pt )        
+        projection_distance = structural_vector.scalar_product( intersection_versor )        
+        projection_vector = intersection_versor.scale( projection_distance )        
+        projected_point = Point( inters_point.x + projection_vector.x,
+                                 inters_point.y + projection_vector.y,
+                                 inters_point.z + projection_vector.z )
+
+        # horizontal distance between projected structural point and profile start
+        distance = calculate_point_distance( projected_point, section_init_pt, section_vector ) 
+                
+        ## solution for current structural point        
+        return { 'id': structural_pt_id,
+                 'structural_pt': structural_pt,
+                 'structural_plane': structural_plane,                
+                 'slope_radians': slope_radians,
+                 'intersection_downward_sense': intersection_downward_sense,
+                 'projected_point': projected_point,
+                 'horizontal_distance': distance }   
+    
+     
+def project_struct_pt_on_section( structural_data, section_init_pt, section_cartes_plane, section_vector ):
+    """
+    defines:
+        - 2D x-y location in section
+        - plane-plane segment intersection
+    """
+
+    point_projections = []
+    for structural_pt, structural_plane, structural_pt_id in structural_data:        
+        inters_solution = map_point_onto_section(structural_pt,
+                                                 structural_plane,
+                                                 structural_pt_id,
+                                                 section_init_pt,
+                                                 section_cartes_plane,
+                                                 section_vector)
+        point_projections.append( inters_solution )
+    return point_projections
+
 
 class Intersection_Parameters(object):
     """

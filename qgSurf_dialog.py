@@ -19,7 +19,7 @@ except:
 
 from geosurf.geoio import read_dem
 from geosurf.spatial import Point, Vector
-from geosurf.struct_geol import StructPlane
+from geosurf.spatial import GeolPlane
 from geosurf.intersections import Intersection_Parameters, Intersections
 from geosurf.svd import xyz_svd 
 
@@ -31,15 +31,14 @@ class qgSurfDialog( QDialog ):
     """
 
     line_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
+    dem_default_text = '--  required  --'
 
 
     def __init__( self, canvas, plugin ):
 
         super( qgSurfDialog, self ).__init__() 
 
-        QObject.connect( self, 
-                         SIGNAL( " rejected ( ) " ), 
-                         self.onPluginClose )
+        self.rejected.connect( self.onPluginClose )
         
         self.canvas = canvas
         self.plugin = plugin   
@@ -50,174 +49,44 @@ class qgSurfDialog( QDialog ):
         self.setWindowFlags( Qt.WindowStaysOnTopHint )
 
 
-    def set_bestfitplane_points(self):
-
-        try:
-            QObject.disconnect( self.bestfitplane_PointMapTool, 
-                 SIGNAL("leftClicked"), 
-                 self.set_bestfitplane_points_from_map )
-        except:
-            pass
-                    
-        self.bestfitplane_reset_point_values()  
-              
-        self.bestfitplane_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
-        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
-        QObject.connect( self.bestfitplane_PointMapTool, 
-                         SIGNAL("leftClicked"), 
-                         self.set_bestfitplane_points_from_map )
-        self.bestfitplane_PointMapTool.setCursor( Qt.CrossCursor )        
-        self.canvas.setMapTool( self.bestfitplane_PointMapTool )
-
-                
-    def set_intersection_point(self):
-        
-        try:
-            QObject.disconnect( self.intersection_PointMapTool, 
-                             SIGNAL("leftClicked"), 
-                             self.update_intersection_point_pos )
-        except:
-            pass            
-                
-        self.intersection_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
-        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
-        QObject.connect( self.intersection_PointMapTool, 
-                         SIGNAL("leftClicked"), 
-                         self.update_intersection_point_pos )
-        self.intersection_PointMapTool.setCursor( Qt.CrossCursor )
-                
-        self.canvas.setMapTool( self.intersection_PointMapTool )
-
-
-    def remove_markers_from_canvas ( self, marker_list ):
-        
-        if marker_list is not None and len( marker_list ) > 0:
-            for mrk in marker_list:
-                self.canvas.scene().removeItem( mrk )         
-
-
-    def bestfitplane_reset_all(self):
-        
-        self.bestfitplane_reset_point_values()        
-        self.bestfitplane_disable_tools()
-
-
-    def bestfitplane_reset_point_values(self):
-
-        self.bestfitplane_reset_point_inputs()  
-        self.bestfitplane_reset_point_markers()
-
-
-    def bestfitplane_reset_point_inputs( self ):
-
-        self.bestfitplane_src_points_ListWdgt.clear()
-        self.bestfitplane_points = []  
-        
-        
-    def bestfitplane_reset_point_markers( self ):
-
-        self.remove_markers_from_canvas( self.bestfitplane_point_markers ) 
-        self.bestfitplane_point_markers = []          
-
-
-    def bestfitplane_disable_tools( self ):
-
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
-        self.bestfitplane_calculate_pButton.setEnabled( False )
-        """
-        self.bestfitplane_saveresults_pButton.setEnabled( False )  
-        """ 
-        try:
-            QObject.disconnect( self.bestfitplane_PointMapTool, 
-                                SIGNAL("leftClicked"), 
-                                self.set_bestfitplane_points_from_map )
-        except:
-            pass
-        try:
-            self.disable_MapTool( self.bestfitplane_PointMapTool )
-        except:
-            pass         
-        
-                
-    def intersection_reset_all( self ):
-        
-        self.intersection_reset_init_values()
-        self.intersection_reset_input()
-        self.intersection_reset_all_markers()
-        
-        
-    def intersection_reset_init_values(self):
+    def intersection_reset_values(self):
 
         self.current_z_value = None
         self.intersection_z_from_dem = False
-        self.intersections = False
+
+        self.intersection_reset_srcpt()
+        self.intersection_reset_results()
+        
+ 
+    def intersection_reset_srcpt(self):        
+
         self.intersection_srcpt_x = None
         self.intersection_srcpt_y = None
-        self.intersections_x = None
-        self.intersections_y = None
         
-
-    def intersection_reset_input(self):
-
-        self.intersection_disable_tools()
-        self.intersection_reset_srcpoint_SpinBoxes()        
-        
-
-    def intersection_disable_tools(self):
-        
-        self.intersection_definepoint_pButton.setEnabled( False )
-        self.intersection_resetsrcpt_pButton.setEnabled( False )
-        try:
-            QObject.disconnect( self.intersection_PointMapTool, 
-                             SIGNAL("leftClicked"), 
-                             self.update_intersection_point_pos )
-        except:
-            pass
-        try:
-            self.disable_MapTool( self.intersection_PointMapTool )
-        except:
-            pass                
+        self.intersection_sourcepoint_marker = None
                 
-    def intersection_reset_all_markers(self):       
         
-        self.remove_markers_from_canvas( self.intersection_markers_list )
-        self.intersection_reset_srcpoint_marker()
-          
-        
-    def intersection_reset_inters_markers(self):
-        
-        self.remove_markers_from_canvas( self.intersection_markers_list )
+    def intersection_reset_results(self):
 
-
-    def intersection_reset_srcpoint_marker(self):
-        
-        if self.intersection_sourcepoint_marker is not None:
-            self.canvas.scene().removeItem( self.intersection_sourcepoint_marker )
-
-              
+        self.intersections_x = []
+        self.intersections_y = []
+        self.intersections_xprt = {}        
+        self.inters = None
+       
+            
     def initialize_parameters(self):
 
-        self.intersection_reset_init_values()        
-        
-        self.dem_default_text = '--  required  --'                    
+        self.intersection_reset_values()        
+                   
         self.previousTool = None        
-        self.source_dem = self.input_points = None
+        self.source_dem = None
+        self.input_points = None
         self.bestfitplane_point_markers = []
         self.intersection_PointMapTool = None
-        self.intersection_sourcepoint_marker = None 
+         
         self.intersection_markers_list = []
 
-  
-    def get_layers_from_qgis(self):        
-
-        curr_map_layers = QgsMapLayerRegistry.instance().mapLayers()
-        mapLayers = zip(unicode(curr_map_layers.keys()), curr_map_layers.values())       
-        rasterLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.RasterLayer, mapLayers )
-        vectorLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.VectorLayer, mapLayers )
-        pointvectLayers = filter( lambda layer: layer[1].geometryType() == QGis.Point, vectorLayers )
-        return rasterLayers, pointvectLayers
-             
-
+        
     def setup_commandwin_gui( self ):
 
         dialog_layout = QVBoxLayout()
@@ -233,7 +102,7 @@ class qgSurfDialog( QDialog ):
         dialog_layout.addWidget( main_widget )                                     
         self.setLayout( dialog_layout )                    
         self.adjustSize()                       
-        self.setWindowTitle( 'qgSurf' )   
+        self.setWindowTitle( 'qgSurf' )        
 
 
     def setup_processing_tab( self ):
@@ -241,8 +110,7 @@ class qgSurfDialog( QDialog ):
         processingWidget = QWidget()  
         processingLayout = QVBoxLayout( )
         
-        processingLayout.addWidget( self.setup_source_dem() ) 
-        
+        processingLayout.addWidget( self.setup_source_dem() )         
         processingLayout.addWidget( self.setup_processing_subtabs() )
                                        
         processingWidget.setLayout(processingLayout)  
@@ -258,21 +126,14 @@ class qgSurfDialog( QDialog ):
         sourcedemLayout.addWidget(QLabel( "Source DEM" ), 0, 0, 1, 3)
         
         self.raster_refreshlayers_pButton = QPushButton( "Get current raster layers" )
-        QObject.connect( self.raster_refreshlayers_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.refresh_raster_layer_list ) 
+        self.raster_refreshlayers_pButton.clicked[bool].connect( self.refresh_raster_layer_list ) 
         self.raster_refreshlayers_pButton.setEnabled( True )       
         sourcedemLayout.addWidget( self.raster_refreshlayers_pButton, 1, 0, 1, 3 )
                 
         sourcedemLayout.addWidget(QLabel( "Use DEM" ), 2, 0, 1, 1)        
         self.dem_comboBox = QComboBox()
         self.dem_comboBox.addItem(self.dem_default_text)
-        
-        """""
-        QObject.connect( self.dem_comboBox, 
-                         SIGNAL( " currentIndexChanged (int) " ), 
-                         self.get_dem )
-        """""
+
         sourcedemLayout.addWidget(self.dem_comboBox, 2, 1, 1, 2)
         
         sourcedemWidget.setLayout( sourcedemLayout )
@@ -321,7 +182,7 @@ class qgSurfDialog( QDialog ):
         htmlText = """
         <h3>Help</h3>
         
-        See web version at: http://bitbucket.org/mauroalberti/qgsurf/wiki/Help
+        See web version at: https://bitbucket.org/mauroalberti/qgsurf/wiki/Help
 
 <br /><br />This plugin allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
 to calculate the intersections of the plane with the DEM. Since this plugin does not 
@@ -382,7 +243,7 @@ a message warning can be repeated more that once.
         aboutLayout = QVBoxLayout( )
         
         htmlText = """
-        <h3>qgSurf release 0.2.1 (2013-06-23)</h3>
+        <h3>qgSurf release 0.2.3 (2013-10-25)</h3>
         Created by M. Alberti (www.malg.eu).
         <br /><br />Plugin for the processing geological planes and topography.  
         <br /><br />Licensed under the terms of GNU GPL 3.
@@ -400,58 +261,39 @@ a message warning can be repeated more that once.
         
         inputWidget = QWidget()  
         inputLayout = QGridLayout( )
-                
-        #inputLayout.addWidget( QLabel( "Source point" ), 0, 0, 1, 1) 
         
         self.intersection_definepoint_pButton = QPushButton( "Set source point in map" )
-        QObject.connect( self.intersection_definepoint_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.set_intersection_point ) 
-        #self.intersection_definepoint_pButton.setEnabled( False )       
+        self.intersection_definepoint_pButton.clicked[bool].connect( self.set_intersection_point )        
         inputLayout.addWidget( self.intersection_definepoint_pButton, 0, 0, 1, 3 )        
 
         self.intersection_resetsrcpt_pButton = QPushButton( "Reset source point" )
-        QObject.connect( self.intersection_resetsrcpt_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.intersection_reset_src_point ) 
-        #self.intersection_resetsrcpt_pButton.setEnabled( False )       
+        self.intersection_resetsrcpt_pButton.clicked[bool].connect( self.intersection_reset_src_point )      
         inputLayout.addWidget( self.intersection_resetsrcpt_pButton, 1, 0, 1, 3 )        
-
-         
-        #inputLayout.setRowStretch ( 0, 4 )
                       
         inputLayout.addWidget( QLabel("X"), 2, 0, 1, 1 )
         self.Pt_x_spinBox = QSpinBox()
         self.Pt_x_spinBox.setRange(-1000000000, 1000000000)
         self.Pt_x_spinBox.setSingleStep(50)
-        QObject.connect( self.Pt_x_spinBox, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_intersection_point_pos )
+        self.Pt_x_spinBox. valueChanged[int].connect( self.update_intersection_point_pos )
         inputLayout.addWidget( self.Pt_x_spinBox, 2, 1, 1, 2 )  
               
         inputLayout.addWidget( QLabel("Y"), 3, 0, 1, 1 )
         self.Pt_y_spinBox = QSpinBox()
         self.Pt_y_spinBox.setRange(-1000000000, 1000000000)
         self.Pt_y_spinBox.setSingleStep(50)
-        QObject.connect( self.Pt_y_spinBox, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_intersection_point_pos )
+        self.Pt_y_spinBox.valueChanged[int].connect( self.update_intersection_point_pos )
         inputLayout.addWidget( self.Pt_y_spinBox, 3, 1, 1, 2 ) 
                       
         inputLayout.addWidget( QLabel("Z"), 4, 0, 1, 1 )
         self.Pt_z_spinBox = QSpinBox()
         self.Pt_z_spinBox.setRange(-10000000, 10000000)
         self.Pt_z_spinBox.setSingleStep(5)
-        QObject.connect( self.Pt_z_spinBox, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.check_z_congruence_with_dem )
+        self.Pt_z_spinBox.valueChanged[int].connect( self.check_z_congruence_with_dem )
         inputLayout.addWidget( self.Pt_z_spinBox, 4, 1, 1, 2 ) 
                
         self.fixz2dem_checkBox = QCheckBox("fix z value to DEM")
         self.fixz2dem_checkBox.setChecked(True)
-        QObject.connect( self.fixz2dem_checkBox, 
-                         SIGNAL( " stateChanged (int) " ), 
-                         self.intersection_set_z_from_dem )
+        self.fixz2dem_checkBox. stateChanged[int].connect( self.intersection_set_z_from_dem )
         inputLayout.addWidget( self.fixz2dem_checkBox, 5, 0, 1, 3 )        
         
         self.intersection_reset_input()
@@ -471,14 +313,13 @@ a message warning can be repeated more that once.
 
 
     def intersection_reset_src_point( self ):
-                    
-        self.intersection_reset_init_values()
         
         self.intersection_resetsrcpt_pButton.setEnabled( False )
-        self.intersection_reset_srcpoint_SpinBoxes()  
+        self.intersection_reset_srcpoint_SpinBoxes()
                            
-        self.intersection_reset_all_markers()
-                            
+        self.intersection_reset_markers()
+        self.intersection_reset_values() 
+                                   
                     
     def setup_geologicdata_sect( self ):
 
@@ -490,7 +331,7 @@ a message warning can be repeated more that once.
         planeorientationLayout.addWidget( dip_dir_label, 0, 0, 1, 2 )
 
         dip_ang_label = QLabel("Dip angle")
-        dip_ang_label.setAlignment ( Qt.AlignCenter )       
+        dip_ang_label.setAlignment( Qt.AlignCenter )       
         planeorientationLayout.addWidget( dip_ang_label, 0, 2, 1, 1 )
         
         self.DDirection_dial = QDial()
@@ -503,9 +344,7 @@ a message warning can be repeated more that once.
         self.DDirection_dial.setWrapping(True)
         self.DDirection_dial.setNotchTarget(30.0)
         self.DDirection_dial.setNotchesVisible(True)   
-        QObject.connect( self.DDirection_dial, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_dipdir_spinbox )    
+        self.DDirection_dial.valueChanged[int].connect( self.update_dipdir_spinbox )    
         planeorientationLayout.addWidget( self.DDirection_dial, 1, 0, 1, 2 )        
                 
         self.DAngle_verticalSlider = QSlider()
@@ -515,32 +354,24 @@ a message warning can be repeated more that once.
         self.DAngle_verticalSlider.setInvertedAppearance(True)
         self.DAngle_verticalSlider.setTickPosition(QSlider.TicksBelow)
         self.DAngle_verticalSlider.setTickInterval(15)
-        QObject.connect( self.DAngle_verticalSlider, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_dipang_spinbox )
+        self.DAngle_verticalSlider.valueChanged[int].connect( self.update_dipang_spinbox )
         planeorientationLayout.addWidget( self.DAngle_verticalSlider, 1, 2, 1, 1 )
 
         self.DDirection_spinBox = QSpinBox()
         self.DDirection_spinBox.setRange(0,360)
         self.DDirection_spinBox.setSingleStep(1)
-        QObject.connect( self.DDirection_spinBox, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_dipdir_slider )
+        self.DDirection_spinBox.valueChanged[int].connect( self.update_dipdir_slider )
         planeorientationLayout.addWidget( self.DDirection_spinBox, 2, 0, 1, 2 )        
          
         self.DAngle_spinBox = QSpinBox()
         self.DAngle_spinBox.setRange(0,90)
         self.DAngle_spinBox.setSingleStep(1)
         self.DAngle_spinBox.setProperty("value", 45) 
-        QObject.connect( self.DAngle_spinBox, 
-                         SIGNAL( " valueChanged (int) " ), 
-                         self.update_dipang_slider )
+        self.DAngle_spinBox.valueChanged[int].connect( self.update_dipang_slider )
         planeorientationLayout.addWidget( self.DAngle_spinBox, 2, 2, 1, 1 )
  
         self.Intersection_calculate_pushButton = QPushButton( "Calculate intersection" )
-        QObject.connect( self.Intersection_calculate_pushButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.calculate_intersection )
+        self.Intersection_calculate_pushButton.clicked[bool].connect( self.calculate_intersection )
         planeorientationLayout.addWidget( self.Intersection_calculate_pushButton, 3, 0, 1, 3 )
         
         planeorientationLayout.addWidget( QLabel("Intersection color"), 4, 0, 1, 1 )
@@ -557,16 +388,12 @@ a message warning can be repeated more that once.
                                                           "darkblue",
                                                           "gray"] )
 
-        QObject.connect( self.Intersection_color_comboBox, 
-                         SIGNAL( " currentIndexChanged (int) " ), 
-                         self.plot_intersections )
+        self.Intersection_color_comboBox.currentIndexChanged[int].connect( self.plot_intersections )
                                                                   
         planeorientationLayout.addWidget( self.Intersection_color_comboBox, 4, 1, 1, 2 )                                                             
          
         self.Intersection_cancel_pushButton = QPushButton( "Cancel intersections" )
-        QObject.connect( self.Intersection_cancel_pushButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.intersection_reset_inters_markers )
+        self.Intersection_cancel_pushButton.clicked.connect( self.reset_intersections )
         planeorientationLayout.addWidget( self.Intersection_cancel_pushButton, 5, 0, 1, 3 )  
                                       
         planeorientationWidget.setLayout(planeorientationLayout)              
@@ -580,18 +407,14 @@ a message warning can be repeated more that once.
         outputLayout = QGridLayout( )
                
         self.Save_pushButton = QPushButton("Save last intersections")
-        QObject.connect( self.Save_pushButton, 
-                         SIGNAL( " clicked() " ), 
-                         self.write_results )
+        self.Save_pushButton.clicked.connect( self.write_results )
         outputLayout.addWidget( self.Save_pushButton, 0, 0, 1, 2 )
         
         self.Output_FileName_Input = QLineEdit()
         outputLayout.addWidget( self.Output_FileName_Input, 1, 0, 1, 1 )
 
         self.Output_Browse = QPushButton(".....")
-        QObject.connect( self.Output_Browse, 
-                         SIGNAL( "clicked()" ), 
-                         self.selectOutputVectorFile )
+        self.Output_Browse.clicked.connect( self.selectOutputVectorFile )
         outputLayout.addWidget( self.Output_Browse, 1, 1, 1, 1 )        
 
         saveGroup = QButtonGroup( outputWidget )
@@ -620,9 +443,7 @@ a message warning can be repeated more that once.
 
         planecalcLayout.addWidget(QLabel( "Source points" ), 2, 0, 1, 2)
         self.bestfitplane_definepoints_pButton = QPushButton( "Define points in map" )
-        QObject.connect( self.bestfitplane_definepoints_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.set_bestfitplane_points )
+        self.bestfitplane_definepoints_pButton.clicked.connect( self.set_bestfitplane_points )
         self.bestfitplane_definepoints_pButton.setEnabled( False )
         planecalcLayout.addWidget( self.bestfitplane_definepoints_pButton, 3, 0, 1, 2 )
         
@@ -630,42 +451,172 @@ a message warning can be repeated more that once.
         planecalcLayout.addWidget( self.bestfitplane_src_points_ListWdgt, 4, 0, 1, 2 )
         
         self.bestfitplane_calculate_pButton = QPushButton( "Calculate best-fit-plane" )
-        QObject.connect( self.bestfitplane_calculate_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.calculate_bestfitplane )
+        self.bestfitplane_calculate_pButton.clicked.connect( self.calculate_bestfitplane )
         self.bestfitplane_calculate_pButton.setEnabled( False )
         planecalcLayout.addWidget( self.bestfitplane_calculate_pButton, 5, 0, 1, 2 )               
-
-        """
-        self.bestfitplane_saveresults_pButton = QPushButton( "Save results" )
-        QObject.connect( self.bestfitplane_saveresults_pButton, 
-                         SIGNAL( " clicked( bool ) " ), 
-                         self.save_bestfitplane_results )
-        self.bestfitplane_saveresults_pButton.setEnabled( False )
-        planecalcLayout.addWidget( self.bestfitplane_saveresults_pButton, 6, 0, 1, 2 )               
-        """
         
         planecalcWidget.setLayout(planecalcLayout)
         
         return planecalcWidget            
 
 
+    def set_bestfitplane_points(self):
+       
+        try:
+            self.bestfitplane_PointMapTool.canvasClicked.disconnect( self.set_bestfitplane_points_from_map )
+        except:
+            pass
+                    
+        self.bestfitplane_reset_point_values()  
+              
+        self.bestfitplane_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
+        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
+        self.bestfitplane_PointMapTool.canvasClicked.connect( self.set_bestfitplane_points_from_map )
+        self.bestfitplane_PointMapTool.setCursor( Qt.CrossCursor )        
+        self.canvas.setMapTool( self.bestfitplane_PointMapTool )
+
+                
+    def set_intersection_point(self):
+        
+        try:
+            self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
+        except:
+            pass            
+                
+        self.intersection_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
+        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
+        self.intersection_PointMapTool.canvasClicked.connect( self.update_intersection_point_pos )
+        self.intersection_PointMapTool.setCursor( Qt.CrossCursor )
+                
+        self.canvas.setMapTool( self.intersection_PointMapTool )
+
+
+    def bestfitplane_reset_all(self):
+        
+        self.bestfitplane_reset_point_values()        
+        self.bestfitplane_disable_tools()
+
+
+    def bestfitplane_reset_point_values(self):
+
+        self.bestfitplane_reset_point_inputs()  
+        self.bestfitplane_reset_point_markers()
+
+
+    def bestfitplane_reset_point_inputs( self ):
+
+        self.bestfitplane_src_points_ListWdgt.clear()
+        self.bestfitplane_points = []  
+
+
+    def remove_bft_markers_from_canvas( self ):        
+        
+        for mrk in self.bestfitplane_point_markers:
+            try:
+                self.canvas.scene().removeItem( mrk ) 
+            except:
+                pass
+        
+        
+    def bestfitplane_reset_point_markers( self ):
+
+        self.remove_bft_markers_from_canvas() 
+        self.bestfitplane_point_markers = []          
+
+
+    def bestfitplane_disable_tools( self ):
+
+        self.bestfitplane_definepoints_pButton.setEnabled( False )
+        self.bestfitplane_calculate_pButton.setEnabled( False )
+        """
+        self.bestfitplane_saveresults_pButton.setEnabled( False )  
+        """ 
+        try:
+            self.bestfitplane_PointMapTool.leftClicked.disconnect( self.set_bestfitplane_points_from_map )
+        except:
+            pass
+        try:
+            self.disable_MapTool( self.bestfitplane_PointMapTool )
+        except:
+            pass         
+        
+                
+    def intersection_reset_all( self ):
+
+        self.intersection_reset_markers() 
+        self.intersection_reset_input()       
+        self.intersection_reset_values()
+
+
+    def intersection_reset_input(self):
+
+        self.intersection_disable_tools()
+        self.intersection_reset_srcpoint_SpinBoxes()        
+        
+
+    def intersection_disable_tools(self):
+        
+        self.intersection_definepoint_pButton.setEnabled( False )
+        self.intersection_resetsrcpt_pButton.setEnabled( False )
+        try:
+            self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
+        except:
+            pass
+        try:
+            self.disable_MapTool( self.intersection_PointMapTool )
+        except:
+            pass
+                        
+                
+    def intersection_reset_markers(self):       
+        
+        self.reset_intersections()
+        self.intersection_remove_srcpt_marker_from_canvas()
+          
+        
+    def reset_intersections(self):
+        
+        self.remove_intersection_markers_from_canvas()
+        self.intersection_markers_list = []
+        self.intersection_reset_results()        
+
+
+    def remove_intersection_markers_from_canvas( self ):
+
+        for mrk in self.intersection_markers_list:
+            try:
+                self.canvas.scene().removeItem( mrk ) 
+            except:
+                pass
+
+
+    def intersection_remove_srcpt_marker_from_canvas(self):
+        
+        if self.intersection_sourcepoint_marker is not None:
+            self.canvas.scene().removeItem( self.intersection_sourcepoint_marker )
+
+  
+    def get_layers_from_qgis(self):        
+
+        curr_map_layers = QgsMapLayerRegistry.instance().mapLayers()
+        mapLayers = zip(unicode(curr_map_layers.keys()), curr_map_layers.values())       
+        rasterLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.RasterLayer, mapLayers )
+        vectorLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.VectorLayer, mapLayers )
+        pointvectLayers = filter( lambda layer: layer[1].geometryType() == QGis.Point, vectorLayers )
+        return rasterLayers, pointvectLayers
+        
+
     def refresh_raster_layer_list( self ):
 
         self.source_dem = None
 
         try:
-            QObject.disconnect( self.dem_comboBox, 
-                                SIGNAL( " currentIndexChanged (int) " ), 
-                                self.get_dem )
+            self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
         except:
             pass
                 
         self.intersection_reset_all()
         self.bestfitplane_reset_all()
-
-        #self.remove_markers_from_canvas( self.intersection_markers_list )
-        #self.intersection_reset_srcpoint_marker()
                     
         self.rasterLayers, _ = self.get_layers_from_qgis()                
         if self.rasterLayers is None or len( self.rasterLayers ) == 0:
@@ -677,9 +628,7 @@ a message warning can be repeated more that once.
         for ( _,layer ) in self.rasterLayers:
             self.dem_comboBox.addItem( layer.name() )
             
-        QObject.connect( self.dem_comboBox, 
-                 SIGNAL( " currentIndexChanged (int) " ), 
-                 self.get_dem )
+        self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )
                 
         QMessageBox.information( self, 
                                  "Source DEMs", 
@@ -718,11 +667,15 @@ a message warning can be repeated more that once.
         self.bestfitplane_definepoints_pButton.setEnabled( True )
         
 
-    def set_bestfitplane_points_from_map( self, position ): # Add point to analyze
+    def set_bestfitplane_points_from_map( self, qgs_point, button ): # Add point to analyze
+
+        # mapPos = self.canvas.getCoordinateTransform().toMapCoordinates( position["x"], position["y"] )
         
-        mapPos = self.canvas.getCoordinateTransform().toMapCoordinates( position["x"], position["y"] )
-        if mapPos.x() <= self.source_dem.xmin or mapPos.x() >= self.source_dem.xmax or \
-           mapPos.y() <= self.source_dem.ymin or mapPos.y() >= self.source_dem.ymax:
+        mapPos_x = qgs_point.x()
+        mapPos_y = qgs_point.y()
+        
+        if mapPos_x <= self.source_dem.xmin or mapPos_x >= self.source_dem.xmax or \
+           mapPos_y <= self.source_dem.ymin or mapPos_y >= self.source_dem.ymax:
             return        
         
         marker = QgsVertexMarker( self.canvas )
@@ -730,11 +683,11 @@ a message warning can be repeated more that once.
         marker.setIconSize( 18 )
         marker.setPenWidth( 2 )
         marker.setColor( QColor( 'limegreen' ) )
-        marker.setCenter(QgsPoint( mapPos.x(), mapPos.y() ))        
+        marker.setCenter(QgsPoint( mapPos_x, mapPos_y ))        
         self.bestfitplane_point_markers.append( marker )        
         self.canvas.refresh()
         
-        self.add_bestfitplane_point( mapPos.x(), mapPos.y() )  
+        self.add_bestfitplane_point( mapPos_x, mapPos_y )  
         
         
     def add_bestfitplane_point( self, x, y ):
@@ -771,17 +724,13 @@ a message warning can be repeated more that once.
         
         normal_vector = Vector( normal[0], normal[1], normal[2])
         normal_axis = normal_vector.to_axis()
-        self.bestfitplane = normal_axis.to_normal_structplane()
+        self.bestfitplane = normal_axis.to_normal_geolplane()
         
         QMessageBox.information( self, "Best fit geological plane", 
                                  "Dip direction: %.1f - dip angle: %.1f" %( self.bestfitplane._dipdir, self.bestfitplane._dipangle ))
 
-
-        """
-        self.bestfitplane_saveresults_pButton.setEnabled( True )
-        """
                    
-    def update_intersection_point_pos( self, position = None ): # Add point to analyze
+    def update_intersection_point_pos( self, qgs_point = None, button = None ): # Add point to analyze
 
         if self.source_dem is None:
             QMessageBox.critical(self, 
@@ -790,11 +739,12 @@ a message warning can be repeated more that once.
             return
 
         self.intersection_resetsrcpt_pButton.setEnabled( True )
-                
+               
         if self.sender() == self.intersection_PointMapTool:
-            mapPos = self.canvas.getCoordinateTransform().toMapCoordinates( position["x"], position["y"] )
-            self.Pt_x_spinBox.setValue( int( mapPos.x() ) )
-            self.Pt_y_spinBox.setValue( int( mapPos.y() ) )
+            mapPos_x = qgs_point.x()
+            mapPos_y = qgs_point.y()
+            self.Pt_x_spinBox.setValue( int( mapPos_x ) )
+            self.Pt_y_spinBox.setValue( int( mapPos_y ) )
         elif self.sender() == self.Pt_x_spinBox or \
              self.sender() == self.Pt_y_spinBox:        
             if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '':
@@ -808,8 +758,8 @@ a message warning can be repeated more that once.
         self.intersection_srcpt_y = self.Pt_y_spinBox.value()
         self.intersection_set_z_from_dem()
         
-        self.remove_markers_from_canvas( self.intersection_markers_list )
-        self.intersection_reset_srcpoint_marker()                        
+        self.remove_intersection_markers_from_canvas( )
+        self.intersection_remove_srcpt_marker_from_canvas()                        
         self.intersection_sourcepoint_marker = QgsVertexMarker( self.canvas )
         self.intersection_sourcepoint_marker.setIconType( 1 )
         self.intersection_sourcepoint_marker.setIconSize( 18 )
@@ -930,10 +880,7 @@ a message warning can be repeated more that once.
         """
         Calculate intersection points.
         """
-        
-        # self.intersection_reset_all_markers()
-        # self.remove_markers_from_canvas( self.intersection_markers_list )
-        
+
         if self.source_dem is None:
             QMessageBox.information( self, 
                                      "Intersection calculation", 
@@ -956,7 +903,7 @@ a message warning can be repeated more that once.
         srcDipDir = self.DDirection_spinBox.value()
         srcDipAngle = self.DAngle_verticalSlider.value()
 
-        self.srcPlaneAttitude = StructPlane( srcDipDir, srcDipAngle )
+        self.srcPlaneAttitude = GeolPlane( srcDipDir, srcDipAngle )
 
         # intersection arrays
         
@@ -989,7 +936,7 @@ a message warning can be repeated more that once.
                                    y=self.inters.parameters._srcPt.y, 
                                    z=self.inters.parameters._srcPt.z )
 
-        self.intersections = dict(data=intersection_data,
+        self.intersections_xprt = dict(data=intersection_data,
                                   plane=intersection_plane,
                                   point=intersection_point)
 
@@ -1025,7 +972,7 @@ a message warning can be repeated more that once.
                                                       self.tr( "Save shapefile" ), 
                                                       "*.shp", 
                                                       "shp (*.shp *.SHP)" )        
-        if output_filename.isEmpty():
+        if not output_filename:
             return
         self.Output_FileName_Input.setText( output_filename ) 
                 
@@ -1036,20 +983,12 @@ a message warning can be repeated more that once.
         """
  
         # check for result existence
-        try:        
-            if self.inters.xcoords_x == [] and \
-               self.inters.xcoords_y == [] and \
-               self.inters.ycoords_x == [] and \
-               self.inters.ycoords_y == [] :
-                QMessageBox.critical(self, 
-                                     "Save results", 
-                                     "No results available") 
-                return
-        except:
-                QMessageBox.critical(self, 
-                                     "Save results", 
-                                     "No results available") 
-                return
+        
+        if self.inters is None:
+            QMessageBox.critical(self, 
+                                 "Save results", 
+                                 "No results available") 
+            return            
             
         self.output_filename = str( self.Output_FileName_Input.text() ) 
         if self.output_filename == '':
@@ -1164,9 +1103,9 @@ a message warning can be repeated more that once.
             curr_Pt_shape.SetField('y', curr_Pt[1]) 
             curr_Pt_shape.SetField('z', curr_Pt[2]) 
 
-            curr_Pt_shape.SetField('srcPt_x', self.intersections['point']['x'])
-            curr_Pt_shape.SetField('srcPt_y', self.intersections['point']['y']) 
-            curr_Pt_shape.SetField('srcPt_z', self.intersections['point']['z'])
+            curr_Pt_shape.SetField('srcPt_x', self.intersections_xprt['point']['x'])
+            curr_Pt_shape.SetField('srcPt_y', self.intersections_xprt['point']['y']) 
+            curr_Pt_shape.SetField('srcPt_z', self.intersections_xprt['point']['z'])
 
             curr_Pt_shape.SetField('dip_dir', self.srcPlaneAttitude._dipdir)
             curr_Pt_shape.SetField('dip_ang', self.srcPlaneAttitude._dipangle)             
@@ -1217,9 +1156,9 @@ a message warning can be repeated more that once.
             line_shape.SetGeometry( line )   
 
             line_shape.SetField( 'id', curr_path_id )
-            line_shape.SetField( 'srcPt_x', self.intersections['point']['x'] )
-            line_shape.SetField( 'srcPt_y', self.intersections['point']['y'] ) 
-            line_shape.SetField( 'srcPt_z', self.intersections['point']['z'] )
+            line_shape.SetField( 'srcPt_x', self.intersections_xprt['point']['x'] )
+            line_shape.SetField( 'srcPt_y', self.intersections_xprt['point']['y'] ) 
+            line_shape.SetField( 'srcPt_z', self.intersections_xprt['point']['z'] )
     
             line_shape.SetField( 'dip_dir', self.srcPlaneAttitude._dipdir )
             line_shape.SetField( 'dip_ang', self.srcPlaneAttitude._dipangle )             
@@ -1234,14 +1173,7 @@ a message warning can be repeated more that once.
         # destroy output geometry
         self.out_shape.Destroy() 
         
-    
-    """
-    def save_bestfitplane_results( self ):
-        
-        pass
-    """    
-        
-           
+               
     def onPluginClose(self):
 
         self.intersection_reset_all()
