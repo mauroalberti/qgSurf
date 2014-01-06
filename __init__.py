@@ -2,12 +2,12 @@
 /***************************************************************************
  qgSurf - plugin for Quantum GIS
 
- geological planes operations
+ Processing of geological planes and surfaces
  
                               -------------------
         begin                : 2011-12-21
-        version              : 0.2.2 for QuantumGIS 2.0, released 2013-10-23 
-        copyright            : (C) 2011-2013 by Mauro Alberti - www.malg.eu
+        version              : 0.3.0 for QuantumGIS 2.0, released 2014-01-06 
+        copyright            : (C) 2011-2014 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         
  ***************************************************************************/

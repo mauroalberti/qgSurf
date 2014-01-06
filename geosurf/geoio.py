@@ -391,7 +391,9 @@ class QGisRasterParameters( object ):
         point.y = self.yMin + (array_dict['y']+0.5)*self.cellsizeNS
         
         return point        
-       
+        
+        
+
 
 def read_raster_band( raster_name ):
     """

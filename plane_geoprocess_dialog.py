@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import os
+
 from math import floor
 import numpy as np
 
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
+
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
 
 from qgis.core import *
 from qgis.gui import *
@@ -24,7 +27,7 @@ from geosurf.intersections import Intersection_Parameters, Intersections
 from geosurf.svd import xyz_svd 
 
         
-class qgSurfDialog( QDialog ):
+class plane_geoprocess_Dialog( QDialog ):
     """
     Constructor
     
@@ -36,7 +39,7 @@ class qgSurfDialog( QDialog ):
 
     def __init__( self, canvas, plugin ):
 
-        super( qgSurfDialog, self ).__init__() 
+        super( plane_geoprocess_Dialog, self ).__init__() 
 
         self.rejected.connect( self.onPluginClose )
         
@@ -44,7 +47,7 @@ class qgSurfDialog( QDialog ):
         self.plugin = plugin   
             
         self.initialize_parameters()                 
-        self.setup_commandwin_gui() 
+        self.setup_gui() 
                 
         self.setWindowFlags( Qt.WindowStaysOnTopHint )
 
@@ -87,35 +90,35 @@ class qgSurfDialog( QDialog ):
         self.intersection_markers_list = []
 
         
-    def setup_commandwin_gui( self ):
+    def setup_gui( self ):
 
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()
         
-        main_widget.addTab( self.setup_processing_tab(), 
-                            "Processing" )                    
+        main_widget.addTab( self.setup_fplane_tab(), 
+                            "Plane geoprocessing" ) 
+        
         main_widget.addTab( self.setup_help_tab(), 
                             "Help" ) 
-        main_widget.addTab( self.setup_about_tab(), 
-                            "About" )
+
                             
         dialog_layout.addWidget( main_widget )                                     
         self.setLayout( dialog_layout )                    
         self.adjustSize()                       
-        self.setWindowTitle( 'qgSurf' )        
+        self.setWindowTitle( 'qgSurf - plane geoprocessing' )        
 
 
-    def setup_processing_tab( self ):
+    def setup_fplane_tab( self ):
         
-        processingWidget = QWidget()  
-        processingLayout = QVBoxLayout( )
+        plansurfaceWidget = QWidget()  
+        plansurfaceLayout = QVBoxLayout( )
         
-        processingLayout.addWidget( self.setup_source_dem() )         
-        processingLayout.addWidget( self.setup_processing_subtabs() )
+        plansurfaceLayout.addWidget( self.setup_source_dem() )         
+        plansurfaceLayout.addWidget( self.setup_plansurface_subtabs() )
                                        
-        processingWidget.setLayout(processingLayout)  
+        plansurfaceWidget.setLayout( plansurfaceLayout )  
                 
-        return processingWidget 
+        return plansurfaceWidget 
 
 
     def setup_source_dem( self ):
@@ -141,7 +144,7 @@ class qgSurfDialog( QDialog ):
         return sourcedemWidget
       
       
-    def setup_processing_subtabs(self):  
+    def setup_plansurface_subtabs(self):  
 
         processingsTabWidget = QTabWidget()
 
@@ -172,7 +175,7 @@ class qgSurfDialog( QDialog ):
         intersectionWidget.setLayout( intersectionLayout )
         
         return intersectionWidget 
- 
+    
 
     def setup_help_tab( self ):
         
@@ -180,11 +183,11 @@ class qgSurfDialog( QDialog ):
         helpLayout = QVBoxLayout( )
         
         htmlText = """
-        <h3>Help</h3>
+        <h3>Plane geoprocessing help</h3>
         
         See web version at: https://bitbucket.org/mauroalberti/qgsurf/wiki/Help
 
-<br /><br />This plugin allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
+<br /><br />This module allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
 to calculate the intersections of the plane with the DEM. Since this plugin does not 
 handle on-the-fly reprojection, if you have to use it for instance for displaying background images 
 with OpenLayers, make sure that you set the project projection to be the same as that of the DEM.
@@ -236,27 +239,7 @@ a message warning can be repeated more that once.
                 
         return helpWidget 
         
-        
-    def setup_about_tab( self ):
-        
-        aboutWidget = QWidget()  
-        aboutLayout = QVBoxLayout( )
-        
-        htmlText = """
-        <h3>qgSurf release 0.2.3 (2013-10-25)</h3>
-        Created by M. Alberti (www.malg.eu).
-        <br /><br />Plugin for the processing geological planes and topography.  
-        <br /><br />Licensed under the terms of GNU GPL 3.
-        """
-        
-        aboutQTextBrowser = QTextBrowser( aboutWidget )        
-        aboutQTextBrowser.insertHtml( htmlText ) 
-        aboutLayout.addWidget( aboutQTextBrowser )  
-        aboutWidget.setLayout(aboutLayout)
-        
-        return aboutWidget              
-
-               
+                  
     def setup_geographicdata_sect( self ):        
         
         inputWidget = QWidget()  
@@ -975,8 +958,8 @@ a message warning can be repeated more that once.
         if not output_filename:
             return
         self.Output_FileName_Input.setText( output_filename ) 
+                      
                 
-        
     def write_results( self ):
         """
         Write intersection results in the output shapefile.

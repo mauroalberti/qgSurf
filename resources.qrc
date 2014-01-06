@@ -1,5 +1,8 @@
 <RCC>
     <qresource prefix="/plugins/qgSurf" >
         <file>icons/qgsurf.png</file>
+        <file>icons/sin_m.png</file>
+        <file>icons/sin_def_m.png</file>
+        <file>icons/about.png</file>	
     </qresource>
 </RCC>
