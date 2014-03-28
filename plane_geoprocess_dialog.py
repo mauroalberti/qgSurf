@@ -7,13 +7,12 @@ import numpy as np
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
-#import matplotlib.pyplot as plt
-#from mpl_toolkits.mplot3d import Axes3D
-
 from qgis.core import *
 from qgis.gui import *
 
-from qgs_tools.ptmaptool import PointMapTool
+from qgs_tools.tools import get_current_raster_layers, project_point, \
+     make_qgs_point
+from qgs_tools.ptmaptool import PointMapToolEmitPoint
     
 try:
     from osgeo import ogr
@@ -24,10 +23,10 @@ from geosurf.geoio import read_dem
 from geosurf.spatial import Point, Vector
 from geosurf.spatial import GeolPlane
 from geosurf.intersections import Intersection_Parameters, Intersections
-from geosurf.svd import xyz_svd 
 
-        
-class plane_geoprocess_Dialog( QDialog ):
+
+
+class plane_geoprocess_QWidget( QWidget ):
     """
     Constructor
     
@@ -39,37 +38,44 @@ class plane_geoprocess_Dialog( QDialog ):
 
     def __init__( self, canvas, plugin ):
 
-        super( plane_geoprocess_Dialog, self ).__init__() 
-
-        self.rejected.connect( self.onPluginClose )
-        
-        self.canvas = canvas
-        self.plugin = plugin   
-            
+        super( plane_geoprocess_QWidget, self ).__init__()       
+        self.canvas, self.plugin = canvas, plugin        
         self.initialize_parameters()                 
         self.setup_gui() 
+
+
+    def update_crs_settings( self ):
+
+        self.get_on_the_fly_projection()
+        if self.on_the_fly_projection: self.get_current_canvas_crs()        
+        
+        
+    def get_on_the_fly_projection( self ):
+        
+        self.on_the_fly_projection = True if self.canvas.hasCrsTransformEnabled() else False
+       
+        
+    def get_current_canvas_crs( self ):        
                 
-        self.setWindowFlags( Qt.WindowStaysOnTopHint )
-
-
-    def intersection_reset_values(self):
+        self.projectCrs = self.canvas.mapRenderer().destinationCrs()
+ 
+       
+    def reset_values(self):
 
         self.current_z_value = None
         self.intersection_z_from_dem = False
-
-        self.intersection_reset_srcpt()
-        self.intersection_reset_results()
+        self.reset_srcpt()
+        self.reset_results()
         
  
-    def intersection_reset_srcpt(self):        
+    def reset_srcpt(self):        
 
         self.intersection_srcpt_x = None
-        self.intersection_srcpt_y = None
-        
+        self.intersection_srcpt_y = None        
         self.intersection_sourcepoint_marker = None
                 
         
-    def intersection_reset_results(self):
+    def reset_results(self):
 
         self.intersections_x = []
         self.intersections_y = []
@@ -79,45 +85,34 @@ class plane_geoprocess_Dialog( QDialog ):
             
     def initialize_parameters(self):
 
-        self.intersection_reset_values()        
-                   
+        self.reset_values() 
         self.previousTool = None        
-        self.source_dem = None
+        self.grid = None
         self.input_points = None
-        self.bestfitplane_point_markers = []
-        self.intersection_PointMapTool = None
-         
+        self.intersection_PointMapTool = None         
         self.intersection_markers_list = []
+        self.update_crs_settings()
 
         
     def setup_gui( self ):
 
         dialog_layout = QVBoxLayout()
-        main_widget = QTabWidget()
-        
-        main_widget.addTab( self.setup_fplane_tab(), 
-                            "Plane geoprocessing" ) 
-        
-        main_widget.addTab( self.setup_help_tab(), 
-                            "Help" ) 
-
-                            
+        main_widget = QTabWidget()        
+        main_widget.addTab( self.setup_fplane_tab(), "Processing" )         
+        main_widget.addTab( self.setup_help_tab(), "Help" )                             
         dialog_layout.addWidget( main_widget )                                     
         self.setLayout( dialog_layout )                    
         self.adjustSize()                       
-        self.setWindowTitle( 'qgSurf - plane geoprocessing' )        
+        self.setWindowTitle( 'qgSurf - DEM-plane intersection' )        
 
 
     def setup_fplane_tab( self ):
         
         plansurfaceWidget = QWidget()  
-        plansurfaceLayout = QVBoxLayout( )
-        
+        plansurfaceLayout = QVBoxLayout( )        
         plansurfaceLayout.addWidget( self.setup_source_dem() )         
-        plansurfaceLayout.addWidget( self.setup_plansurface_subtabs() )
-                                       
-        plansurfaceWidget.setLayout( plansurfaceLayout )  
-                
+        plansurfaceLayout.addWidget( self.setup_tab() )                                       
+        plansurfaceWidget.setLayout( plansurfaceLayout ) 
         return plansurfaceWidget 
 
 
@@ -125,104 +120,61 @@ class plane_geoprocess_Dialog( QDialog ):
 
         sourcedemWidget = QWidget()  
         sourcedemLayout = QGridLayout( )
-
-        sourcedemLayout.addWidget(QLabel( "Source DEM" ), 0, 0, 1, 3)
-        
+        sourcedemLayout.addWidget(QLabel( "Source DEM" ), 0, 0, 1, 3)        
         self.raster_refreshlayers_pButton = QPushButton( "Get current raster layers" )
         self.raster_refreshlayers_pButton.clicked[bool].connect( self.refresh_raster_layer_list ) 
         self.raster_refreshlayers_pButton.setEnabled( True )       
-        sourcedemLayout.addWidget( self.raster_refreshlayers_pButton, 1, 0, 1, 3 )
-                
+        sourcedemLayout.addWidget( self.raster_refreshlayers_pButton, 1, 0, 1, 3 )                
         sourcedemLayout.addWidget(QLabel( "Use DEM" ), 2, 0, 1, 1)        
         self.dem_comboBox = QComboBox()
         self.dem_comboBox.addItem(self.dem_default_text)
-
-        sourcedemLayout.addWidget(self.dem_comboBox, 2, 1, 1, 2)
-        
-        sourcedemWidget.setLayout( sourcedemLayout )
-        
+        sourcedemLayout.addWidget(self.dem_comboBox, 2, 1, 1, 2)        
+        sourcedemWidget.setLayout( sourcedemLayout )        
         return sourcedemWidget
-      
-      
-    def setup_plansurface_subtabs(self):  
-
-        processingsTabWidget = QTabWidget()
-
-        processingsTabWidget.addTab( self.setup_bestfitplane_calc_tab(), 
-                                 "Best-fit-plane calculation" )         
-        processingsTabWidget.addTab( self.setup_intersection_tab(), 
-                                 "Plane-DEM intersection" ) 
-
-        return processingsTabWidget
 
 
-    def setup_intersection_tab( self ):  
+    def setup_tab( self ):  
 
         intersectionWidget = QWidget() 
-        intersectionLayout = QVBoxLayout()
- 
+        intersectionLayout = QVBoxLayout() 
         intersection_toolbox = QToolBox()
-
-        intersection_toolbox.addItem ( self.setup_geographicdata_sect(), 
-                                       'Geographic parameters' )
-        intersection_toolbox.addItem ( self.setup_geologicdata_sect(), 
-                                       'Geological parameters' )
-        intersection_toolbox.addItem ( self.setup_output_sect(), 
-                                       'Output' )
-
-        # widget final setup                
+        intersection_toolbox.addItem ( self.setup_geographicdata_sect(), 'Geographic parameters' )
+        intersection_toolbox.addItem ( self.setup_geologicdata_sect(), 'Geological parameters' )
+        intersection_toolbox.addItem ( self.setup_output_sect(), 'Output' )             
         intersectionLayout.addWidget( intersection_toolbox )
-        intersectionWidget.setLayout( intersectionLayout )
-        
+        intersectionWidget.setLayout( intersectionLayout )        
         return intersectionWidget 
     
 
     def setup_help_tab( self ):
         
         helpWidget = QWidget()  
-        helpLayout = QVBoxLayout( )
-        
+        helpLayout = QVBoxLayout( )        
         htmlText = """
-        <h3>Plane geoprocessing help</h3>
-        
-        See web version at: https://bitbucket.org/mauroalberti/qgsurf/wiki/Help
-
-<br /><br />This module allows to calculate the best-fit plane give a DEM and a set of points, or alternatively, given a geological plane, a DEM and a point, 
-to calculate the intersections of the plane with the DEM. Since this plugin does not 
-handle on-the-fly reprojection, if you have to use it for instance for displaying background images 
-with OpenLayers, make sure that you set the project projection to be the same as that of the DEM.
+This module allows to calculate the intersections of a plane with the DEM, given the plane attitude expressed according
+to geological convention and a source point.
 
 <h4>Loading of DEM data</h4>
 <b>a)</b> Load in the QGis project the required DEM(s) layers and whatsoever vector or image layers needed for your analysis.
 <br /><b>b)</b> Use "Get current raster layers" in qgSurf plugin: this will allow the plugin to know which raster layers are currently loaded.
-<br /><b>c)</b> From the "Use DEM" combo box, choose the required DEM and make sure that the QGis project and the DEM have the same projection.
-
-<h4>Best-fit plane calculation</h4>
-The basis of the algorithm is the application of singular value decomposition to derive the eigenvectors of a set of measures. 
-<br />The best-fit plane processing sequence is:
-<br /><b>d)</b> from the "Best-fit-plane calculation", press "Define points in map": this will allow you to define in the canvas at least three, 
-and possibly more points, whose coordinates will be listed in the plugin widget.
-<br /><b>e)</b> with at least three points defined, you can calculate the best-fit plane by pressing "Calculate best-fit-plane": 
-a message box will report the dip direction and dip angle of the calculated plane.
-<br /><b>f)</b> you can add even more points and again calculate the best-fit plane; otherwise, 
-if you want to start a new analysis on the same DEM, go to <b>e)</b>, or if you want to use another DEM, 
-go to <b>c)</b> if it is already loaded in the project, or load it in the project and then go to <b>b)</b>.
+<br /><b>c)</b> From the "Use DEM" combo box, choose the DEM to use.
  
 <h4>Plane-DEM intersection</h4>
-<b>g)</b> You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section. 
-You can erase it with "Reset source point" or put a new one by simply clicking in the map.
-<br /><b>h)</b> In the X, Y and Z spinboxes, you will see the coordinates of the source point. You can modify them within the spinboxes themselves.
-You can also use Z values not fixed to the DEM surfaces.
-<br /><b>i)</b> In the "Geological parameters" section, you can set the dip direction and the dip angle, and then calculate the
+<b>d)</b> You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section. 
+You can erase the current value with "Reset source point" or just define a new one by simply clicking in the map.
+<br /><b>e)</b> In the X, Y and Z spinboxes, the coordinates of the source point are displayed. You can modify them from within the spinboxes.
+You can also choose to use Z values not fixed to the DEM surfaces, by setting the 'lock z value to DEM surface' checkbox off.
+<br /><b>f)</b> In the "Geological parameters" section, you can define the dip direction and the dip angle, and then calculate the
 theoretical intersections by pressing "Calculate intersection".
-<br /><b>j)</b> You can change the last intersection color by choosing a color from the "Intersection color" combo box, and delete all the intersections
+<br /><b>g)</b> You can change the last intersection color by choosing a color from the "Intersection color" combo box, and delete all the intersections
 with "Cancel intersections".
-<br /><b>k)</b> In the "Output" section, you can save the last intersections as a point or line shapefile, also loading it 
+<br /><b>h)</b> In the "Output" section, you can save the last intersections as a point or line shapefile, also loading it 
 within the current project.
 
 <h4>Known limitations</h4>
-- This plugin does not handle on-the-fly reprojection. So if you need to use it, make sure that you set the 
-project projection to be the same as that of the DEM.
+- <b>The algorithm does not support calculations on DEM in polar coordinates (i.e., lat-long.). <u>The analyzed DEM must be in a planar projection (e.g., UTM, Lambert
+Conformal Conic), with
+the height values expressed in the same unit (e.g., meters) as the horizontal coordinates</u></b>.
 <br />- Rotation angles for input rasters (DEM) are not supported. Errors could be silent, so please check this detail with QGis or other tools.
   
 <h4>Known bugs</h4>
@@ -235,22 +187,20 @@ a message warning can be repeated more that once.
         helpQTextBrowser = QTextBrowser( helpWidget )        
         helpQTextBrowser.insertHtml( htmlText ) 
         helpLayout.addWidget( helpQTextBrowser )
-        helpWidget.setLayout(helpLayout)  
-                
+        helpWidget.setLayout(helpLayout)                  
         return helpWidget 
         
                   
     def setup_geographicdata_sect( self ):        
         
         inputWidget = QWidget()  
-        inputLayout = QGridLayout( )
-        
+        inputLayout = QGridLayout( )        
         self.intersection_definepoint_pButton = QPushButton( "Set source point in map" )
         self.intersection_definepoint_pButton.clicked[bool].connect( self.set_intersection_point )        
         inputLayout.addWidget( self.intersection_definepoint_pButton, 0, 0, 1, 3 )        
 
         self.intersection_resetsrcpt_pButton = QPushButton( "Reset source point" )
-        self.intersection_resetsrcpt_pButton.clicked[bool].connect( self.intersection_reset_src_point )      
+        self.intersection_resetsrcpt_pButton.clicked[bool].connect( self.reset_src_point )      
         inputLayout.addWidget( self.intersection_resetsrcpt_pButton, 1, 0, 1, 3 )        
                       
         inputLayout.addWidget( QLabel("X"), 2, 0, 1, 1 )
@@ -274,12 +224,12 @@ a message warning can be repeated more that once.
         self.Pt_z_spinBox.valueChanged[int].connect( self.check_z_congruence_with_dem )
         inputLayout.addWidget( self.Pt_z_spinBox, 4, 1, 1, 2 ) 
                
-        self.fixz2dem_checkBox = QCheckBox("fix z value to DEM")
+        self.fixz2dem_checkBox = QCheckBox("lock z value to DEM surface")
         self.fixz2dem_checkBox.setChecked(True)
-        self.fixz2dem_checkBox. stateChanged[int].connect( self.intersection_set_z_from_dem )
+        self.fixz2dem_checkBox. stateChanged[int].connect( self.set_z_from_dem )
         inputLayout.addWidget( self.fixz2dem_checkBox, 5, 0, 1, 3 )        
         
-        self.intersection_reset_input()
+        self.reset_input()
         
         inputWidget.setLayout(inputLayout) 
         
@@ -288,20 +238,17 @@ a message warning can be repeated more that once.
 
     def check_z_congruence_with_dem( self ):
         
-        if self.intersection_z_from_dem and \
-           self.Pt_z_spinBox.value() != self.current_z_value:
-            self.intersection_z_from_dem = False
-            self.fixz2dem_checkBox.setChecked( False )
+        if self.intersection_z_from_dem and self.Pt_z_spinBox.value() != self.current_z_value:
+            self.intersection_z_from_dem = False; self.fixz2dem_checkBox.setChecked( False )
         self.current_z_value = self.Pt_z_spinBox.value()
 
 
-    def intersection_reset_src_point( self ):
+    def reset_src_point( self ):
         
         self.intersection_resetsrcpt_pButton.setEnabled( False )
-        self.intersection_reset_srcpoint_SpinBoxes()
-                           
-        self.intersection_reset_markers()
-        self.intersection_reset_values() 
+        self.reset_srcpoint_SpinBoxes()                           
+        self.reset_markers()
+        self.reset_values() 
                                    
                     
     def setup_geologicdata_sect( self ):
@@ -318,11 +265,11 @@ a message warning can be repeated more that once.
         planeorientationLayout.addWidget( dip_ang_label, 0, 2, 1, 1 )
         
         self.DDirection_dial = QDial()
-        self.DDirection_dial.setRange(0,360)
-        self.DDirection_dial.setPageStep(1)
-        self.DDirection_dial.setProperty("value", 180)
-        self.DDirection_dial.setSliderPosition(180)
-        self.DDirection_dial.setTracking(True)
+        self.DDirection_dial.setRange( 0, 360 )
+        self.DDirection_dial.setPageStep( 1 )
+        self.DDirection_dial.setProperty( "value", 180 )
+        self.DDirection_dial.setSliderPosition( 180 )
+        self.DDirection_dial.setTracking( True )
         self.DDirection_dial.setOrientation(Qt.Vertical)
         self.DDirection_dial.setWrapping(True)
         self.DDirection_dial.setNotchTarget(30.0)
@@ -360,16 +307,7 @@ a message warning can be repeated more that once.
         planeorientationLayout.addWidget( QLabel("Intersection color"), 4, 0, 1, 1 )
         
         self.Intersection_color_comboBox = QComboBox()
-        self.Intersection_color_comboBox.insertItems( 0, ["blue",
-                                                          "white",                                                          
-                                                          "red",
-                                                          "yellow",
-                                                          "orange",
-                                                          "brown",
-                                                          "green",
-                                                          "pink",
-                                                          "darkblue",
-                                                          "gray"] )
+        self.Intersection_color_comboBox.insertItems( 0, ["blue", "white", "red", "yellow", "orange", "brown", "green", "pink", "darkblue", "gray"] )
 
         self.Intersection_color_comboBox.currentIndexChanged[int].connect( self.plot_intersections )
                                                                   
@@ -418,46 +356,6 @@ a message warning can be repeated more that once.
 
         return outputWidget
 
-
-    def setup_bestfitplane_calc_tab( self ):        
-        
-        planecalcWidget = QWidget()  
-        planecalcLayout = QGridLayout( )        
-
-        planecalcLayout.addWidget(QLabel( "Source points" ), 2, 0, 1, 2)
-        self.bestfitplane_definepoints_pButton = QPushButton( "Define points in map" )
-        self.bestfitplane_definepoints_pButton.clicked.connect( self.set_bestfitplane_points )
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
-        planecalcLayout.addWidget( self.bestfitplane_definepoints_pButton, 3, 0, 1, 2 )
-        
-        self.bestfitplane_src_points_ListWdgt = QListWidget()
-        planecalcLayout.addWidget( self.bestfitplane_src_points_ListWdgt, 4, 0, 1, 2 )
-        
-        self.bestfitplane_calculate_pButton = QPushButton( "Calculate best-fit-plane" )
-        self.bestfitplane_calculate_pButton.clicked.connect( self.calculate_bestfitplane )
-        self.bestfitplane_calculate_pButton.setEnabled( False )
-        planecalcLayout.addWidget( self.bestfitplane_calculate_pButton, 5, 0, 1, 2 )               
-        
-        planecalcWidget.setLayout(planecalcLayout)
-        
-        return planecalcWidget            
-
-
-    def set_bestfitplane_points(self):
-       
-        try:
-            self.bestfitplane_PointMapTool.canvasClicked.disconnect( self.set_bestfitplane_points_from_map )
-        except:
-            pass
-                    
-        self.bestfitplane_reset_point_values()  
-              
-        self.bestfitplane_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
-        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
-        self.bestfitplane_PointMapTool.canvasClicked.connect( self.set_bestfitplane_points_from_map )
-        self.bestfitplane_PointMapTool.setCursor( Qt.CrossCursor )        
-        self.canvas.setMapTool( self.bestfitplane_PointMapTool )
-
                 
     def set_intersection_point(self):
         
@@ -465,371 +363,200 @@ a message warning can be repeated more that once.
             self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
         except:
             pass            
-                
-        self.intersection_PointMapTool = PointMapTool( self.canvas, self.plugin ) # mouse listener
+         
+        self.update_crs_settings()
+                       
+        self.intersection_PointMapTool = PointMapToolEmitPoint( self.canvas, self.plugin ) # mouse listener
         self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
         self.intersection_PointMapTool.canvasClicked.connect( self.update_intersection_point_pos )
-        self.intersection_PointMapTool.setCursor( Qt.CrossCursor )
-                
+        self.intersection_PointMapTool.setCursor( Qt.CrossCursor )                
         self.canvas.setMapTool( self.intersection_PointMapTool )
 
-
-    def bestfitplane_reset_all(self):
-        
-        self.bestfitplane_reset_point_values()        
-        self.bestfitplane_disable_tools()
-
-
-    def bestfitplane_reset_point_values(self):
-
-        self.bestfitplane_reset_point_inputs()  
-        self.bestfitplane_reset_point_markers()
-
-
-    def bestfitplane_reset_point_inputs( self ):
-
-        self.bestfitplane_src_points_ListWdgt.clear()
-        self.bestfitplane_points = []  
-
-
-    def remove_bft_markers_from_canvas( self ):        
-        
-        for mrk in self.bestfitplane_point_markers:
-            try:
-                self.canvas.scene().removeItem( mrk ) 
-            except:
-                pass
-        
-        
-    def bestfitplane_reset_point_markers( self ):
-
-        self.remove_bft_markers_from_canvas() 
-        self.bestfitplane_point_markers = []          
-
-
-    def bestfitplane_disable_tools( self ):
-
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
-        self.bestfitplane_calculate_pButton.setEnabled( False )
-        """
-        self.bestfitplane_saveresults_pButton.setEnabled( False )  
-        """ 
-        try:
-            self.bestfitplane_PointMapTool.leftClicked.disconnect( self.set_bestfitplane_points_from_map )
-        except:
-            pass
-        try:
-            self.disable_MapTool( self.bestfitplane_PointMapTool )
-        except:
-            pass         
-        
                 
-    def intersection_reset_all( self ):
+    def reset_all( self ):
 
-        self.intersection_reset_markers() 
-        self.intersection_reset_input()       
-        self.intersection_reset_values()
+        self.reset_markers() 
+        self.reset_input()
+        self.reset_values()
 
 
-    def intersection_reset_input(self):
+    def reset_input(self):
 
-        self.intersection_disable_tools()
-        self.intersection_reset_srcpoint_SpinBoxes()        
+        self.disable_tools()
+        self.reset_srcpoint_SpinBoxes()        
         
 
-    def intersection_disable_tools(self):
+    def disable_tools(self):
         
         self.intersection_definepoint_pButton.setEnabled( False )
         self.intersection_resetsrcpt_pButton.setEnabled( False )
-        try:
-            self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
-        except:
-            pass
-        try:
-            self.disable_MapTool( self.intersection_PointMapTool )
-        except:
-            pass
+        try: self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
+        except: pass
+        try: self.disable_MapTool( self.intersection_PointMapTool )
+        except: pass
                         
                 
-    def intersection_reset_markers(self):       
+    def reset_markers(self):       
         
         self.reset_intersections()
-        self.intersection_remove_srcpt_marker_from_canvas()
+        self.remove_srcpt_marker_from_canvas()
           
         
     def reset_intersections(self):
         
-        self.remove_intersection_markers_from_canvas()
+        self.remove_markers_from_canvas()
         self.intersection_markers_list = []
-        self.intersection_reset_results()        
+        self.reset_results()        
 
 
-    def remove_intersection_markers_from_canvas( self ):
+    def remove_markers_from_canvas( self ):
 
         for mrk in self.intersection_markers_list:
-            try:
-                self.canvas.scene().removeItem( mrk ) 
-            except:
-                pass
+            self.canvas.scene().removeItem( mrk ) 
 
 
-    def intersection_remove_srcpt_marker_from_canvas(self):
+    def remove_srcpt_marker_from_canvas(self):
         
         if self.intersection_sourcepoint_marker is not None:
             self.canvas.scene().removeItem( self.intersection_sourcepoint_marker )
-
-  
-    def get_layers_from_qgis(self):        
-
-        curr_map_layers = QgsMapLayerRegistry.instance().mapLayers()
-        mapLayers = zip(unicode(curr_map_layers.keys()), curr_map_layers.values())       
-        rasterLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.RasterLayer, mapLayers )
-        vectorLayers = filter( lambda layer: layer[1].type() == QgsMapLayer.VectorLayer, mapLayers )
-        pointvectLayers = filter( lambda layer: layer[1].geometryType() == QGis.Point, vectorLayers )
-        return rasterLayers, pointvectLayers
         
 
     def refresh_raster_layer_list( self ):
 
-        self.source_dem = None
-
-        try:
-            self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
-        except:
-            pass
-                
-        self.intersection_reset_all()
-        self.bestfitplane_reset_all()
-                    
-        self.rasterLayers, _ = self.get_layers_from_qgis()                
+        self.dem, self.grid = None, None        
+        try: self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
+        except: pass                
+        self.reset_all()                   
+        self.rasterLayers = get_current_raster_layers()                 
         if self.rasterLayers is None or len( self.rasterLayers ) == 0:
             QMessageBox.critical( self, "Source DEMs", "No raster layer found in current project" )
             return
-
         self.dem_comboBox.clear()
         self.dem_comboBox.addItem( self.dem_default_text )
-        for ( _,layer ) in self.rasterLayers:
-            self.dem_comboBox.addItem( layer.name() )
-            
-        self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )
-                
-        QMessageBox.information( self, 
-                                 "Source DEMs", 
-                                 "Found %d raster layers. Select one in 'Use DEM' (below)" % len( self.rasterLayers ))
+        for layer in self.rasterLayers: self.dem_comboBox.addItem( layer.name() )            
+        self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
+        QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'. Warning: use only DEMs in planar coordinates with same units (e.g., meters) for both horizontal distances and heights. For instance, DEMs in lat-long with heights in meters will produce erroneous results." % len( self.rasterLayers ))
 
               
     def get_dem( self, ndx_DEM_file = 0 ): 
         
-        self.source_dem = None
-        
-        self.intersection_reset_all()
-        self.bestfitplane_reset_all()
-        
-        if self.rasterLayers is None or len( self.rasterLayers ) == 0:
-            return
+        self.dem = None        
+        self.reset_all()       
+        if self.rasterLayers is None or len( self.rasterLayers ) == 0: return          
                                 
         # no DEM layer defined  
-        if ndx_DEM_file == 0:  
-            return
-        
-        dem_name = self.rasterLayers[ndx_DEM_file-1][1].source()          
+        if ndx_DEM_file == 0: return             
+
+        self.dem = self.rasterLayers[ndx_DEM_file-1]        
         try:
-            self.source_dem = read_dem( dem_name )               
-        except:
-            QMessageBox.critical( self, "DEM", "Unable to read file" )
+            self.grid = read_dem( self.dem.source() )               
+        except IOError, e:
+            QMessageBox.critical( self, "DEM", str( e ) )
             return
-        
-        if self.source_dem is None: 
+
+        if self.grid is None: 
             QMessageBox.critical( self, "DEM", "DEM was not read" )
             return
- 
-        QMessageBox.information( self, "On-the-fly projection warning", "Be sure that current DEM and project use same projection" )
-                   
+        
         self.intersection_definepoint_pButton.setEnabled( True )
         self.intersection_resetsrcpt_pButton.setEnabled( True )
-        self.bestfitplane_definepoints_pButton.setEnabled( True )
         
 
-    def set_bestfitplane_points_from_map( self, qgs_point, button ): # Add point to analyze
+    def coords_within_dem_bndr( self, dem_crs_coord_x, dem_crs_coord_y):
+        
+        if dem_crs_coord_x <= self.grid.xmin or dem_crs_coord_x >= self.grid.xmax or \
+           dem_crs_coord_y <= self.grid.ymin or dem_crs_coord_y >= self.grid.ymax:
+            return False        
+        return True        
+        
 
-        # mapPos = self.canvas.getCoordinateTransform().toMapCoordinates( position["x"], position["y"] )
+    def create_marker(self, canvas, prj_crs_x, prj_crs_y, pen_width= 2, icon_type = 2, icon_size = 18, icon_color = 'limegreen' ):
         
-        mapPos_x = qgs_point.x()
-        mapPos_y = qgs_point.y()
-        
-        if mapPos_x <= self.source_dem.xmin or mapPos_x >= self.source_dem.xmax or \
-           mapPos_y <= self.source_dem.ymin or mapPos_y >= self.source_dem.ymax:
-            return        
-        
-        marker = QgsVertexMarker( self.canvas )
-        marker.setIconType( 2 )
-        marker.setIconSize( 18 )
-        marker.setPenWidth( 2 )
-        marker.setColor( QColor( 'limegreen' ) )
-        marker.setCenter(QgsPoint( mapPos_x, mapPos_y ))        
-        self.bestfitplane_point_markers.append( marker )        
-        self.canvas.refresh()
-        
-        self.add_bestfitplane_point( mapPos_x, mapPos_y )  
-        
-        
-    def add_bestfitplane_point( self, x, y ):
-       
-        curr_point = Point( x, y )
-        currArrCoord = self.source_dem.geog2array_coord(curr_point)        
-        z = floor(self.source_dem.interpolate_bilinear(currArrCoord)) 
-        
-        self.bestfitplane_points.append( [x, y, z] )        
-        self.bestfitplane_src_points_ListWdgt.addItem( "%.3f %.3f %.3f" % (x, y, z) )
-        
-        if self.bestfitplane_src_points_ListWdgt.count () >= 3:
-            self.bestfitplane_calculate_pButton.setEnabled( True )
-
-     
-    def calculate_bestfitplane(self):        
-
-        xyz_list = self.bestfitplane_points
-        
-        xyz_array = np.array( xyz_list, dtype=np.float64)
-        self.xyz_mean = np.mean( xyz_array, axis=0 )
-
-        svd = xyz_svd( xyz_array-self.xyz_mean )
-        if svd['result'] == None:
-            QMessageBox.critical( self, 
-                                  "Best fit plane", 
-                                  "Unable to calculate result")
-            return        
-
-        _, _, eigenvectors = svd['result']   
-                           
-        lowest_eigenvector = eigenvectors[ -1, : ]  # Solution is last row
-        normal = lowest_eigenvector[ : 3 ] / np.linalg.norm( lowest_eigenvector[ : 3 ] )
-        
-        normal_vector = Vector( normal[0], normal[1], normal[2])
-        normal_axis = normal_vector.to_axis()
-        self.bestfitplane = normal_axis.to_normal_geolplane()
-        
-        QMessageBox.information( self, "Best fit geological plane", 
-                                 "Dip direction: %.1f - dip angle: %.1f" %( self.bestfitplane._dipdir, self.bestfitplane._dipangle ))
+        marker = QgsVertexMarker( canvas )
+        marker.setIconType( icon_type )
+        marker.setIconSize( icon_size )
+        marker.setPenWidth( pen_width )
+        marker.setColor( QColor( icon_color ) )
+        marker.setCenter(QgsPoint( prj_crs_x, prj_crs_y ))         
+        return marker        
 
                    
     def update_intersection_point_pos( self, qgs_point = None, button = None ): # Add point to analyze
 
-        if self.source_dem is None:
-            QMessageBox.critical(self, 
-                                 "Intersection source point", 
-                                 "Source DEM is not defined") 
+        if self.grid is None:
+            QMessageBox.critical(self, "Intersection source point", "Source DEM is not defined") 
             return
 
         self.intersection_resetsrcpt_pButton.setEnabled( True )
                
         if self.sender() == self.intersection_PointMapTool:
-            mapPos_x = qgs_point.x()
-            mapPos_y = qgs_point.y()
-            self.Pt_x_spinBox.setValue( int( mapPos_x ) )
-            self.Pt_y_spinBox.setValue( int( mapPos_y ) )
-        elif self.sender() == self.Pt_x_spinBox or \
-             self.sender() == self.Pt_y_spinBox:        
-            if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '':
-                return            
-            if self.sender() == self.Pt_x_spinBox and self.intersection_srcpt_x == self.Pt_x_spinBox.value():                    
-                return
-            if self.sender() == self.Pt_y_spinBox and self.intersection_srcpt_y == self.Pt_y_spinBox.value():
-                return
+            self.Pt_x_spinBox.setValue( int( qgs_point.x() ) ); self.Pt_y_spinBox.setValue( int( qgs_point.y() ) )
+        elif self.sender() == self.Pt_x_spinBox or self.sender() == self.Pt_y_spinBox:        
+            if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '': return            
+            if self.sender() == self.Pt_x_spinBox and self.intersection_srcpt_x == self.Pt_x_spinBox.value(): return
+            if self.sender() == self.Pt_y_spinBox and self.intersection_srcpt_y == self.Pt_y_spinBox.value(): return
 
-        self.intersection_srcpt_x = self.Pt_x_spinBox.value()
-        self.intersection_srcpt_y = self.Pt_y_spinBox.value()
-        self.intersection_set_z_from_dem()
-        
-        self.remove_intersection_markers_from_canvas( )
-        self.intersection_remove_srcpt_marker_from_canvas()                        
-        self.intersection_sourcepoint_marker = QgsVertexMarker( self.canvas )
-        self.intersection_sourcepoint_marker.setIconType( 1 )
-        self.intersection_sourcepoint_marker.setIconSize( 18 )
-        self.intersection_sourcepoint_marker.setPenWidth( 2 ) 
-        self.intersection_sourcepoint_marker.setCenter(QgsPoint( self.intersection_srcpt_x, 
-                                                                 self.intersection_srcpt_y ))
+        self.intersection_srcpt_x, self.intersection_srcpt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()
+        self.set_z_from_dem()        
+        self.remove_markers_from_canvas(); self.remove_srcpt_marker_from_canvas()        
+        self.intersection_sourcepoint_marker = self.create_marker( self.canvas, 
+                                                                   self.intersection_srcpt_x, self.intersection_srcpt_y, 
+                                                                   icon_type = 1, 
+                                                                   icon_color = QColor( str( self.Intersection_color_comboBox.currentText() ) ) )        
         self.canvas.refresh()
 
 
-    def intersection_set_z_from_dem (self):
+    def set_z_from_dem (self):
         """
         Update z value.
         
         """         
                 
-        if self.source_dem is None: return
+        if self.grid is None: return        
+        if not self.fixz2dem_checkBox.isChecked(): return
         
-        if self.fixz2dem_checkBox.isChecked():    
+        if self.on_the_fly_projection:         
+            dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value() )        
+        else:
+            dem_crs_source_pt_x, dem_crs_source_pt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()       
+            
+        if not self.coords_within_dem_bndr( dem_crs_source_pt_x, dem_crs_source_pt_y): 
+            QMessageBox.critical( self, "Intersection source point", 
+                                 "Defined point is outside source DEM extent" )                 
+            return
+        currArrCoord = self.grid.geog2array_coord( Point( dem_crs_source_pt_x, dem_crs_source_pt_y ) )        
+        z = floor(self.grid.interpolate_bilinear(currArrCoord))         
+        if z is None: return    
+        self.current_z_value = int( z )           
+        self.Pt_z_spinBox.setValue( self.current_z_value )
+        self.intersection_z_from_dem = True
 
-            curr_x = self.Pt_x_spinBox.value()
-            curr_y = self.Pt_y_spinBox.value()
-            
-            if curr_x <= self.source_dem.xmin or curr_x >= self.source_dem.xmax or \
-               curr_y <= self.source_dem.ymin or curr_y >= self.source_dem.ymax:
-                QMessageBox.critical(self, 
-                                     "Intersection source point", 
-                                     "Defined point is outside source DEM extent")                 
-                return
-           
-            curr_point = Point( curr_x, curr_y )
-            currArrCoord = self.source_dem.geog2array_coord(curr_point)
-            
-            z = floor(self.source_dem.interpolate_bilinear(currArrCoord)) 
-            
-            if z is not None:
-                self.current_z_value = int( z )           
-                self.Pt_z_spinBox.setValue( self.current_z_value )
-                self.intersection_z_from_dem = True  
-        
-        
-    def disable_bestfitplane_points_definition(self):
-        
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
 
-        self.disable_bestfitplane_points_MapTool()
-        for marker in self.bestfitplane_point_markers:        
-            self.canvas.scene().removeItem( marker )
-        self.bestfitplane_point_markers = []
-        self.bestfitplane_src_points_ListWdgt.clear()
-        
-           
     def disable_MapTool( self, mapTool ):
                             
         try:
-            if mapTool is not None:                   
-                self.canvas.unsetMapTool( mapTool )
+            if mapTool is not None: self.canvas.unsetMapTool( mapTool )
         except:
             pass                            
 
         try:
-            if self.previousTool is not None:                            
-                self.canvas.setMapTool( self.previousTool )
+            if self.previousTool is not None: self.canvas.setMapTool( self.previousTool )
         except:
             pass
 
+         
+    def reset_srcpoint_SpinBoxes(self):
+        
+        for spinbox in ( self.Pt_x_spinBox, self.Pt_y_spinBox, self.Pt_z_spinBox ):
+            spinbox.clear()
 
-    def disable_bestfitplane_points_MapTool( self ):
-        
-        self.disable_MapTool( self.bestfitplane_PointMapTool )
-        
-              
-    def intersection_reset_srcpoint_SpinBoxes(self):
-        
-        self.Pt_x_spinBox.clear()
-        self.Pt_y_spinBox.clear()
-        self.Pt_z_spinBox.clear()
-        
         
     def update_dipdir_slider(self):
         """
         Update the value of the dip direction in the slider.""
-        """
-        
-        real_dipdirection = self.DDirection_spinBox.value()
-        transformed_dipdirection = real_dipdirection + 180.0
-        if transformed_dipdirection > 360.0:
-            transformed_dipdirection = transformed_dipdirection - 360            
+        """        
+        transformed_dipdirection = self.DDirection_spinBox.value() + 180.0
+        if transformed_dipdirection > 360.0: transformed_dipdirection -= 360.0            
         self.DDirection_dial.setValue( transformed_dipdirection ) 
   
            
@@ -837,11 +564,8 @@ a message warning can be repeated more that once.
         """
         Update the value of the dip direction in the spinbox.
         """        
-        transformed_dipdirection = self.DDirection_dial.value()
-        real_dipdirection = transformed_dipdirection - 180.0
-        if real_dipdirection < 0.0:
-            real_dipdirection = real_dipdirection + 360.0
-            
+        real_dipdirection = self.DDirection_dial.value() - 180.0
+        if real_dipdirection < 0.0: real_dipdirection += 360.0            
         self.DDirection_spinBox.setValue( real_dipdirection ) 
 
                  
@@ -857,71 +581,63 @@ a message warning can be repeated more that once.
         Update the value of the dip angle in the spinbox.
         """        
         self.DAngle_spinBox.setValue( self.DAngle_verticalSlider.value() ) 
+
+
+    def project_coords( self, x, y, source_crs, dest_crs ):
         
-                       
+        if self.on_the_fly_projection and source_crs != dest_crs:
+            dest_crs_qgs_pt = project_point( make_qgs_point( x, y ), source_crs, dest_crs )
+            return  dest_crs_qgs_pt.x(), dest_crs_qgs_pt.y() 
+        else:
+            return  x, y        
+       
+
+    def get_dem_crs_coords( self, x, y ):
+    
+        return self.project_coords( x, y, self.projectCrs, self.dem.crs() )
+
+
+    def get_prj_crs_coords( self, x, y ):
+
+        return self.project_coords( x, y, self.dem.crs(), self.projectCrs )
+        
+                               
     def calculate_intersection( self ):
         """
         Calculate intersection points.
         """
 
-        if self.source_dem is None:
-            QMessageBox.information( self, 
-                                     "Intersection calculation", 
-                                     "Please first select a DEM")
+        if self.grid is None:
+            QMessageBox.information( self, "Intersection calculation", "Please first select a DEM")
             return
-
                 
-        if self.Pt_x_spinBox.text() == '' or \
-           self.Pt_y_spinBox.text() == '' or \
-           self.Pt_z_spinBox.text() == '':
-            QMessageBox.information( self, 
-                                     "Intersection calculation", 
-                                     "Define the location of the source point in 'Geographic parameters' section")
+        if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '' or self.Pt_z_spinBox.text() == '':
+            QMessageBox.information( self, "Intersection calculation", "Define the location of the source point in 'Geographic parameters' section")
             return
-                                                          
-        sourcePoint = Point(self.Pt_x_spinBox.value(), 
-                           self.Pt_y_spinBox.value(), 
-                           self.Pt_z_spinBox.value())
 
-        srcDipDir = self.DDirection_spinBox.value()
-        srcDipAngle = self.DAngle_verticalSlider.value()
+        prj_crs_source_pt_x, prj_crs_source_pt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()
+        if self.on_the_fly_projection:       
+            dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( prj_crs_source_pt_x, prj_crs_source_pt_y ) 
+        else:
+            dem_crs_source_pt_x, dem_crs_source_pt_y = prj_crs_source_pt_x, prj_crs_source_pt_y
+        dem_crs_source_point = Point( dem_crs_source_pt_x, dem_crs_source_pt_y, self.Pt_z_spinBox.value() )
 
-        self.srcPlaneAttitude = GeolPlane( srcDipDir, srcDipAngle )
+        self.srcPlaneAttitude = GeolPlane( self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value() )
 
-        # intersection arrays
-        
-        self.inters = Intersections()
-        
-        intersection_results = self.source_dem.intersection_with_surface('plane', 
-                                                                         sourcePoint,  
-                                                                         self.srcPlaneAttitude )
-        
-        self.inters.xcoords_x = intersection_results[0]
-        self.inters.xcoords_y = intersection_results[1]
-        self.inters.ycoords_x = intersection_results[2]
-        self.inters.ycoords_y = intersection_results[3]
-            
-        self.inters.parameters = Intersection_Parameters(self.source_dem._sourcename, sourcePoint, self.srcPlaneAttitude)
+        # intersection arrays       
 
-
+        self.inters = Intersections() 
+        self.inters.xcoords_x, self.inters.xcoords_y, \
+        self.inters.ycoords_x, self.inters.ycoords_y = self.grid.intersection_with_surface('plane', dem_crs_source_point, self.srcPlaneAttitude )            
+        self.inters.parameters = Intersection_Parameters(self.grid._sourcename, dem_crs_source_point, self.srcPlaneAttitude)
         self.intersections_x = list( self.inters.xcoords_x[ np.logical_not(np.isnan(self.inters.xcoords_x)) ] ) + \
-                          list( self.inters.ycoords_x[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )
-    
+                               list( self.inters.ycoords_x[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )    
         self.intersections_y = list( self.inters.xcoords_y[ np.logical_not(np.isnan(self.inters.xcoords_x)) ] ) + \
-                          list( self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )
-                          
-        intersection_data = dict( x=self.intersections_x, y=self.intersections_y ) 
-         
-        intersection_plane = dict( dipdir=self.inters.parameters._srcPlaneAttitude._dipdir, 
-                                   dipangle= self.inters.parameters._srcPlaneAttitude._dipangle )
-        
-        intersection_point = dict( x=self.inters.parameters._srcPt.x, 
-                                   y=self.inters.parameters._srcPt.y, 
-                                   z=self.inters.parameters._srcPt.z )
-
-        self.intersections_xprt = dict(data=intersection_data,
-                                  plane=intersection_plane,
-                                  point=intersection_point)
+                               list( self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )                          
+        intersection_data = dict( x = self.intersections_x, y = self.intersections_y )          
+        intersection_plane = dict( dipdir = self.inters.parameters._srcPlaneAttitude._dipdir, dipangle = self.inters.parameters._srcPlaneAttitude._dipangle )        
+        intersection_point = dict( x = self.inters.parameters._srcPt.x, y = self.inters.parameters._srcPt.y, z = self.inters.parameters._srcPt.z )
+        self.intersections_xprt = dict( data = intersection_data, plane = intersection_plane, point = intersection_point)
 
         self.plot_intersections()
         
@@ -936,15 +652,14 @@ a message warning can be repeated more that once.
             return
         
         current_markers_list = []
-        for x, y in zip( self.intersections_x, self.intersections_y ): 
-            marker = QgsVertexMarker( self.canvas )
-            marker.setIconType( 1 )
-            marker.setColor( QColor( str( self.Intersection_color_comboBox.currentText() ) ) )
-            marker.setIconSize( 8 )
-            marker.setPenWidth( 1 )
-            marker.setCenter( QgsPoint( x, y) )
-            current_markers_list.append(marker)
-        
+        for dem_crs_x, dem_crs_y in zip( self.intersections_x, self.intersections_y ):
+            if self.on_the_fly_projection:
+                prj_crs_x, prj_crs_y = self.get_prj_crs_coords( dem_crs_x, dem_crs_y )
+            else:
+                prj_crs_x, prj_crs_y = dem_crs_x, dem_crs_y           
+            marker = self.create_marker( self.canvas, prj_crs_x, prj_crs_y, pen_width= 1, icon_type = 1, icon_size = 8, 
+                                         icon_color = QColor( str( self.Intersection_color_comboBox.currentText() ) ) )
+            current_markers_list.append(marker)        
         self.intersection_markers_list += current_markers_list   
         self.canvas.refresh()
 
@@ -955,8 +670,7 @@ a message warning can be repeated more that once.
                                                       self.tr( "Save shapefile" ), 
                                                       "*.shp", 
                                                       "shp (*.shp *.SHP)" )        
-        if not output_filename:
-            return
+        if not output_filename: return        
         self.Output_FileName_Input.setText( output_filename ) 
                       
                 
@@ -968,23 +682,17 @@ a message warning can be repeated more that once.
         # check for result existence
         
         if self.inters is None:
-            QMessageBox.critical(self, 
-                                 "Save results", 
-                                 "No results available") 
+            QMessageBox.critical(self, "Save results", "No results available") 
             return            
             
         self.output_filename = str( self.Output_FileName_Input.text() ) 
         if self.output_filename == '':
-            QMessageBox.critical(self, 
-                                 "Save results", 
-                                 "No output file defined") 
+            QMessageBox.critical( self, "Save results", "No output file defined" ) 
             return
                            
         # set output type
-        if self.Save_points_rButt.isChecked():
-            self.result_geometry = 'points'
-        else:
-            self.result_geometry = 'lines'        
+        if self.Save_points_rButt.isChecked(): self.result_geometry = 'points'
+        else: self.result_geometry = 'lines'        
         
         # creation of output shapefile
         shape_driver = ogr.GetDriverByName( "ESRI Shapefile" )              
@@ -1034,11 +742,8 @@ a message warning can be repeated more that once.
         self.outshape_featdef = self.out_layer.GetLayerDefn() 
 
         # write results
-        if self.result_geometry == 'points':
-            self.write_intersections_as_points()
-        else:
-            self.write_intersections_as_lines() 
-
+        if self.result_geometry == 'points': self.write_intersections_as_points()
+        else: self.write_intersections_as_lines()
         QMessageBox.information(self, "Result", "Saved to shapefile: %s" % self.output_filename)
 
         # add theme to QGis project
@@ -1068,26 +773,34 @@ a message warning can be repeated more that once.
         intersections_y = list( x_filtered_coord_y ) + list( y_filtered_coord_y )                                           
         intersections_z = list( x_filtered_coord_z ) + list( y_filtered_coord_z )       
          
-        curr_Pt_id = 0                    
-
-        for curr_Pt in zip(intersections_x, intersections_y, intersections_z):
-            
+        curr_Pt_id = 0   
+        for curr_Pt in zip(intersections_x, intersections_y, intersections_z):            
             curr_Pt_id += 1
+            if self.on_the_fly_projection:            
+                prj_crs_x, prj_crs_y = self.get_prj_crs_coords( float(curr_Pt[0]), float(curr_Pt[1]) )
+            else:
+                prj_crs_x, prj_crs_y = float(curr_Pt[0]), float(curr_Pt[1])
             
             # pre-processing for new feature in output layer
             curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
-            curr_Pt_geom.AddPoint(float(curr_Pt[0]), float(curr_Pt[1]), float(curr_Pt[2]))
+            curr_Pt_geom.AddPoint( prj_crs_x, prj_crs_y, float(curr_Pt[2]) )
                 
             # create a new feature
             curr_Pt_shape = ogr.Feature(self.outshape_featdef)
             curr_Pt_shape.SetGeometry(curr_Pt_geom)
-            curr_Pt_shape.SetField('id', curr_Pt_id)                                       
-            curr_Pt_shape.SetField('x', curr_Pt[0])
-            curr_Pt_shape.SetField('y', curr_Pt[1]) 
-            curr_Pt_shape.SetField('z', curr_Pt[2]) 
+            curr_Pt_shape.SetField('id', curr_Pt_id)
+                                    
+            curr_Pt_shape.SetField( 'x', prj_crs_x )
+            curr_Pt_shape.SetField( 'y', prj_crs_y ) 
+            curr_Pt_shape.SetField( 'z', curr_Pt[2] ) 
 
-            curr_Pt_shape.SetField('srcPt_x', self.intersections_xprt['point']['x'])
-            curr_Pt_shape.SetField('srcPt_y', self.intersections_xprt['point']['y']) 
+            if self.on_the_fly_projection:
+                prj_crs_src_pt_x, prj_crs_src_pt_y = self.get_prj_crs_coords( self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'] )            
+            else:
+                prj_crs_src_pt_x, prj_crs_src_pt_y = self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y']
+                
+            curr_Pt_shape.SetField('srcPt_x', prj_crs_src_pt_x)
+            curr_Pt_shape.SetField('srcPt_y', prj_crs_src_pt_y) 
             curr_Pt_shape.SetField('srcPt_z', self.intersections_xprt['point']['z'])
 
             curr_Pt_shape.SetField('dip_dir', self.srcPlaneAttitude._dipdir)
@@ -1097,8 +810,7 @@ a message warning can be repeated more that once.
             self.out_layer.CreateFeature(curr_Pt_shape)            
             
             # destroy no longer used objects
-            curr_Pt_geom.Destroy()
-            curr_Pt_shape.Destroy()
+            curr_Pt_geom.Destroy(); curr_Pt_shape.Destroy()
                             
         # destroy output geometry
         self.out_shape.Destroy() 
@@ -1117,30 +829,33 @@ a message warning can be repeated more that once.
         # networks of connected intersections
         self.inters.networks = self.inters.define_networks()   
         
-        for curr_path_id, curr_path_points in self.inters.networks.iteritems():
-                                    
-            line = ogr.Geometry( ogr.wkbLineString )
-            
-            for curr_point_id in curr_path_points:  
-                          
-                curr_intersection = self.inters.links[ curr_point_id-1 ]
-                           
-                i, j, direct = curr_intersection['i'], curr_intersection['j'], curr_intersection['pi_dir']
-                
-                if direct == 'x': x, y = self.inters.xcoords_x[ i, j ], self.inters.xcoords_y[ i, j ]
-                if direct == 'y': x, y = self.inters.ycoords_x[ i, j ], self.inters.ycoords_y[ i, j ] 
-                                       
-                z = self.plane_z( x, y )
- 
-                line.AddPoint( x, y, z )            
+        for curr_path_id, curr_path_points in self.inters.networks.iteritems():                                    
+            line = ogr.Geometry( ogr.wkbLineString )            
+            for curr_point_id in curr_path_points:                            
+                curr_intersection = self.inters.links[ curr_point_id-1 ]                           
+                i, j, direct = curr_intersection['i'], curr_intersection['j'], curr_intersection['pi_dir']                
+                if direct == 'x': dem_crs_x, dem_crs_y = self.inters.xcoords_x[ i, j ], self.inters.xcoords_y[ i, j ]
+                if direct == 'y': dem_crs_x, dem_crs_y = self.inters.ycoords_x[ i, j ], self.inters.ycoords_y[ i, j ]                                        
+                z = self.plane_z( dem_crs_x, dem_crs_y )
+                if self.on_the_fly_projection: 
+                    prj_crs_x, prj_crs_y = self.get_prj_crs_coords( dem_crs_x, dem_crs_y )
+                else:
+                    prj_crs_x, prj_crs_y = dem_crs_x, dem_crs_y                
+                line.AddPoint( prj_crs_x, prj_crs_y, z )            
                                        
             # create a new feature
             line_shape = ogr.Feature( self.outshape_featdef )
             line_shape.SetGeometry( line )   
 
             line_shape.SetField( 'id', curr_path_id )
-            line_shape.SetField( 'srcPt_x', self.intersections_xprt['point']['x'] )
-            line_shape.SetField( 'srcPt_y', self.intersections_xprt['point']['y'] ) 
+            
+            if self.on_the_fly_projection:
+                prj_crs_src_pt_x, prj_crs_src_pt_y = self.get_prj_crs_coords( self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'] )            
+            else:
+                prj_crs_src_pt_x, prj_crs_src_pt_y = self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y']            
+                
+            line_shape.SetField( 'srcPt_x', prj_crs_src_pt_x )
+            line_shape.SetField( 'srcPt_y', prj_crs_src_pt_y ) 
             line_shape.SetField( 'srcPt_z', self.intersections_xprt['point']['z'] )
     
             line_shape.SetField( 'dip_dir', self.srcPlaneAttitude._dipdir )
@@ -1155,10 +870,6 @@ a message warning can be repeated more that once.
                             
         # destroy output geometry
         self.out_shape.Destroy() 
-        
-               
-    def onPluginClose(self):
 
-        self.intersection_reset_all()
-        self.bestfitplane_reset_all()
+
 

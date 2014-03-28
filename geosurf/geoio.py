@@ -47,11 +47,15 @@ class GDALParameters( object ):
         Set raster no data value.
         
         @param  nodataval:  the raster no-data value.
-        @type  nodataval:  number or string convertible to float.
+        @type  nodataval:  None, otherwise number or string convertible to float.
                 
         @return:  self.         
         """
-        self._nodatavalue = float( nodataval )
+
+        try:
+            self._nodatavalue = float( nodataval )
+        except:
+            self._nodatavalue = None
         
    
     def g_noDataValue( self ):
@@ -331,27 +335,20 @@ class GDALParameters( object ):
 
 
 class QGisRasterParameters( object ):
-    """
-    Manage GDAL parameters from rasters.
-    
-    """
 
     # class constructor
-    def __init__( self ): 
-        """
-        Class constructor.
-        
-        @return:  generic-case GDAL parameters.
-        """
-        self.nodatavalue = None
-        self.cellsizeEW = None
-        self.cellsizeNS = None
-        self.rows = None
-        self.cols = None
-        self.xMin = None
-        self.xMax = None
-        self.yMin = None
-        self.yMax = None
+    def __init__( self, cellsizeEW, cellsizeNS, rows, cols, xMin, xMax, yMin, yMax, nodatavalue = None, crs = None ): 
+
+        self.cellsizeEW = cellsizeEW
+        self.cellsizeNS = cellsizeNS
+        self.rows = rows
+        self.cols = cols
+        self.xMin = xMin
+        self.xMax = xMax
+        self.yMin = yMin
+        self.yMax = yMax
+        self.nodatavalue = nodatavalue
+        self.crs = crs
 
 
     def point_in_dem_area(self, point):
@@ -391,11 +388,9 @@ class QGisRasterParameters( object ):
         point.y = self.yMin + (array_dict['y']+0.5)*self.cellsizeNS
         
         return point        
-        
-        
 
 
-def read_raster_band( raster_name ):
+def read_raster_band_via_gdal( raster_name ):
     """
     Read an input raster band, based on GDAL module.
     
@@ -412,10 +407,14 @@ def read_raster_band( raster_name ):
     gdal.AllRegister
     
     # open raster file and check operation success 
-    raster_data = gdal.Open( str( raster_name ), GA_ReadOnly )    
+    try:
+        raster_data = gdal.Open( str( raster_name ), GA_ReadOnly )    
+    except:
+        raise IOError, 'Unable to open raster with gdal.Open function'
+    
     if raster_data is None:
         raise IOError, 'Unable to open raster band' 
-
+    
     # initialize DEM parameters
     raster_params = GDALParameters()
     
@@ -423,8 +422,8 @@ def read_raster_band( raster_name ):
     raster_params.driverShortName = raster_data.GetDriver().ShortName
 
     # get current raster projection
-    raster_params.projection = raster_data.GetProjection()   
-
+    raster_params.projection = raster_data.GetProjection()
+    
     # get row and column numbers    
     raster_params.rows = raster_data.RasterYSize
     raster_params.cols = raster_data.RasterXSize
@@ -441,27 +440,31 @@ def read_raster_band( raster_name ):
     raster_params.topLeftY = raster_data.GetGeoTransform()[3]
     raster_params.rotGT4 = raster_data.GetGeoTransform()[4]
     raster_params.pixSizeNS = raster_data.GetGeoTransform()[5]
- 
+     
     # get single band 
     band = raster_data.GetRasterBand(1)
-    
+
     # get no data value for current band
-    try: 
+    try:
         raster_params.noDataValue = band.GetNoDataValue()
     except:
         pass
-    # read data from band 
-    grid_values = band.ReadAsArray( 0, 0, raster_params.cols, raster_params.rows )
+            
+    # read data from band
+    try: 
+        grid_values = band.ReadAsArray( 0, 0, raster_params.cols, raster_params.rows )
+    except:
+        raise IOError, 'Unable to read grid values with gdal ReadAsArray function'
     if grid_values is None:
         raise IOError, 'Unable to read data from raster'
-     
+         
     # transform data into numpy array
-    data = np.asarray( grid_values ) 
+    data = np.asarray( grid_values )
 
     # if nodatavalue exists, set null values to NaN in numpy array
-    if raster_params.noDataValue is not None:
+    if raster_params.noDataValue is not None and not np.isnan( raster_params.noDataValue ):
         data = np.where( abs( data - raster_params.noDataValue ) > 1e-05, data, np.NaN ) 
-
+    
     return raster_params, data
 
 
@@ -476,18 +479,18 @@ def read_dem( in_dem_fn ):
             
     # try reading DEM data
     try:
-        dem_params, dem_array = read_raster_band( in_dem_fn )
+        dem_params, dem_array = read_raster_band_via_gdal( in_dem_fn )
         dem_params.check_params()
     except ( IOError, TypeError, Raster_Parameters_Errors ), e:                    
-        raise IOError, 'Unable to read data from raster'
-           
+        raise IOError, e
+                          
     # create current grid
     return Grid(in_dem_fn, dem_params, dem_array)
     
                
-def read_line_shapefile( line_shp_path ):
+def read_line_shapefile_via_ogr( line_shp_path ):
     """
-    Read line shapefile.
+    Read line shapefile using OGR.
 
     @param  line_shp_path:  parameter to check.
     @type  line_shp_path:  QString or string
@@ -552,5 +555,3 @@ def read_line_shapefile( line_shp_path ):
 
     return dict( success = True, extent=lines_extent, vertices=lines_points ) 
        
-    # return lines_points, layer_extent_x, layer_extent_y
-

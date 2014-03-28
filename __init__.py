@@ -6,7 +6,7 @@
  
                               -------------------
         begin                : 2011-12-21
-        version              : 0.3.0 for QuantumGIS 2.0, released 2014-01-06 
+        version              : 0.3.1 for QuantumGIS 2.0 
         copyright            : (C) 2011-2014 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         

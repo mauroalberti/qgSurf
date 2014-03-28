@@ -26,6 +26,8 @@ class geosurface_simulation_Dialog( QDialog ):
     def __init__( self ):
 
         super( geosurface_simulation_Dialog, self ).__init__() 
+        self.analytical_surface_params = None
+        self.geographical_surface_params = None
                             
         self.setup_gui() 
 
@@ -270,21 +272,19 @@ class geosurface_simulation_Dialog( QDialog ):
 
     def view_analytical_surface( self ):
 
-        try:         
-            view_surface( self.analytical_surface_abz )
-        except:
+        if self.analytical_surface_params is None:
             QMessageBox.critical( self, "Surface simulation", "Matrix not yet calculated" )
-            return            
+            return
+        view_surface( self.analytical_surface_abz )
         
 
     def view_geographical_surface( self ):
 
-        try:         
-            view_surface( self.simulated_geosurface )
-        except:
+        if self.geographical_surface_params is None:
             QMessageBox.critical( self, "Surface simulation", "Geographic surface not yet calculated" )
-            return            
-
+            return         
+        view_surface( self.simulated_geosurface )
+        
 
     def calculate_scale_matrix( self, a_range, b_range, grid_length, grid_width ):
         

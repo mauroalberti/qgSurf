@@ -18,6 +18,11 @@ from .algebr_utils import point_solution
 MINIMUM_SEPARATION_THRESHOLD = 1e-10
 MINIMUM_VECTOR_MAGNITUDE = 1e-10 
        
+
+#*** TEMP
+from PyQt4.QtCore import *
+from PyQt4.QtGui import *
+#*** temp DEBUG
  
 
 class Point(object):
@@ -27,7 +32,7 @@ class Point(object):
     """
         
     # class constructor
-    def __init__( self, x = np.nan, y = np.nan, z = np.nan ):
+    def __init__( self, x = np.nan, y = np.nan, z = 0.0 ):
         """ 
         Point class constructor.
         
@@ -120,7 +125,12 @@ class Point(object):
     # property for z
     z = property( g_z, s_z )
     
-  
+
+    def copy( self ):
+        
+        return Point( self.x, self.y, self.z )
+        
+          
     def distance( self, another ):
         """
         Calculate Euclidean distance between two points.
@@ -131,10 +141,11 @@ class Point(object):
         @return:  distance between the two points - float.        
         """
         
-        assert self.z != np.nan
-        assert another.z != np.nan
-        return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 + ( self.z - another.z ) ** 2 )
-    
+        try:
+            return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 + ( self.z - another.z ) ** 2 )
+        except:
+            return np.nan
+        
     
     def hor_distance( self, another ):
         """
@@ -145,7 +156,10 @@ class Point(object):
         
         @return:  horizontal distance between the two points - float.        
         """
-        return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 )
+        try:
+            return sqrt( ( self.x - another.x ) ** 2 + ( self.y - another.y ) ** 2 )
+        except:
+            return np.nan        
     
         
     def movedby( self, sx = 0.0 , sy = 0.0 , sz = 0.0 ):
@@ -202,6 +216,40 @@ class Point(object):
                       self.z )
         
         
+    def is_coincident_with( self, another, tolerance = 1.0e-6 ):
+        
+        if self.distance(another) > tolerance:
+            return False
+        else:
+            return True
+        
+
+def interpolate_linear_horizontal_points( start_pt, end_pt, interp_distance ):
+    
+    assert interp_distance >= 0
+    
+    length_2d, _, versor_2D, _ = start_pt.distance_uvector( end_pt )
+    
+    assert length_2d > 0.0
+
+    generator_vector = versor_2D.scale( interp_distance )
+
+    interpolated_points = [ start_pt ]
+    
+    n = 0
+    
+    while ( True ):        
+        n += 1 
+        new_pt = start_pt.displaced_by_vector( generator_vector.scale( n ) )
+        if start_pt.distance(new_pt) >= length_2d:
+            break        
+        interpolated_points.append( new_pt )
+        
+    interpolated_points.append( end_pt )
+        
+    return interpolated_points
+
+            
 class Point4D( Point ):
     
     def __init__(self, x = np.nan, y = np.nan, z = 0.0, time = np.nan ):
@@ -591,7 +639,209 @@ class GeolPlane(object):
         
         return CartesianPlane( a, b, c, d )
     
-      
+
+class Line(object):
+    # Line is a list of Point objects
+
+    def __init__( self ):
+     
+        self.points = []
+        
+        
+    def copy( self ):
+        
+        new_line = Line()
+        new_line.points = [ pt.copy() for pt in self.points ]
+        
+        return new_line
+        
+
+    def add_point( self, pt ):
+        
+        new_line = self.copy()
+        new_line.points.append( pt.copy() )
+        
+        return new_line
+        
+ 
+    def add_points(self, pt_list ):
+
+        new_line = self.copy()
+        new_line.points = new_line.points + [ pt.copy() for pt in pt_list ]
+        
+        return new_line
+                        
+
+    def remove_coincident_successive_points( self ):
+        
+        new_line = Line().add_point( self.points[0] )
+
+        for ndx in range(1, self.num_points() ):
+            if not self.points[ndx].is_coincident_with( new_line.points[-1] ):
+                new_line = new_line.add_point( self.points[ndx] )
+ 
+        return new_line
+    
+
+    def join( self, another ):
+        """
+        Joins together two lines and returns the join as a new line without point changes, 
+        with possible overlapping points 
+        and orientation mismatches between the two original lines
+        """
+        
+        return self.add_points( another.points )
+   
+                    
+    def num_points( self ):
+        
+        return len( self.points )
+    
+        
+    def length( self ):
+        
+        length = 0.0
+        for ndx in range( self.num_points()-1 ):
+            length += self.points[ndx].distance( self.points[ndx+1] )
+        return length            
+
+
+    def incremental_length( self ):
+        
+        incremental_length_list = []
+        length = 0.0
+        incremental_length_list.append( length )
+        for ndx in range( self.num_points()-1 ):            
+            length += self.points[ndx].distance( self.points[ndx+1] )
+            incremental_length_list.append( length )        
+            
+        return incremental_length_list         
+        
+
+    def reverse_direction( self ):
+        
+        new_line = self.copy()
+        new_line.points.reverse() # in-place operation on new_line
+        
+        return new_line
+    
+                
+    def resample_with_original_vertices( self, sample_distance, mantain_original_vertices = True ):
+        
+        cleaned_line = self.remove_coincident_successive_points()
+        resampled_line = Line()
+
+        for point_ndx in xrange( cleaned_line.num_points() - 1 ):
+            
+            resampled_line = resampled_line.add_points( interpolate_linear_horizontal_points( 
+                                                            cleaned_line.points[ point_ndx ],
+                                                            cleaned_line.points[ point_ndx+1 ],
+                                                            sample_distance )[:-1] )
+        resampled_line = resampled_line.add_point( cleaned_line.points[ -1 ] )
+
+        return resampled_line
+            
+
+    def get_slopes( self ):
+  
+        slopes_list = []
+        for ndx in range( self.num_points() - 1 ):            
+            vector = self.points[ndx].to_vector( self.points[ndx+1] )
+            slopes_list.append( degrees( vector.slope_radians() ) ) 
+        slopes_list.append( np.nan ) # slope value for last point is unknown         
+        return slopes_list        
+        
+        
+def line_from_xyz_list( xyz_list ):
+    
+    return Line().add_points( [ Point(x,y,z) for (x,y,z) in xyz_list ] )
+
+        
+class MultiLine(object):
+    # MultiLine is a list of Line objects
+    
+    def __init__( self, lines_list ):
+     
+        self.lines = lines_list    
+    
+    
+    def num_parts( self ):
+        
+        return len( self.lines )
+    
+    
+    def num_points( self ):
+        
+        num_points = 0
+        for line in self.lines:
+            num_points += line.num_points()
+            
+        return num_points
+    
+
+    def is_continuous( self ):
+        
+        for line_ndx in range( len(self.lines) - 1 ):
+            if not self.lines[line_ndx].points[-1].is_coincident_with( self.lines[line_ndx+1].points[0] ) or \
+               not self.lines[line_ndx].points[-1].is_coincident_with( self.lines[line_ndx+1].points[-1] ):
+                return False
+            
+        return True
+        
+            
+    def is_unidirectional( self ):        
+        
+        for line_ndx in range( len(self.lines) - 1):
+            if not self.lines[line_ndx].points[-1].is_coincident_with( self.lines[line_ndx+1].points[0] ):
+                return False
+            
+        return True
+
+
+    def to_line( self ):
+
+        return Line().add_points( [ point for line in self.lines for point in line.points ] )
+        
+
+def multiline_from_xyz( xyz_lists ):
+    # input is a list of list of (x,y,z) values
+    
+    line_list = []
+    for xyz_list in xyz_lists:
+        line_list.append( line_from_xyz_list( xyz_list ) )
+        
+    return MultiLine( line_list )
+        
+    
+def multiline_from_lines( line_list ):
+    
+    return MultiLine( line_list )
+    
+     
+def merge_lines( lines, progress_ids ):
+    """
+    lines: a list of list of (x,y,z) tuples for multilines, o
+    """
+
+    sorted_line_list = [line for (id, line) in sorted(zip( progress_ids, lines))]
+
+    line_list = []
+    for line in sorted_line_list:
+       
+        line_type, line_geometry = line 
+     
+        if line_type == 'multiline': 
+            path_line = multiline_from_xyz( line_geometry ).to_line()
+        elif line_type == 'line':            
+            path_line = line_from_xyz_list( line_geometry ) 
+        line_list.append( path_line )  # now a list of Lines     
+                
+    # now the list of Lines has to be transformed into a single Line 
+    merged_line = multiline_from_lines( line_list ).to_line().remove_coincident_successive_points()
+    
+    return merged_line
+               
+                   
 class ArrCoord(object):
     """
     2D Array coordinates.
@@ -1033,49 +1283,51 @@ class Grid(object):
 
     def intersection_with_surface( self, surf_type, srcPt, srcPlaneAttitude ):
         """
-        Calculates the intersections (as points) between DEM (self) and analytical surface.
-        Currently it works only with planes as analytical surface cases.
+        Calculates the intersections (as points) between DEM (the self object) and an analytical surface.
+        Currently it works only with planes.
         
-        @param surf_type: type of considered surface (e.g., plane).
+        @param surf_type: type of considered surface (i.e., plane, the only case implemented at present).
         @type surf_type: String.
         @param srcPt: point, expressed in geographical coordinates, that the plane must contain.
         @type srcPt: Point.
         @param srcPlaneAttitude: orientation of the surface (currently only planes).
         @type srcPlaneAttitude: class GeolPlane.
         
-        @return: tuple of six arrays
+        @return: tuple of four arrays
         """
         
         if surf_type == 'plane': 
                         
-            # lambdas to compute the geographic coordinates (in x- and y-) of a cell center 
-            coord_grid2geog_x = lambda j : self.domain.g_llcorner().x + self.cellsize_x() * ( 0.5 + j )
-            coord_grid2geog_y = lambda i : self.domain.g_trcorner().y - self.cellsize_y() * ( 0.5 + i )
+            # closures to compute the geographic coordinates (in x- and y-) of a cell center
+            # the grid coordinates of the cell center are expressed by i and j 
+            grid_coord_to_geogr_coord_x_closure = lambda j : self.domain.g_llcorner().x + self.cellsize_x() * ( 0.5 + j )
+            grid_coord_to_geogr_coord_y_closure = lambda i : self.domain.g_trcorner().y - self.cellsize_y() * ( 0.5 + i )
              
             # arrays storing the geographical coordinates of the cell centers along the x- and y- axes    
-            x_values = self.x()
-            y_values = self.y()      
+            cell_center_x_array = self.x()
+            cell_center_y_array = self.y()      
 
-            ycoords_x, xcoords_y  = np.broadcast_arrays( x_values, y_values )
+            ycoords_x, xcoords_y  = np.broadcast_arrays( cell_center_x_array, cell_center_y_array )
                         
             #### x-axis direction intersections
             
             # 2D array of DEM segment parameters                         
             x_dem_m = self.grad_forward_x()            
-            x_dem_q = self.data - x_values * x_dem_m            
+            x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
-            # equation for the planar surface that, given (x,y), will be used to derive z  
-            plane_z = srcPlaneAttitude.plane_from_geo( srcPt  )
+            # closure for the planar surface that, given (x,y), will be used to derive z  
+            plane_z_closure = srcPlaneAttitude.plane_from_geo( srcPt  )
             
             # 2D array of plane segment parameters
             x_plane_m = srcPlaneAttitude.plane_x_coeff(  )            
-            x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, coord_grid2geog_y, plane_z )
+            x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, grid_coord_to_geogr_coord_y_closure, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
-            x_inters_denomin =  np.where( x_dem_m != x_plane_m, x_dem_m-x_plane_m, np.NaN )            
-            coincident_x = np.where( x_dem_q != x_plane_q, np.NaN, ycoords_x )            
-            xcoords_x = np.where( x_dem_m != x_plane_m , (x_plane_q - x_dem_q ) / x_inters_denomin, coincident_x )
-            
+            x_inters_denomin =  np.where( x_dem_m != x_plane_m, x_dem_m-x_plane_m, np.NaN )  
+                      
+            coincident_x = np.where( x_dem_q != x_plane_q, np.NaN, ycoords_x )
+                        
+            xcoords_x = np.where( x_dem_m != x_plane_m , (x_plane_q - x_dem_q ) / x_inters_denomin, coincident_x )            
             xcoords_x = np.where( xcoords_x < ycoords_x , np.NaN, xcoords_x )           
             xcoords_x = np.where( xcoords_x >= ycoords_x + self.cellsize_x() , np.NaN, xcoords_x )  
                         
@@ -1084,11 +1336,11 @@ class Grid(object):
 
             # 2D array of DEM segment parameters  
             y_dem_m = self.grad_forward_y()            
-            y_dem_q = self.data - y_values * y_dem_m
+            y_dem_q = self.data - cell_center_y_array * y_dem_m
  
             # 2D array of plane segment parameters
             y_plane_m = srcPlaneAttitude.plane_y_coeff(  )            
-            y_plane_q = array_from_function( 1, self.col_num(), coord_grid2geog_x , lambda i: 0, plane_z )
+            y_plane_q = array_from_function( 1, self.col_num(), grid_coord_to_geogr_coord_x_closure , lambda i: 0, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
             y_inters_denomin =  np.where( y_dem_m != y_plane_m, y_dem_m - y_plane_m, np.NaN )
@@ -1114,27 +1366,27 @@ class Grid(object):
         if surf_type == 'plane': 
                         
             # lambdas to compute the geographic coordinates (in x- and y-) of a cell center 
-            coord_grid2geog_x = lambda j : self.domain.g_llcorner().x + self.cellsize_x() * ( 0.5 + j )
-            coord_grid2geog_y = lambda i : self.domain.g_trcorner().y - self.cellsize_y() * ( 0.5 + i )
+            grid_coord_ to_geogr_coord_x = lambda j : self.domain.g_llcorner().x + self.cellsize_x() * ( 0.5 + j )
+            grid_coord_to_geogr_coord_y_closure = lambda i : self.domain.g_trcorner().y - self.cellsize_y() * ( 0.5 + i )
              
             # arrays storing the geographical coordinates of the cell centers along the x- and y- axes    
-            x_values = self.x()
-            y_values = self.y()      
+            cell_center_x_array = self.x()
+            cell_center_y_array = self.y()      
 
-            ycoords_x, xcoords_y  = np.broadcast_arrays( x_values, y_values )
+            ycoords_x, xcoords_y  = np.broadcast_arrays( cell_center_x_array, cell_center_y_array )
                         
             #### x-axis direction intersections
             
             # 2D array of DEM segment parameters                         
             x_dem_m = self.grad_forward_x()            
-            x_dem_q = self.data - x_values * x_dem_m            
+            x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
             # equation for the planar surface that, given (x,y), will be used to derive z  
-            plane_z = srcPlaneAttitude.plane_from_geo( srcPt )
+            plane_z_closure = srcPlaneAttitude.plane_from_geo( srcPt )
             
             # 2D array of plane segment parameters
             x_plane_m = srcPlaneAttitude.plane_x_coeff(  )            
-            x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, coord_grid2geog_y, plane_z )
+            x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, grid_coord_to_geogr_coord_y_closure, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
             x_inters_denomin =  np.where( x_dem_m != x_plane_m, x_dem_m-x_plane_m, np.NaN )            
@@ -1149,11 +1401,11 @@ class Grid(object):
 
             # 2D array of DEM segment parameters  
             y_dem_m = self.grad_forward_y()            
-            y_dem_q = self.data - y_values * y_dem_m
+            y_dem_q = self.data - cell_center_y_array * y_dem_m
  
             # 2D array of plane segment parameters
             y_plane_m = srcPlaneAttitude.plane_y_coeff(  )            
-            y_plane_q = array_from_function( 1, self.col_num(), coord_grid2geog_x , lambda i: 0, plane_z )
+            y_plane_q = array_from_function( 1, self.col_num(), grid_coord_ to_geogr_coord_x , lambda i: 0, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
             y_inters_denomin =  np.where( y_dem_m != y_plane_m, y_dem_m - y_plane_m, np.NaN )

@@ -2,8 +2,8 @@
 name=qgSurf
 description=Processing of geological planes and surfaces
 category=Plugins
-version=version 0.3.0
-experimental=True
+version=version 0.3.1
+experimental=False
 qgisMinimumVersion=2.0
 author=Mauro Alberti
 email=alberti.m65@gmail.com
@@ -11,11 +11,12 @@ icon=./icons/qgsurf.png
 
 ; start of optional metadata
 changelog=
-    0.2.0: map display/interaction is now through the QGis map window
-    0.2.1: calculate best-fit plane orientation given points drawn in the QGis map window
-    0.2.2: version compatible with QGis 2.0
+	0.2.0: map display/interaction is now through the QGis map window
+	0.2.1: calculate best-fit plane orientation given points drawn in the QGis map window
+	0.2.2: version compatible with QGis 2.0
 	0.2.3: fix graphic bug (dem intersection symbol not deleted on plugin close)
-	0.3.0: added modules for the processing of geological surfaces (non-planar); experimental 
+	0.3.0: added modules for the processing of geological surfaces (non-planar)
+	0.3.1: support for on-the-fly-projection for Best-Fit-Plane interpolation and DEM-plane intersection; minor bugs fixing 
 
 ; tags are in comma separated value format, spaces are allowed
 tags=raster,dem,intersection,structural geology, geological surfaces, 3D surfaces
