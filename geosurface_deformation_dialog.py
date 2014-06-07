@@ -39,7 +39,7 @@ class geosurface_deformation_Dialog( QDialog ):
         main_widget.addTab( self.setup_main_tab(), 
                             "3D surface deformation" ) 
                            
-        main_widget.addTab( self.setup_help_tab(), 
+        main_widget.addTab( self.setup_about_tab(), 
                             "Help" ) 
                             
         dialog_layout.addWidget( main_widget )                                     
@@ -182,7 +182,7 @@ class geosurface_deformation_Dialog( QDialog ):
         return outputWidget       
         
 
-    def setup_help_tab( self ):
+    def setup_about_tab( self ):
         
         helpWidget = QWidget()  
         helpLayout = QVBoxLayout( )

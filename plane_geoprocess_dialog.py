@@ -14,13 +14,10 @@ from qgs_tools.tools import get_current_raster_layers, project_point, \
      make_qgs_point
 from qgs_tools.ptmaptool import PointMapToolEmitPoint
     
-try:
-    from osgeo import ogr
-except: 
-    import ogr
+from osgeo import ogr
 
 from geosurf.geoio import read_dem
-from geosurf.spatial import Point, Vector
+from geosurf.spatial import Point_2D, Point_3D #, Vector
 from geosurf.spatial import GeolPlane
 from geosurf.intersections import Intersection_Parameters, Intersections
 
@@ -40,50 +37,11 @@ class plane_geoprocess_QWidget( QWidget ):
 
         super( plane_geoprocess_QWidget, self ).__init__()       
         self.canvas, self.plugin = canvas, plugin        
-        self.initialize_parameters()                 
+        self.init_params()                 
         self.setup_gui() 
 
-
-    def update_crs_settings( self ):
-
-        self.get_on_the_fly_projection()
-        if self.on_the_fly_projection: self.get_current_canvas_crs()        
-        
-        
-    def get_on_the_fly_projection( self ):
-        
-        self.on_the_fly_projection = True if self.canvas.hasCrsTransformEnabled() else False
-       
-        
-    def get_current_canvas_crs( self ):        
-                
-        self.projectCrs = self.canvas.mapRenderer().destinationCrs()
- 
-       
-    def reset_values(self):
-
-        self.current_z_value = None
-        self.intersection_z_from_dem = False
-        self.reset_srcpt()
-        self.reset_results()
-        
- 
-    def reset_srcpt(self):        
-
-        self.intersection_srcpt_x = None
-        self.intersection_srcpt_y = None        
-        self.intersection_sourcepoint_marker = None
-                
-        
-    def reset_results(self):
-
-        self.intersections_x = []
-        self.intersections_y = []
-        self.intersections_xprt = {}        
-        self.inters = None
-       
             
-    def initialize_parameters(self):
+    def init_params(self):
 
         self.reset_values() 
         self.previousTool = None        
@@ -99,7 +57,7 @@ class plane_geoprocess_QWidget( QWidget ):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab( self.setup_fplane_tab(), "Processing" )         
-        main_widget.addTab( self.setup_help_tab(), "Help" )                             
+        main_widget.addTab( self.setup_about_tab(), "Help" )                             
         dialog_layout.addWidget( main_widget )                                     
         self.setLayout( dialog_layout )                    
         self.adjustSize()                       
@@ -146,7 +104,7 @@ class plane_geoprocess_QWidget( QWidget ):
         return intersectionWidget 
     
 
-    def setup_help_tab( self ):
+    def setup_about_tab( self ):
         
         helpWidget = QWidget()  
         helpLayout = QVBoxLayout( )        
@@ -235,6 +193,46 @@ a message warning can be repeated more that once.
         
         return inputWidget
 
+
+
+    def update_crs_settings( self ):
+
+        self.get_on_the_fly_projection()
+        if self.on_the_fly_projection: self.get_current_canvas_crs()        
+        
+        
+    def get_on_the_fly_projection( self ):
+        
+        self.on_the_fly_projection = True if self.canvas.hasCrsTransformEnabled() else False
+       
+        
+    def get_current_canvas_crs( self ):        
+                
+        self.projectCrs = self.canvas.mapRenderer().destinationCrs()
+ 
+       
+    def reset_values(self):
+
+        self.current_z_value = None
+        self.intersection_z_from_dem = False
+        self.reset_srcpt()
+        self.reset_results()
+        
+ 
+    def reset_srcpt(self):        
+
+        self.intersection_srcpt_x = None
+        self.intersection_srcpt_y = None        
+        self.intersection_sourcepoint_marker = None
+                
+        
+    def reset_results(self):
+
+        self.intersections_x = []
+        self.intersections_y = []
+        self.intersections_xprt = {}        
+        self.inters = None
+       
 
     def check_z_congruence_with_dem( self ):
         
@@ -524,7 +522,7 @@ a message warning can be repeated more that once.
             QMessageBox.critical( self, "Intersection source point", 
                                  "Defined point is outside source DEM extent" )                 
             return
-        currArrCoord = self.grid.geog2array_coord( Point( dem_crs_source_pt_x, dem_crs_source_pt_y ) )        
+        currArrCoord = self.grid.geog2array_coord( Point_2D( dem_crs_source_pt_x, dem_crs_source_pt_y ) )        
         z = floor(self.grid.interpolate_bilinear(currArrCoord))         
         if z is None: return    
         self.current_z_value = int( z )           
@@ -620,7 +618,7 @@ a message warning can be repeated more that once.
             dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( prj_crs_source_pt_x, prj_crs_source_pt_y ) 
         else:
             dem_crs_source_pt_x, dem_crs_source_pt_y = prj_crs_source_pt_x, prj_crs_source_pt_y
-        dem_crs_source_point = Point( dem_crs_source_pt_x, dem_crs_source_pt_y, self.Pt_z_spinBox.value() )
+        dem_crs_source_point = Point_3D( dem_crs_source_pt_x, dem_crs_source_pt_y, self.Pt_z_spinBox.value() )
 
         self.srcPlaneAttitude = GeolPlane( self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value() )
 
@@ -636,7 +634,7 @@ a message warning can be repeated more that once.
                                list( self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ] )                          
         intersection_data = dict( x = self.intersections_x, y = self.intersections_y )          
         intersection_plane = dict( dipdir = self.inters.parameters._srcPlaneAttitude._dipdir, dipangle = self.inters.parameters._srcPlaneAttitude._dipangle )        
-        intersection_point = dict( x = self.inters.parameters._srcPt.x, y = self.inters.parameters._srcPt.y, z = self.inters.parameters._srcPt.z )
+        intersection_point = dict( x = self.inters.parameters._srcPt._x, y = self.inters.parameters._srcPt._y, z = self.inters.parameters._srcPt._z )
         self.intersections_xprt = dict( data = intersection_data, plane = intersection_plane, point = intersection_point)
 
         self.plot_intersections()
@@ -786,9 +784,9 @@ a message warning can be repeated more that once.
             curr_Pt_geom.AddPoint( prj_crs_x, prj_crs_y, float(curr_Pt[2]) )
                 
             # create a new feature
-            curr_Pt_shape = ogr.Feature(self.outshape_featdef)
-            curr_Pt_shape.SetGeometry(curr_Pt_geom)
-            curr_Pt_shape.SetField('id', curr_Pt_id)
+            curr_Pt_shape = ogr.Feature( self.outshape_featdef )
+            curr_Pt_shape.SetGeometry( curr_Pt_geom )
+            curr_Pt_shape.SetField( 'id', curr_Pt_id )
                                     
             curr_Pt_shape.SetField( 'x', prj_crs_x )
             curr_Pt_shape.SetField( 'y', prj_crs_y ) 

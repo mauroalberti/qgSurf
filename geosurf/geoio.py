@@ -14,7 +14,7 @@ try:
 except: 
     import ogr
 
-from .spatial import Grid, Point
+from .spatial import Grid, Point_3D
 from .errors import Raster_Parameters_Errors
 
 
@@ -298,18 +298,18 @@ class GDALParameters( object ):
         """
         Creates a point at the lower-left corner of the raster.
         
-        @return:  new Point instance.                        
+        @return:  new Point_3D instance.                        
         """
-        return Point( self.topLeftX, self.topLeftY - abs( self.pixSizeNS ) * self.rows )
+        return Point_3D( self.topLeftX, self.topLeftY - abs( self.pixSizeNS ) * self.rows )
 
     
     def trcorner( self ):
         """
         Create a point at the top-right corner of the raster.
 
-        @return:  new Point instance.                
+        @return:  new Point_3D instance.                
         """        
-        return Point( self.topLeftX + abs( self.pixSizeEW ) * self.cols, self.topLeftY )  
+        return Point_3D( self.topLeftX + abs( self.pixSizeEW ) * self.cols, self.topLeftY )  
    
 
     def geo_equiv( self, other, tolerance = 1.0e-6 ): 
@@ -337,8 +337,9 @@ class GDALParameters( object ):
 class QGisRasterParameters( object ):
 
     # class constructor
-    def __init__( self, cellsizeEW, cellsizeNS, rows, cols, xMin, xMax, yMin, yMax, nodatavalue = None, crs = None ): 
+    def __init__( self, name, cellsizeEW, cellsizeNS, rows, cols, xMin, xMax, yMin, yMax, nodatavalue, crs ): 
 
+        self.name = name
         self.cellsizeEW = cellsizeEW
         self.cellsizeNS = cellsizeNS
         self.rows = rows
@@ -353,10 +354,10 @@ class QGisRasterParameters( object ):
 
     def point_in_dem_area(self, point):
         
-        if point.x >= self.xMin and \
-           point.x <= self.xMax and \
-           point.y >= self.yMin and \
-           point.y <= self.yMax:
+        if point._x >= self.xMin and \
+           point._x <= self.xMax and \
+           point._y >= self.yMin and \
+           point._y <= self.yMax:
             return True
         else:
             return False
@@ -364,10 +365,10 @@ class QGisRasterParameters( object ):
           
     def point_in_interpolation_area(self, point):
         
-        if point.x >= self.xMin+self.cellsizeEW/2.0 and \
-           point.x <= self.xMax-self.cellsizeEW/2.0 and \
-           point.y >= self.yMin+self.cellsizeNS/2.0 and \
-           point.y <= self.yMax-self.cellsizeNS/2.0:
+        if point._x >= self.xMin+self.cellsizeEW/2.0 and \
+           point._x <= self.xMax-self.cellsizeEW/2.0 and \
+           point._y >= self.yMin+self.cellsizeNS/2.0 and \
+           point._y <= self.yMax-self.cellsizeNS/2.0:
             return True
         else:
             return False
@@ -375,17 +376,17 @@ class QGisRasterParameters( object ):
                    
     def geogr2raster(self, point):
         
-        x = ( point.x - ( self.xMin + self.cellsizeEW/2.0 ) ) / self.cellsizeEW
-        y = ( point.y - ( self.yMin + self.cellsizeNS/2.0 ) ) / self.cellsizeNS
+        x = ( point._x - ( self.xMin + self.cellsizeEW/2.0 ) ) / self.cellsizeEW
+        y = ( point._y - ( self.yMin + self.cellsizeNS/2.0 ) ) / self.cellsizeNS
         
         return dict(x=x,y=y) 
       
     
     def raster2geogr(self, array_dict ):
         
-        point = Point()
-        point.x = self.xMin + (array_dict['x']+0.5)*self.cellsizeEW
-        point.y = self.yMin + (array_dict['y']+0.5)*self.cellsizeNS
+        point = Point_3D()
+        point._x = self.xMin + (array_dict['x']+0.5)*self.cellsizeEW
+        point._y = self.yMin + (array_dict['y']+0.5)*self.cellsizeNS
         
         return point        
 
@@ -545,7 +546,7 @@ def read_line_shapefile_via_ogr( line_shp_path ):
                             
             x, y, z = line_geom.GetX(i), line_geom.GetY(i), line_geom.GetZ(i)
                         
-            line_points.append( Point(x,y,z) )
+            line_points.append( Point_3D(x,y,z) )
                             
         lines_points.append(line_points)
                     
