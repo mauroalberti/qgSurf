@@ -5,69 +5,73 @@ import os
 from math import floor
 import numpy as np
 
+import webbrowser
+
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 
 from osgeo import ogr
 
 from qgis.core import *
+from qgis.core import QgsPoint, QgsRaster, QgsMapLayerRegistry, QgsMapLayer, QGis
+
 from qgis.gui import *
 
-from qgs_tools.tools import get_current_raster_layers, project_point, \
-     make_qgs_point
-from qgs_tools.ptmaptool import PointMapToolEmitPoint
+from geosurf.qgs_tools import loaded_raster_layers, loaded_point_layers, loaded_line_layers, project_qgs_point, \
+     qgs_point, PointMapToolEmitPoint
     
 from geosurf.geoio import read_dem
-from geosurf.spatial import Point_2D, Vector_3D
+from geosurf.spatial import Point_2D, Vector_3D, list3_to_list, remove_equal_consecutive_xypairs
 from geosurf.svd import xyz_svd 
-from qt_utils.utils import define_save_file_name, define_existing_file_name
-
-from ogr_tools.shapefiles import create_shapefile, open_shapefile, write_point_result
-from ogr_tools.errors import OGR_IO_Errors
-  
-import webbrowser
-
-      
+from geosurf.qt_utils import define_save_file_name, define_existing_file_name
+from geosurf.qgs_tools import vector_type, pt_geoms_attrs, line_geoms_attrs
+from geosurf.ogr_tools import create_shapefile, open_shapefile, write_point_result
+from geosurf.errors import OGR_IO_Errors, VectorIOException
+   
 
 class bestfitplane_QWidget( QWidget ):
 
-    # line_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
     dem_default_text = '--  required  --'
-    
+    ptlnlyr_default_text = '--  choose  --'
+        
     fields_dict_list = [ dict(name='id', ogr_type=ogr.OFTInteger ),
-                     dict(name='x', ogr_type=ogr.OFTReal ),
-                     dict(name='y', ogr_type=ogr.OFTReal ),
-                     dict(name='z', ogr_type=ogr.OFTReal ),
-                     dict(name='dip_dir', ogr_type=ogr.OFTReal ),
-                     dict(name='dip_ang', ogr_type=ogr.OFTReal ),
-                     dict(name='descript', ogr_type=ogr.OFTString, width=50 )  ]
+                         dict(name='x', ogr_type=ogr.OFTReal ),
+                         dict(name='y', ogr_type=ogr.OFTReal ),
+                         dict(name='z', ogr_type=ogr.OFTReal ),
+                         dict(name='dip_dir', ogr_type=ogr.OFTReal ),
+                         dict(name='dip_ang', ogr_type=ogr.OFTReal ),
+                         dict(name='descript', ogr_type=ogr.OFTString, width=50 )  ]
             
-
 
     def __init__( self, canvas, plugin ):
 
         super( bestfitplane_QWidget, self ).__init__()         
         self.canvas, self.plugin = canvas, plugin       
         self.init_params()                 
-        self.setup_gui() 
-
+        self.setup_gui()
 
             
     def init_params(self):
  
+        self.reset_dem_input_states()
         self.previousTool = None        
-        self.grid = None
         self.input_points = None
         self.bestfitplane_point_markers = []  
-        self.res_id = 0       
+        self.res_id = 0 
+        
 
+    def reset_dem_input_states( self ):
+        
+        self.dem, self.grid = None, None
+        
         
     def setup_gui( self ):
 
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab( self.setup_fplane_tab(), "Processing" )         
-        main_widget.addTab( self.setup_about_tab(), "About" )                             
+        main_widget.addTab( self.setup_about_tab(), "About" )
+                                     
         dialog_layout.addWidget( main_widget )                                     
         self.setLayout( dialog_layout )                    
         self.adjustSize()                       
@@ -91,16 +95,16 @@ class bestfitplane_QWidget( QWidget ):
         sourcedem_QGroupBox = QGroupBox( self.tr("Source DEM") )  
         
         sourcedemLayout = QGridLayout( ) 
-     
-        self.raster_refreshlayers_pButton = QPushButton( "Get current raster layers" )
-        self.raster_refreshlayers_pButton.clicked[bool].connect( self.refresh_raster_layer_list ) 
-        self.raster_refreshlayers_pButton.setEnabled( True )       
-        sourcedemLayout.addWidget( self.raster_refreshlayers_pButton, 0, 0, 1, 3 )                
-        sourcedemLayout.addWidget(QLabel( "Use" ), 1, 0, 1, 1)        
-        self.dem_comboBox = QComboBox()
-        self.dem_comboBox.addItem(self.dem_default_text)
-        sourcedemLayout.addWidget(self.dem_comboBox, 1, 1, 1, 2)  
-              
+    
+        sourcedemLayout.addWidget(QLabel( "Choose DEM layer" ), 0, 0, 1, 1)        
+        self.define_dem_QComboBox = QComboBox()
+        self.define_dem_QComboBox.addItem(self.dem_default_text)
+        sourcedemLayout.addWidget(self.define_dem_QComboBox, 0, 1, 1, 2)  
+
+        self.refresh_raster_layer_list()
+        QgsMapLayerRegistry.instance().layerWasAdded.connect( self.refresh_raster_layer_list )
+        QgsMapLayerRegistry.instance().layerRemoved.connect( self.refresh_raster_layer_list )
+                             
         sourcedem_QGroupBox.setLayout( sourcedemLayout )  
               
         return sourcedem_QGroupBox
@@ -113,17 +117,33 @@ class bestfitplane_QWidget( QWidget ):
         source_points_Layout = QGridLayout( ) 
 
         self.bestfitplane_definepoints_pButton = QPushButton( "Define source points in map" )
-        self.bestfitplane_definepoints_pButton.clicked.connect( self.set_bfp_points )
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
-        source_points_Layout.addWidget( self.bestfitplane_definepoints_pButton, 0, 0, 1, 2 )
+        self.bestfitplane_definepoints_pButton.clicked.connect( self.bfp_inpoint_from_map_click )
+        source_points_Layout.addWidget( self.bestfitplane_definepoints_pButton, 0, 0, 1, 1 )
+
+        self.bestfitplane_resetpoints_pButton = QPushButton( "Reset all source points" )
+        self.bestfitplane_resetpoints_pButton.clicked.connect( self.bfp_reset_all_inpoints )
+        source_points_Layout.addWidget( self.bestfitplane_resetpoints_pButton, 0, 1, 1, 1 )
+        
+        self.bestfitplane_getpointsfromlyr_pButton = QPushButton( "Get source points from layer" )
+        self.bestfitplane_getpointsfromlyr_pButton.clicked.connect( self.bfp_points_from_lyr )
+        source_points_Layout.addWidget( self.bestfitplane_getpointsfromlyr_pButton, 1, 0, 1, 1 )
+                
+        self.bestfitplane_inpts_lyr_list_QComboBox = QComboBox()
+        source_points_Layout.addWidget( self.bestfitplane_inpts_lyr_list_QComboBox, 1, 1, 1, 1 )
+
+        self.refresh_inpts_layer_list()
+        QgsMapLayerRegistry.instance().layerWasAdded.connect( self.refresh_inpts_layer_list )
+        QgsMapLayerRegistry.instance().layerRemoved.connect( self.refresh_inpts_layer_list )
+                
+        self.enable_point_input_buttons( False )        
         
         self.bestfitplane_src_points_ListWdgt = QListWidget()
-        source_points_Layout.addWidget( self.bestfitplane_src_points_ListWdgt, 1, 0, 1, 2 )
+        source_points_Layout.addWidget( self.bestfitplane_src_points_ListWdgt, 2, 0, 1, 2 )
         
         self.bestfitplane_calculate_pButton = QPushButton( "Calculate best-fit plane" )
         self.bestfitplane_calculate_pButton.clicked.connect( self.calculate_bestfitplane )
         self.bestfitplane_calculate_pButton.setEnabled( False )
-        source_points_Layout.addWidget( self.bestfitplane_calculate_pButton, 2, 0, 1, 2 )   
+        source_points_Layout.addWidget( self.bestfitplane_calculate_pButton, 3, 0, 1, 2 )   
 
         source_points_QGroupBox.setLayout( source_points_Layout ) 
                  
@@ -176,32 +196,111 @@ class bestfitplane_QWidget( QWidget ):
               
         return help_QGroupBox
     
-               
-    def set_bfp_points(self):
+
+    def add_marker( self, prj_crs_x, prj_crs_y ):
+        
+        marker = self.create_marker( self.canvas, prj_crs_x, prj_crs_y )       
+        self.bestfitplane_point_markers.append( marker )        
+        self.canvas.refresh()        
+        
+                        
+    def set_bfp_input_point( self, qgs_pt, add_marker = True ): 
+
+        prj_crs_x, prj_crs_y = qgs_pt.x(), qgs_pt.y()
+        if self.on_the_fly_projection:     
+            dem_crs_coord_x, dem_crs_coord_y = self.get_dem_crs_coords( prj_crs_x, prj_crs_y )
+        else:
+            dem_crs_coord_x, dem_crs_coord_y = prj_crs_x, prj_crs_y
+                                
+        if not self.coords_within_dem_bndr( dem_crs_coord_x, dem_crs_coord_y):
+            return        
+       
+        if add_marker:
+            self.add_marker(prj_crs_x, prj_crs_y)
+       
+        curr_point = Point_2D( float( dem_crs_coord_x), float( dem_crs_coord_y) )        
+        currArrCoord = self.grid.geog2array_coord(curr_point)     
+        dem_z_value = self.grid.interpolate_bilinear(currArrCoord)
+        
+        self.bestfitplane_points.append( [prj_crs_x, prj_crs_y, dem_z_value] )        
+        self.bestfitplane_src_points_ListWdgt.addItem( "%.3f %.3f %.3f" % ( prj_crs_x, prj_crs_y, dem_z_value ) )
+        
+        if not self.bestfitplane_calculate_pButton.isEnabled() and self.bestfitplane_src_points_ListWdgt.count () >= 3:
+            self.bestfitplane_calculate_pButton.setEnabled( True )
+
+
+    def bfp_reset_all_inpoints( self ):
+        
+        self.reset_point_input_values()         
+        
+                       
+    def bfp_inpoint_from_map_click(self):
        
         try:
-            self.bestfitplane_PointMapTool.canvasClicked.disconnect( self.get_point_from_map )
+            self.bestfitplane_PointMapTool.canvasClicked.disconnect( self.set_bfp_input_point )
         except:
             pass
-                    
-        self.reset_point_values() 
         
         self.update_crs_settings()
                       
         self.bestfitplane_PointMapTool = PointMapToolEmitPoint( self.canvas, self.plugin ) # mouse listener
         self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
-        self.bestfitplane_PointMapTool.canvasClicked.connect( self.get_point_from_map )
+        self.bestfitplane_PointMapTool.canvasClicked.connect( self.set_bfp_input_point )
         self.bestfitplane_PointMapTool.setCursor( Qt.CrossCursor )        
         self.canvas.setMapTool( self.bestfitplane_PointMapTool )
 
 
+    def bfp_points_from_lyr( self ):
+        
+        # get vector layer
+        
+        try:
+            assert self.bestfitplane_inpts_lyr_list_QComboBox.currentIndex() > 0
+            inpts_lyr_qgis_ndx = self.bestfitplane_inpts_lyr_list_QComboBox.currentIndex() - 1
+            inpts_lyr = self.inpts_Layers[ inpts_lyr_qgis_ndx ]
+        except:
+            QMessageBox.critical( self, 
+                                  "Input point layer", 
+                                  "Check chosen input layer" ) 
+            return
+
+        # read xy tuples from layer (removed consecutive duplicates)
+        layer_geom_type = vector_type( inpts_lyr )
+        if layer_geom_type == 'point':
+            xypair_list = pt_geoms_attrs( inpts_lyr )
+        elif layer_geom_type == 'line':
+            xypair_list3 = line_geoms_attrs( inpts_lyr )
+            xypair_list3_1 = [ xypair_list02[0] for xypair_list02 in xypair_list3 ]
+            xypair_flatlist = list3_to_list( xypair_list3_1 )
+            xypair_list = remove_equal_consecutive_xypairs( xypair_flatlist )
+        else:
+            raise VectorIOException, "Geometry type of chosen layer is not point or line"
+        
+        if len( xypair_list ) > 50:
+            QMessageBox.critical( self, 
+                                  "Input point layer", 
+                                  "More than 50 points to handle. Please use less features") 
+            return            
+
+        # for all xy tuples, project to project CRS as a qgis point
+        self.update_crs_settings()
+        if self.on_the_fly_projection:
+            proj_crs_qgispoint_list = [ project_qgs_point( qgs_point(x,y), inpts_lyr.crs(), self.projectCrs ) for (x,y) in xypair_list ]
+        else:
+            proj_crs_qgispoint_list = [ qgs_point( xypair[0], xypair[1] ) for xypair in xypair_list ]
+                
+        # for all qgs points, process them for the input point processing queue
+        for qgs_pt in proj_crs_qgispoint_list:
+            self.set_bfp_input_point( qgs_pt, add_marker = False )
+    
+    
     def setup_about_tab( self ):
         
         helpWidget = QWidget()  
         helpLayout = QVBoxLayout( )        
         htmlText = """
 <h3>qgSurf - Best Fit Plane</h3>
-This module allows to calculate the best-fit plane given a DEM and a set of user-defined points.
+This module allows to calculate the best-fit plane given a DEM and a set of user-defined points or lines.
 <br /><br />Created and maintained by M. Alberti (www.malg.eu). 
 <br />Licensed under the terms of GNU GPL 3.
         """
@@ -216,7 +315,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
     def update_crs_settings( self ):
 
         self.get_on_the_fly_projection()
-        if self.on_the_fly_projection: self.get_current_canvas_crs()        
+        if self.on_the_fly_projection: 
+            self.get_current_canvas_crs()        
         
         
     def get_on_the_fly_projection( self ):
@@ -229,13 +329,13 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
         self.projectCrs = self.canvas.mapRenderer().destinationCrs()
 
 
-    def reset_all(self):
+    def reset_input_point_states(self):
        
-        self.reset_point_values()        
-        self.disable_tools()
+        self.reset_point_input_values()        
+        self.disable_point_input_tools()
 
 
-    def reset_point_values(self):
+    def reset_point_input_values(self):
 
         self.reset_point_markers()
         self.reset_point_inputs()  
@@ -252,45 +352,82 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
         for mrk in self.bestfitplane_point_markers:
             self.canvas.scene().removeItem( mrk )  
         self.bestfitplane_point_markers = []          
+
+
+    def enable_point_input_buttons( self, choice = True ):
         
+        self.bestfitplane_definepoints_pButton.setEnabled( choice )
+        self.bestfitplane_getpointsfromlyr_pButton.setEnabled( choice )
+        self.bestfitplane_inpts_lyr_list_QComboBox.setEnabled( choice )
+        self.bestfitplane_resetpoints_pButton.setEnabled( choice )
+                
 
-    def disable_tools( self ):
+    def enable_point_save_buttons( self, choice = True ):
+        
+        self.create_shapefile_pButton.setEnabled( choice )
+        self.use_shapefile_pButton.setEnabled( choice )
+        
+        self.save_solution_pButton.setEnabled( choice )
+        self.stop_edit_pButton.setEnabled( choice )
+ 
+        
+    def disable_point_input_tools( self ):
 
-        self.bestfitplane_definepoints_pButton.setEnabled( False ); self.bestfitplane_calculate_pButton.setEnabled( False )
+        self.enable_point_input_buttons( False )
+        self.enable_point_save_buttons( False )
+        
         try: 
-            self.bestfitplane_PointMapTool.leftClicked.disconnect( self.get_point_from_map )
+            self.bestfitplane_PointMapTool.leftClicked.disconnect( self.set_bfp_input_point )
         except: 
             pass
         try: 
             self.disable_MapTool( self.bestfitplane_PointMapTool )
         except: 
             pass         
+                
         
-
     def refresh_raster_layer_list( self ):
 
-        self.dem, self.grid = None, None        
+        self.reset_dem_input_states()
+                
         try: 
-            self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
+            self.define_dem_QComboBox.currentIndexChanged[int].disconnect( self.get_working_dem )
         except: 
-            pass                
-        self.reset_all()                    
-        self.rasterLayers = get_current_raster_layers()                 
-        if self.rasterLayers is None or len( self.rasterLayers ) == 0:
-            QMessageBox.critical( self, "Source DEMs", "No raster layer found in current project" )
-            return
-        self.dem_comboBox.clear()
-        self.dem_comboBox.addItem( self.dem_default_text )
-        for layer in self.rasterLayers: 
-            self.dem_comboBox.addItem( layer.name() )            
-        self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
-        QMessageBox.information( self, "Source DEMs", "Found %d raster layers.<br /><br />Select one in 'Use DEM' (below).<br /><br />Warning: <b>when using DEMs in lat-long</b>, set the project CRS to a planar projection, with horizontal distances and heights in the same units (e.g., meters)." % len( self.rasterLayers ))
+            pass
+         
+        try:               
+            self.reset_input_point_states()
+        except:
+            pass
 
-              
-    def get_dem( self, ndx_DEM_file = 0 ): 
+        self.define_dem_QComboBox.clear()
+        self.define_dem_QComboBox.addItem( self.dem_default_text )
+                                  
+        self.rasterLayers = loaded_raster_layers()                 
+        if self.rasterLayers is None or len( self.rasterLayers ) == 0:
+            return
+        for layer in self.rasterLayers: 
+            self.define_dem_QComboBox.addItem( layer.name() )
+                        
+        self.define_dem_QComboBox.currentIndexChanged[int].connect( self.get_working_dem )                
+
+
+    def refresh_inpts_layer_list( self ):       
+
+        self.bestfitplane_inpts_lyr_list_QComboBox.clear()
+        self.bestfitplane_inpts_lyr_list_QComboBox.addItem( bestfitplane_QWidget.ptlnlyr_default_text )
+                                  
+        self.inpts_Layers = loaded_point_layers() + loaded_line_layers()                
+        if self.inpts_Layers is None or len( self.inpts_Layers ) == 0:
+            return
+        for layer in self.inpts_Layers: 
+            self.bestfitplane_inpts_lyr_list_QComboBox.addItem( layer.name() )
         
-        self.dem = None        
-        self.reset_all()        
+                      
+    def get_working_dem( self, ndx_DEM_file = 0 ): 
+        
+        self.reset_dem_input_states()       
+        self.reset_input_point_states()        
         if self.rasterLayers is None or len( self.rasterLayers ) == 0: 
             return          
                                 
@@ -309,7 +446,7 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
             QMessageBox.critical( self, "DEM", "DEM was not read" )
             return
 
-        self.bestfitplane_definepoints_pButton.setEnabled( True )
+        self.enable_point_input_buttons()
         
 
     def coords_within_dem_bndr( self, dem_crs_coord_x, dem_crs_coord_y):
@@ -330,31 +467,6 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
         marker.setCenter(QgsPoint( prj_crs_x, prj_crs_y ))         
         return marker        
         
-                
-    def get_point_from_map( self, qgs_point, button ): 
-
-        prj_crs_x, prj_crs_y = qgs_point.x(), qgs_point.y()
-        if self.on_the_fly_projection:     
-            dem_crs_coord_x, dem_crs_coord_y = self.get_dem_crs_coords( prj_crs_x, prj_crs_y )
-        else:
-            dem_crs_coord_x, dem_crs_coord_y = prj_crs_x, prj_crs_y
-                                
-        if not self.coords_within_dem_bndr( dem_crs_coord_x, dem_crs_coord_y): return        
-       
-        marker = self.create_marker( self.canvas, prj_crs_x, prj_crs_y )       
-        self.bestfitplane_point_markers.append( marker )        
-        self.canvas.refresh()
-       
-        curr_point = Point_2D( float( dem_crs_coord_x), float( dem_crs_coord_y) )        
-        currArrCoord = self.grid.geog2array_coord(curr_point)     
-        dem_z_value = floor(self.grid.interpolate_bilinear(currArrCoord))
-        
-        self.bestfitplane_points.append( [prj_crs_x, prj_crs_y, dem_z_value] )        
-        self.bestfitplane_src_points_ListWdgt.addItem( "%.3f %.3f %.3f" % ( prj_crs_x, prj_crs_y, dem_z_value ) )
-        
-        if self.bestfitplane_src_points_ListWdgt.count () >= 3:
-            self.bestfitplane_calculate_pButton.setEnabled( True )
-
      
     def calculate_bestfitplane(self):        
 
@@ -383,7 +495,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
     
     def disable_points_definition(self):
         
-        self.bestfitplane_definepoints_pButton.setEnabled( False )
+        self.enable_point_input_buttons( False )
+        
         self.disable_points_MapTool()
         self.reset_point_markers()
         self.bestfitplane_src_points_ListWdgt.clear()
@@ -410,7 +523,7 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
     def project_coords( self, x, y, source_crs, dest_crs ):
         
         if self.on_the_fly_projection and source_crs != dest_crs:
-            dest_crs_qgs_pt = project_point( make_qgs_point( x, y ), source_crs, dest_crs )
+            dest_crs_qgs_pt = project_qgs_point( qgs_point( x, y ), source_crs, dest_crs )
             return  dest_crs_qgs_pt.x(), dest_crs_qgs_pt.y() 
         else:
             return  x, y        
@@ -436,6 +549,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
             point_shapefile_path = dialog.output_point_shape_QLineEdit.text()
             # create_polygon_shape = dialog.polygonCheckBox.isChecked()
             # polygon_shapefile_path = dialog.output_polygon_shape_QLineEdit.text()
+        else:
+            return
          
         """   
         if not ( create_point_shape or create_polygon_shape):
@@ -480,6 +595,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
             point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
             # update_polygon_shape = dialog.polygonCheckBox.isChecked()
             # polygon_shapefile_path = dialog.input_polygon_shape_QLineEdit.text()
+        else:
+            return
         
         """    
         if not ( update_point_shape or update_polygon_shape):
@@ -511,9 +628,14 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
                                   "Shapefile cannot be edited")
             return            
         
+        if len( prev_solution_list ) == 0:
+            QMessageBox.critical( self, 
+                                  "Point shapefile", 
+                                  "Shapefile is empty")
+            return                      
         
         write_point_result( self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list )
-        
+
         self.res_id = max( [ rec[0] for rec in prev_solution_list ] )
          
         self.save_solution_pButton.setEnabled( True ) 
@@ -549,6 +671,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
             
         except:
             pass
+        finally:
+            self.enable_point_save_buttons( False )
            
 
     def open_html_help( self ):        

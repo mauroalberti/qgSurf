@@ -8,41 +8,39 @@
 
 <h3>qgSurf - Best Fit Plane - help</h3>
 
-
 <h4>Module purpose</h4>
 
 <div style="margin: 20px;">
-The purpose of this module is to allow the derivation of the planar attitude that best fits a set of points on a topographic surface. This task is common in geological mapping and geological analysis. Coupling mapping or remote sensing information with topographic data, it is possible to estimate the orientation of the geological plane that fits a set of observations, all located on the topographic surface (example in Fig. 1).
+The purpose of this module is to allow the derivation of the planar attitude that best fits a set of points or lines on a topographic surface. This task is common in geological mapping and geological analysis. By coupling mapping or remote sensing information with topographic data, it is possible to estimate the orientation of the geological plane fitting a set of observations, all located on the topographic surface (example in Fig. 1).
 </div>
 
 <div style="text-align:center;margin: 20px;font-size: 90%;font-style:italic;">
-	<img src="images/Fig_01.png" style="align:middle; max_width: 90%"/>
+	<img src="images/Fig_01.png" style="align:middle; max_width: 80%"/>
 	<br /><br />Fig. 1. Example of estimation of a fault attitude in the western border of Mt. Alpi zone (southern Italy). 
-	<br />Points are drawn  on the slope map derived by a DEM, with elevations extracted from DEM ("dem_w4u3" in this case).
+	<br />Points are drawn on the slope map derived by a DEM, with elevations extracted from DEM ("dem_w4u3" in this case).
 </div>
 
 <br />
 
 <h4>Input data</h4>
-The module requires a DEM as the elevation information source for points digitized by the user on the map. If the CRS of the DEM is in latitude-longitude, it is important to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters). Otherwise, the module result is not correct.
+The module requires a DEM as the source of the elevations for points digitized by the user on the map or loaded point/line layers. If the CRS of the DEM is in polar coordinates (i.e., latitude and longitude), it is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters). Otherwise, the module outputs are wrong.
 <br />
 
 <h4>Usage</h4>
 
 
 <div style="float: left; width: 40%; margin: 10px 10px 0 0;">
-	The user has to update the list of rasters currently loaded in the QGis project, by clicking on the <b>Get current raster layers</b> button [1 in Fig. 2].
+	The user chooses a DEM from the list of rasters currently loaded in the QGis project [1 in Fig. 2]. This DEM provides the source elevation for points.
+	<br /><br />
+	Then the user defines the x-y locations of the points, by drawing them directly in the map canvas or by choosing a loaded point/line layer. In the latter case, only selected elements are used for the best-fit-plane calculations, unless there is no active selection, in which case all records are used. In the former case, it is possible digitized the points in the map canvas, after clicking on the <b>Define source points in map</b> button [2]. The coordinates of the points defined in the map are added in the list of source points [6]. It is possible to reset the list of points by clicking the <b>Reset all source points</b> button [3]. Data can also originate by a loaded layer, chosen in the [5] list and then clicking the <b>Get source points from layer</b>. Input points are appended to the list [6].
+	<br /><br />
+	When finished with the point definition, the best-fit-plane can be calculated by pressing the <b>Calculate best-fit plane</b> button [7]. A pop-up window should normally display the resulting plane dip direction and dip angle (see example in Fig. 1).
+	<br /><br />
+	It is possible to save one or more set of best-fit plane solutions, together with their source points, in a shapefile. To this purpose, the user can create a new, ad-hoc shapefile with the <b>Create shapefile for storing results</b> button [8]. Computed results can be added to this shapefile with the <b>Add current solution to shapefile</b> button [10], that opens a window when the user can insert a description of the computed solution (max. of 50 characters allowed).
+	<br /><br />
+	When completed an analysis session, the results can be saved to the shapefile with the <b>Save and stop edits in shapefile</b> button [11] and loaded in the QGis project.
 	<br />
-	After that, a single DEM layer has to be chosen by the updated list of rasters [2]. It provides the source elevation for points digitized by the user in a map.
-	<br /><br />
-	Having completed the definition of the source DEM, we can now pass to the insertion of points in the map. It is activated by clicking the <b>Define source points in map</b> button [3]. As many points as clicked in the map are added to the list of source points [4]. Note that if you want to clear the list and also to reset the map view of defined points, you can click the same last button again.   
-	<br /><br />
-	When you are satisfied with the point choice, the best-fit-plane can be calculated by pressing the <b>Calculate best-fit plane</b> button [5]. A pop-up window should normally display the resulting plane dip direction and dip angle (see example in Fig. 1). 
-	<br /><br />
-	It is possible to save one or more set of best-fit plane solutions, together with their source points, in a shapefile. Initially, the user has to create an ad-hoc shapefile with the <b>Create shapefile for storing results</b> button [6]. Computed results can be added to this shapefile with the <b>Add current solution to shapefile</b> button [7], that opens a window when the user can insert a description of the computed solution (max. of 50 characters allowed).	
-	<br /><br />
-	When completed an analysis session, the results can be saved to the shapefile with the <b>Save and stop edits</b> in shapefile button [8] and loaded in the QGis project.
-	<br />In a successive session, the previously created shapefile can be loaded with the <b>Use previous shapefile</b> button [9] and then new results added with the described commands.
+	In a successive session, the previously created shapefile can be loaded with the <b>Use previous shapefile</b> button [9] and then new results added with the described commands.
 </div>
 
 <div style="float: left; display: block; margin: 10px 0 0 10px; text-align:center; font-size: 90%; font-style:italic;">
@@ -61,7 +59,7 @@ The basis of the algorithm is the application of singular value decomposition to
 <div style="font-size: 85%; font-style: italic;">
 -----
 <br /><br /><br />
-Doc version 2014-06-07, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
+Doc version 2014-06-20, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
 </div>
 
 <br /><br /><br /><br />

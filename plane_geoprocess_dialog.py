@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-
 from math import floor
 import numpy as np
 
@@ -9,10 +8,6 @@ from PyQt4.QtGui import *
 
 from qgis.core import *
 from qgis.gui import *
-
-from qgs_tools.tools import get_current_raster_layers, project_point, \
-     make_qgs_point
-from qgs_tools.ptmaptool import PointMapToolEmitPoint
     
 from osgeo import ogr
 
@@ -21,6 +16,9 @@ from geosurf.spatial import Point_2D, Point_3D #, Vector
 from geosurf.spatial import GeolPlane
 from geosurf.intersections import Intersection_Parameters, Intersections
 
+from geosurf.qgs_tools import loaded_raster_layers, project_qgs_point, \
+     qgs_point
+from geosurf.qgs_tools import PointMapToolEmitPoint
 
 
 class plane_geoprocess_QWidget( QWidget ):
@@ -425,7 +423,7 @@ a message warning can be repeated more that once.
         try: self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
         except: pass                
         self.reset_all()                   
-        self.rasterLayers = get_current_raster_layers()                 
+        self.rasterLayers = loaded_raster_layers()                 
         if self.rasterLayers is None or len( self.rasterLayers ) == 0:
             QMessageBox.critical( self, "Source DEMs", "No raster layer found in current project" )
             return
@@ -584,7 +582,7 @@ a message warning can be repeated more that once.
     def project_coords( self, x, y, source_crs, dest_crs ):
         
         if self.on_the_fly_projection and source_crs != dest_crs:
-            dest_crs_qgs_pt = project_point( make_qgs_point( x, y ), source_crs, dest_crs )
+            dest_crs_qgs_pt = project_qgs_point( qgs_point( x, y ), source_crs, dest_crs )
             return  dest_crs_qgs_pt.x(), dest_crs_qgs_pt.y() 
         else:
             return  x, y        
