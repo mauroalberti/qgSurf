@@ -192,7 +192,6 @@ a message warning can be repeated more that once.
         return inputWidget
 
 
-
     def update_crs_settings( self ):
 
         self.get_on_the_fly_projection()
@@ -386,10 +385,16 @@ a message warning can be repeated more that once.
         
         self.intersection_definepoint_pButton.setEnabled( False )
         self.intersection_resetsrcpt_pButton.setEnabled( False )
-        try: self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
-        except: pass
-        try: self.disable_MapTool( self.intersection_PointMapTool )
-        except: pass
+        
+        try: 
+            self.intersection_PointMapTool.canvasClicked.disconnect( self.update_intersection_point_pos )
+        except: 
+            pass
+        
+        try: 
+            self.disable_MapTool( self.intersection_PointMapTool )
+        except: 
+            pass
                         
                 
     def reset_markers(self):       
@@ -420,8 +425,10 @@ a message warning can be repeated more that once.
     def refresh_raster_layer_list( self ):
 
         self.dem, self.grid = None, None        
-        try: self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
-        except: pass                
+        try: 
+            self.dem_comboBox.currentIndexChanged[int].disconnect( self.get_dem )
+        except: 
+            pass                
         self.reset_all()                   
         self.rasterLayers = loaded_raster_layers()                 
         if self.rasterLayers is None or len( self.rasterLayers ) == 0:
@@ -429,7 +436,8 @@ a message warning can be repeated more that once.
             return
         self.dem_comboBox.clear()
         self.dem_comboBox.addItem( self.dem_default_text )
-        for layer in self.rasterLayers: self.dem_comboBox.addItem( layer.name() )            
+        for layer in self.rasterLayers: 
+            self.dem_comboBox.addItem( layer.name() )            
         self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
         QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'. Warning: use only DEMs in planar coordinates with same units (e.g., meters) for both horizontal distances and heights. For instance, DEMs in lat-long with heights in meters will produce erroneous results." % len( self.rasterLayers ))
 
@@ -438,10 +446,12 @@ a message warning can be repeated more that once.
         
         self.dem = None        
         self.reset_all()       
-        if self.rasterLayers is None or len( self.rasterLayers ) == 0: return          
+        if self.rasterLayers is None or len( self.rasterLayers ) == 0: 
+            return          
                                 
         # no DEM layer defined  
-        if ndx_DEM_file == 0: return             
+        if ndx_DEM_file == 0: 
+            return             
 
         self.dem = self.rasterLayers[ndx_DEM_file-1]        
         try:
@@ -488,9 +498,12 @@ a message warning can be repeated more that once.
         if self.sender() == self.intersection_PointMapTool:
             self.Pt_x_spinBox.setValue( int( qgs_point.x() ) ); self.Pt_y_spinBox.setValue( int( qgs_point.y() ) )
         elif self.sender() == self.Pt_x_spinBox or self.sender() == self.Pt_y_spinBox:        
-            if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '': return            
-            if self.sender() == self.Pt_x_spinBox and self.intersection_srcpt_x == self.Pt_x_spinBox.value(): return
-            if self.sender() == self.Pt_y_spinBox and self.intersection_srcpt_y == self.Pt_y_spinBox.value(): return
+            if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '': 
+                return            
+            elif self.sender() == self.Pt_x_spinBox and self.intersection_srcpt_x == self.Pt_x_spinBox.value(): 
+                return
+            elif self.sender() == self.Pt_y_spinBox and self.intersection_srcpt_y == self.Pt_y_spinBox.value(): 
+                return
 
         self.intersection_srcpt_x, self.intersection_srcpt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()
         self.set_z_from_dem()        
@@ -520,9 +533,11 @@ a message warning can be repeated more that once.
             QMessageBox.critical( self, "Intersection source point", 
                                  "Defined point is outside source DEM extent" )                 
             return
+        
         currArrCoord = self.grid.geog2array_coord( Point_2D( dem_crs_source_pt_x, dem_crs_source_pt_y ) )        
         z = floor(self.grid.interpolate_bilinear(currArrCoord))         
-        if z is None: return    
+        if z is None: 
+            return    
         self.current_z_value = int( z )           
         self.Pt_z_spinBox.setValue( self.current_z_value )
         self.intersection_z_from_dem = True
@@ -666,7 +681,8 @@ a message warning can be repeated more that once.
                                                       self.tr( "Save shapefile" ), 
                                                       "*.shp", 
                                                       "shp (*.shp *.SHP)" )        
-        if not output_filename: return        
+        if not output_filename: 
+            return        
         self.Output_FileName_Input.setText( output_filename ) 
                       
                 
@@ -866,6 +882,12 @@ a message warning can be repeated more that once.
                             
         # destroy output geometry
         self.out_shape.Destroy() 
+        
+    
+        
+          
+            
+            
 
 
 

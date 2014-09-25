@@ -2,7 +2,7 @@
 name=qgSurf
 description=Processing of geological planes and surfaces
 category=Plugins
-version=version 0.3.3
+version=version 0.3.4
 experimental=False
 qgisMinimumVersion=2.0
 author=Mauro Alberti
@@ -11,17 +11,18 @@ icon=./icons/qgsurf.png
 
 ; start of optional metadata
 changelog=
-	0.2.0: map display/interaction is now through the QGis map window
-	0.2.1: calculate best-fit plane orientation given points drawn in the QGis map window
-	0.2.2: version compatible with QGis 2.0
-	0.2.3: fix graphic bug (dem intersection symbol not deleted on plugin close)
-	0.3.0: added modules for the processing of geological surfaces (non-planar)
-	0.3.1: support for on-the-fly-projection for Best-Fit-Plane interpolation and DEM-plane intersection; minor bugs fixing 
-    	0.3.2: best-fit-plane: added saving of one or more point set solutions as shapefiles
-    	0.3.3: best-fit-plane: added point input from loaded point/line layer 
+  0.2.0: map display/interaction is now through the QGis map window
+  0.2.1: calculate best-fit plane orientation given points drawn in the QGis map window
+  0.2.2: version compatible with QGis 2.0
+  0.2.3: fix graphic bug (dem intersection symbol not deleted on plugin close)
+  0.3.0: added modules for the processing of geological surfaces (non-planar)
+  0.3.1: support for on-the-fly-projection for Best-Fit-Plane interpolation and DEM-plane intersection; minor bugs fixing 
+  0.3.2: best-fit-plane: added saving of one or more point set solutions as shapefiles
+  0.3.3: best-fit-plane: added point input from loaded point/line layer
+  0.3.4: removed (for QGis compatibility issues) both "geosurface_simulation" and "geosurface_deformation" modules: they are now an independent, stand-alone Python project (simSurf, available in GitHub)
     
 ; tags are in comma separated value format, spaces are allowed
-tags=raster, dem, intersection, structural geology, geological planes, 3D geological surfaces
+tags=raster, dem, intersection, structural geology, geological planes
 
 homepage=https://bitbucket.org/mauroalberti/qgsurf
 tracker=https://bitbucket.org/mauroalberti/qgsurf/issues

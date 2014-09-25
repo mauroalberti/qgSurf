@@ -400,7 +400,11 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
         except:
             pass
 
-        self.define_dem_QComboBox.clear()
+        try:
+            self.define_dem_QComboBox.clear()
+        except:
+            return
+        
         self.define_dem_QComboBox.addItem( self.dem_default_text )
                                   
         self.rasterLayers = loaded_raster_layers()                 
@@ -412,9 +416,13 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
         self.define_dem_QComboBox.currentIndexChanged[int].connect( self.get_working_dem )                
 
 
-    def refresh_inpts_layer_list( self ):       
-
-        self.bestfitplane_inpts_lyr_list_QComboBox.clear()
+    def refresh_inpts_layer_list( self ):
+        
+        try:
+            self.bestfitplane_inpts_lyr_list_QComboBox.clear()
+        except:
+            return
+        
         self.bestfitplane_inpts_lyr_list_QComboBox.addItem( bestfitplane_QWidget.ptlnlyr_default_text )
                                   
         self.inpts_Layers = loaded_point_layers() + loaded_line_layers()                
@@ -678,8 +686,8 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
     def open_html_help( self ):        
 
         webbrowser.open('{}/help/help.html'.format(os.path.dirname(__file__)), new = True )
+          
 
-        
         
 class NewShapeFilesDialog( QDialog ):
     
