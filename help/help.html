@@ -23,7 +23,7 @@ The purpose of this module is to allow the derivation of the planar attitude tha
 <br />
 
 <h4>Input data</h4>
-The module requires a DEM as the source of the elevations for points digitized by the user on the map or loaded point/line layers. If the CRS of the DEM is in polar coordinates (i.e., latitude and longitude), it is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters). Otherwise, the module outputs are wrong.
+The module requires a DEM as the source of the elevations for points digitized by the user on the map or loaded point/line layers. If the CRS of the DEM is in polar coordinates (i.e., latitude and longitude), it is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters). Otherwise, the module outputs are wrong. For the same reason, if the source DEM is in a planar CRS, the project CRS must be a planar CRS with horizontal locations expressed in the same unit as the vertical distance unit of the source DEM. 
 <br />
 
 <h4>Usage</h4>

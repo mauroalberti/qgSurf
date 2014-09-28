@@ -47,7 +47,6 @@ class plane_geoprocess_QWidget( QWidget ):
         self.input_points = None
         self.intersection_PointMapTool = None         
         self.intersection_markers_list = []
-        self.update_crs_settings()
 
         
     def setup_gui( self ):
@@ -67,7 +66,7 @@ class plane_geoprocess_QWidget( QWidget ):
         plansurfaceWidget = QWidget()  
         plansurfaceLayout = QVBoxLayout( )        
         plansurfaceLayout.addWidget( self.setup_source_dem() )         
-        plansurfaceLayout.addWidget( self.setup_tab() )                                       
+        plansurfaceLayout.addWidget( self.setup_tabs() )                                       
         plansurfaceWidget.setLayout( plansurfaceLayout ) 
         return plansurfaceWidget 
 
@@ -89,7 +88,7 @@ class plane_geoprocess_QWidget( QWidget ):
         return sourcedemWidget
 
 
-    def setup_tab( self ):  
+    def setup_tabs( self ):  
 
         intersectionWidget = QWidget() 
         intersectionLayout = QVBoxLayout() 
@@ -128,14 +127,13 @@ with "Cancel intersections".
 within the current project.
 
 <h4>Known limitations</h4>
-- <b>The algorithm does not support calculations on DEM in polar coordinates (i.e., lat-long.). <u>The analyzed DEM must be in a planar projection (e.g., UTM, Lambert
-Conformal Conic), with
-the height values expressed in the same unit (e.g., meters) as the horizontal coordinates</u></b>.
+- <b>The algorithm does not support calculations with DEM in polar coordinates (i.e., lat-long.). <u>The analyzed DEM must be in a planar projection (e.g., UTM, Lambert
+Conformal Conic), with the height values expressed in the same unit (e.g., meters) as the horizontal coordinates</u></b>.
 <br />- Rotation angles for input rasters (DEM) are not supported. Errors could be silent, so please check this detail with QGis or other tools.
   
 <h4>Known bugs</h4>
-- Very large DEM can originate memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
-<br />- If you try to define source points outside DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM), 
+- Very large DEM could produce memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
+<br />- If you try to define source points outside the DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM), 
 a message warning can be repeated more that once.
 
         """
@@ -160,29 +158,23 @@ a message warning can be repeated more that once.
         inputLayout.addWidget( self.intersection_resetsrcpt_pButton, 1, 0, 1, 3 )        
                       
         inputLayout.addWidget( QLabel("X"), 2, 0, 1, 1 )
-        self.Pt_x_spinBox = QSpinBox()
-        self.Pt_x_spinBox.setRange(-1000000000, 1000000000)
-        self.Pt_x_spinBox.setSingleStep(50)
-        self.Pt_x_spinBox. valueChanged[int].connect( self.update_intersection_point_pos )
-        inputLayout.addWidget( self.Pt_x_spinBox, 2, 1, 1, 2 )  
+        self.Pt_x_QLineEdit = QLineEdit()
+        self.Pt_x_QLineEdit.textEdited.connect( self.update_intersection_point_pos )
+        inputLayout.addWidget( self.Pt_x_QLineEdit, 2, 1, 1, 2 )  
               
         inputLayout.addWidget( QLabel("Y"), 3, 0, 1, 1 )
-        self.Pt_y_spinBox = QSpinBox()
-        self.Pt_y_spinBox.setRange(-1000000000, 1000000000)
-        self.Pt_y_spinBox.setSingleStep(50)
-        self.Pt_y_spinBox.valueChanged[int].connect( self.update_intersection_point_pos )
-        inputLayout.addWidget( self.Pt_y_spinBox, 3, 1, 1, 2 ) 
+        self.Pt_y_QLineEdit = QLineEdit()
+        self.Pt_y_QLineEdit.textEdited.connect( self.update_intersection_point_pos )
+        inputLayout.addWidget( self.Pt_y_QLineEdit, 3, 1, 1, 2 ) 
                       
         inputLayout.addWidget( QLabel("Z"), 4, 0, 1, 1 )
-        self.Pt_z_spinBox = QSpinBox()
-        self.Pt_z_spinBox.setRange(-10000000, 10000000)
-        self.Pt_z_spinBox.setSingleStep(5)
-        self.Pt_z_spinBox.valueChanged[int].connect( self.check_z_congruence_with_dem )
-        inputLayout.addWidget( self.Pt_z_spinBox, 4, 1, 1, 2 ) 
+        self.Pt_z_QLineEdit = QLineEdit()
+        self.Pt_z_QLineEdit.textEdited.connect( self.check_z_congruence_with_dem )
+        inputLayout.addWidget( self.Pt_z_QLineEdit, 4, 1, 1, 2 ) 
                
         self.fixz2dem_checkBox = QCheckBox("lock z value to DEM surface")
         self.fixz2dem_checkBox.setChecked(True)
-        self.fixz2dem_checkBox. stateChanged[int].connect( self.set_z_from_dem )
+        self.fixz2dem_checkBox.stateChanged[int].connect( self.update_z_value )
         inputLayout.addWidget( self.fixz2dem_checkBox, 5, 0, 1, 3 )        
         
         self.reset_input()
@@ -194,18 +186,11 @@ a message warning can be repeated more that once.
 
     def update_crs_settings( self ):
 
-        self.get_on_the_fly_projection()
-        if self.on_the_fly_projection: self.get_current_canvas_crs()        
-        
-        
-    def get_on_the_fly_projection( self ):
-        
         self.on_the_fly_projection = True if self.canvas.hasCrsTransformEnabled() else False
-       
-        
-    def get_current_canvas_crs( self ):        
-                
-        self.projectCrs = self.canvas.mapRenderer().destinationCrs()
+        if self.on_the_fly_projection: 
+            self.projectCrs = self.canvas.mapRenderer().destinationCrs()
+        else:
+            self.projectCrs = None       
  
        
     def reset_values(self):
@@ -233,15 +218,17 @@ a message warning can be repeated more that once.
 
     def check_z_congruence_with_dem( self ):
         
-        if self.intersection_z_from_dem and self.Pt_z_spinBox.value() != self.current_z_value:
-            self.intersection_z_from_dem = False; self.fixz2dem_checkBox.setChecked( False )
-        self.current_z_value = self.Pt_z_spinBox.value()
+        if self.intersection_z_from_dem and float( self.Pt_z_QLineEdit.text() ) != self.current_z_value:
+            self.intersection_z_from_dem = False
+            self.fixz2dem_checkBox.setChecked( False )
+            
+        self.current_z_value = float( self.Pt_z_QLineEdit.text() )
 
 
     def reset_src_point( self ):
         
         self.intersection_resetsrcpt_pButton.setEnabled( False )
-        self.reset_srcpoint_SpinBoxes()                           
+        self.reset_srcpoint_QLineEdit()                           
         self.reset_markers()
         self.reset_values() 
                                    
@@ -321,31 +308,40 @@ a message warning can be repeated more that once.
 
         outputWidget = QWidget()  
         outputLayout = QGridLayout( )
-               
-        self.Save_pushButton = QPushButton("Save last intersections")
-        self.Save_pushButton.clicked.connect( self.write_results )
-        outputLayout.addWidget( self.Save_pushButton, 0, 0, 1, 2 )
+
+        outputLayout.addWidget( QLabel( self.tr( "Save results in")), 0, 0, 1, 1 )
         
         self.Output_FileName_Input = QLineEdit()
-        outputLayout.addWidget( self.Output_FileName_Input, 1, 0, 1, 1 )
+        outputLayout.addWidget( self.Output_FileName_Input, 0, 1, 1, 2 )
 
         self.Output_Browse = QPushButton(".....")
         self.Output_Browse.clicked.connect( self.selectOutputVectorFile )
-        outputLayout.addWidget( self.Output_Browse, 1, 1, 1, 1 )        
+        outputLayout.addWidget( self.Output_Browse, 0, 3, 1, 1 ) 
 
+        outputLayout.addWidget( QLabel( self.tr( "with geometry:")), 1, 0, 1, 1 )
+                               
         saveGroup = QButtonGroup( outputWidget )
-
+        
         self.Save_points_rButt = QRadioButton("points")
         self.Save_points_rButt.setChecked(True)
         saveGroup.addButton(self.Save_points_rButt, 0)
-        outputLayout.addWidget( self.Save_points_rButt, 2, 0, 1, 1 )
+        outputLayout.addWidget( self.Save_points_rButt, 1, 1, 1, 1 )
         
         self.Save_lines_rButt = QRadioButton("lines")
         saveGroup.addButton(self.Save_lines_rButt, 1)
-        outputLayout.addWidget( self.Save_lines_rButt, 2, 1, 1, 1 )        
+        outputLayout.addWidget( self.Save_lines_rButt, 1, 2, 1, 1 )        
                 
         self.Load_output_checkBox = QCheckBox("load output in project")
-        outputLayout.addWidget( self.Load_output_checkBox, 3, 0, 1, 2 )
+        outputLayout.addWidget( self.Load_output_checkBox, 2, 0, 1, 2 )                       
+                       
+                       
+        self.Save_pushButton = QPushButton("Save last intersections")
+        self.Save_pushButton.clicked.connect( self.write_results )
+        outputLayout.addWidget( self.Save_pushButton, 3, 0, 1, 4 )
+        
+       
+
+
                 
         outputWidget.setLayout(outputLayout)              
 
@@ -378,7 +374,7 @@ a message warning can be repeated more that once.
     def reset_input(self):
 
         self.disable_tools()
-        self.reset_srcpoint_SpinBoxes()        
+        self.reset_srcpoint_QLineEdit()        
         
 
     def disable_tools(self):
@@ -439,7 +435,7 @@ a message warning can be repeated more that once.
         for layer in self.rasterLayers: 
             self.dem_comboBox.addItem( layer.name() )            
         self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
-        QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'. Warning: use only DEMs in planar coordinates with same units (e.g., meters) for both horizontal distances and heights. For instance, DEMs in lat-long with heights in meters will produce erroneous results." % len( self.rasterLayers ))
+        QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'.\n\nWarnings\n1) DO NOT USE a DEM in polar coordinates (i.e., lat-lon): the result will be wrong.\n2) Moreover, the DEM must have the same vertical distance unit as the horizontal one (e.g., both meters). Otherwise, results will be wrong.\n3) Large DEMs can freeze the program." % len( self.rasterLayers ))
 
               
     def get_dem( self, ndx_DEM_file = 0 ): 
@@ -463,7 +459,10 @@ a message warning can be repeated more that once.
         if self.grid is None: 
             QMessageBox.critical( self, "DEM", "DEM was not read" )
             return
-        
+
+        if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
+            QMessageBox.critical( self, "DEM", "It seems that this DEM is in polar coordinates (i.e., lat-lon). If so, results will be wrong. Please consider choosing another DEM with a planar CRS." )
+                   
         self.intersection_definepoint_pButton.setEnabled( True )
         self.intersection_resetsrcpt_pButton.setEnabled( True )
         
@@ -496,17 +495,43 @@ a message warning can be repeated more that once.
         self.intersection_resetsrcpt_pButton.setEnabled( True )
                
         if self.sender() == self.intersection_PointMapTool:
-            self.Pt_x_spinBox.setValue( int( qgs_point.x() ) ); self.Pt_y_spinBox.setValue( int( qgs_point.y() ) )
-        elif self.sender() == self.Pt_x_spinBox or self.sender() == self.Pt_y_spinBox:        
-            if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '': 
+            
+            self.intersection_srcpt_x = qgs_point.x()
+            self.intersection_srcpt_y = qgs_point.y()
+            self.Pt_x_QLineEdit.setText( str( self.intersection_srcpt_x ) )
+            self.Pt_y_QLineEdit.setText( str( self.intersection_srcpt_y ) )
+            
+        elif self.sender() == self.Pt_x_QLineEdit:
+            
+            if self.Pt_x_QLineEdit.text() == '':
+                QMessageBox.critical(self, "qgSurf", "Error: x value is not defined") 
+                return
+            try:
+                self.intersection_srcpt_x = float( self.Pt_x_QLineEdit.text() )
+            except:
+                QMessageBox.critical( self, "qgSurf", "Error: x value is not correctly defined")
+                return 
+                                   
+        elif self.sender() == self.Pt_y_QLineEdit:
+            
+            if self.Pt_y_QLineEdit.text() == '':
+                QMessageBox.critical(self, "qgSurf", "Error: y value is not defined") 
+                return  
+            try:
+                self.intersection_srcpt_y = float( self.Pt_y_QLineEdit.text() )
+            except:
+                QMessageBox.critical( self, "qgSurf", "Error: y value is not correctly defined")
                 return            
-            elif self.sender() == self.Pt_x_spinBox and self.intersection_srcpt_x == self.Pt_x_spinBox.value(): 
-                return
-            elif self.sender() == self.Pt_y_spinBox and self.intersection_srcpt_y == self.Pt_y_spinBox.value(): 
-                return
-
-        self.intersection_srcpt_x, self.intersection_srcpt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()
-        self.set_z_from_dem()        
+        
+        z_value_from_dem = self.update_z_value()
+        if z_value_from_dem is None: 
+            self.current_z_value = None
+            self.Pt_z_QLineEdit.setText( "" )
+        else:
+            self.current_z_value = z_value_from_dem 
+            self.Pt_z_QLineEdit.setText( str( self.current_z_value ) )
+            self.intersection_z_from_dem = True
+                           
         self.remove_markers_from_canvas(); self.remove_srcpt_marker_from_canvas()        
         self.intersection_sourcepoint_marker = self.create_marker( self.canvas, 
                                                                    self.intersection_srcpt_x, self.intersection_srcpt_y, 
@@ -515,33 +540,36 @@ a message warning can be repeated more that once.
         self.canvas.refresh()
 
 
-    def set_z_from_dem (self):
+    def update_z_value (self):
         """
         Update z value.
         
         """         
-                
-        if self.grid is None: return        
-        if not self.fixz2dem_checkBox.isChecked(): return
         
+        # to prevent action when the DEM is not set              
+        if self.grid is None: 
+            return None 
+               
+        if not self.fixz2dem_checkBox.isChecked(): 
+            return None
+
         if self.on_the_fly_projection:         
-            dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value() )        
+            dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( self.intersection_srcpt_x, self.intersection_srcpt_y )        
         else:
-            dem_crs_source_pt_x, dem_crs_source_pt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()       
-            
+            dem_crs_source_pt_x, dem_crs_source_pt_y = self.intersection_srcpt_x, self.intersection_srcpt_y      
+         
         if not self.coords_within_dem_bndr( dem_crs_source_pt_x, dem_crs_source_pt_y): 
             QMessageBox.critical( self, "Intersection source point", 
                                  "Defined point is outside source DEM extent" )                 
-            return
+            return None
         
         currArrCoord = self.grid.geog2array_coord( Point_2D( dem_crs_source_pt_x, dem_crs_source_pt_y ) )        
-        z = floor(self.grid.interpolate_bilinear(currArrCoord))         
+        z = self.grid.interpolate_bilinear(currArrCoord)         
         if z is None: 
-            return    
-        self.current_z_value = int( z )           
-        self.Pt_z_spinBox.setValue( self.current_z_value )
-        self.intersection_z_from_dem = True
-
+            return None
+        
+        return z
+        
 
     def disable_MapTool( self, mapTool ):
                             
@@ -556,10 +584,10 @@ a message warning can be repeated more that once.
             pass
 
          
-    def reset_srcpoint_SpinBoxes(self):
+    def reset_srcpoint_QLineEdit(self):
         
-        for spinbox in ( self.Pt_x_spinBox, self.Pt_y_spinBox, self.Pt_z_spinBox ):
-            spinbox.clear()
+        for qlineedit in ( self.Pt_x_QLineEdit, self.Pt_y_QLineEdit, self.Pt_z_QLineEdit ):
+            qlineedit.clear()
 
         
     def update_dipdir_slider(self):
@@ -584,6 +612,7 @@ a message warning can be repeated more that once.
         """
         Update the value of the dip angle in the slider.
         """
+        
         self.DAngle_verticalSlider.setValue( self.DAngle_spinBox.value() )    
  
                   
@@ -591,6 +620,7 @@ a message warning can be repeated more that once.
         """
         Update the value of the dip angle in the spinbox.
         """        
+        
         self.DAngle_spinBox.setValue( self.DAngle_verticalSlider.value() ) 
 
 
@@ -619,19 +649,25 @@ a message warning can be repeated more that once.
         """
 
         if self.grid is None:
-            QMessageBox.information( self, "Intersection calculation", "Please first select a DEM")
+            QMessageBox.information( self, "qgSurf", "Please first define a source DEM")
             return
                 
-        if self.Pt_x_spinBox.text() == '' or self.Pt_y_spinBox.text() == '' or self.Pt_z_spinBox.text() == '':
-            QMessageBox.information( self, "Intersection calculation", "Define the location of the source point in 'Geographic parameters' section")
+        if self.Pt_x_QLineEdit.text() == '' or self.Pt_y_QLineEdit.text() == '' or self.Pt_z_QLineEdit.text() == '':
+            QMessageBox.information( self, "qgSurf", "Define the location of the source point in 'Geographic parameters' section")
             return
-
-        prj_crs_source_pt_x, prj_crs_source_pt_y = self.Pt_x_spinBox.value(), self.Pt_y_spinBox.value()
+        
+        try:
+            z = float( self.Pt_z_QLineEdit.text() )
+        except:
+            QMessageBox.information( self, "qgSurf", "z value is not correctly defined" )
+            return
+        
+        prj_crs_source_pt_x, prj_crs_source_pt_y = self.intersection_srcpt_x, self.intersection_srcpt_y
         if self.on_the_fly_projection:       
             dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords( prj_crs_source_pt_x, prj_crs_source_pt_y ) 
         else:
             dem_crs_source_pt_x, dem_crs_source_pt_y = prj_crs_source_pt_x, prj_crs_source_pt_y
-        dem_crs_source_point = Point_3D( dem_crs_source_pt_x, dem_crs_source_pt_y, self.Pt_z_spinBox.value() )
+        dem_crs_source_point = Point_3D( dem_crs_source_pt_x, dem_crs_source_pt_y, z )
 
         self.srcPlaneAttitude = GeolPlane( self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value() )
 
