@@ -6,7 +6,7 @@ from PyQt4.QtGui import *
 import resources
 
 from bestfitplane_dialog import bestfitplane_QWidget
-from plane_geoprocess_dialog import plane_geoprocess_QWidget
+from plane_dem_intersection_dialog import plane_dem_intersection_QWidget
 from about_dialog import about_Dialog
 
 
@@ -104,7 +104,7 @@ class qgSurf_gui(object):
         plane_geoprocessing_DockWidget = QDockWidget( 'DEM-plane intersection', self.interface.mainWindow() )        
         plane_geoprocessing_DockWidget.setAttribute(Qt.WA_DeleteOnClose)
         plane_geoprocessing_DockWidget.setAllowedAreas( Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea )        
-        self.planeProcess_Qwidget = plane_geoprocess_QWidget( self.canvas, self.plane_geoprocessing )      
+        self.planeProcess_Qwidget = plane_dem_intersection_QWidget( self.canvas, self.plane_geoprocessing )      
         plane_geoprocessing_DockWidget.setWidget( self.planeProcess_Qwidget ) 
         plane_geoprocessing_DockWidget.destroyed.connect(self.pdint_closeEvent )       
         self.interface.addDockWidget( Qt.RightDockWidgetArea, plane_geoprocessing_DockWidget )

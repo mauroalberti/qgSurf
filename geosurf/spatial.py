@@ -2,7 +2,7 @@
 
 from __future__  import division
 
-from math import sqrt, floor, ceil, sin, cos, tan, radians, asin, acos, atan, atan2, degrees
+from math import sqrt, floor, ceil, pi, sin, cos, tan, radians, asin, acos, atan, atan2, degrees
 
 import numpy as np
 
@@ -65,6 +65,17 @@ class Point_2D( object ):
             return False
         else:
             return True
+
+
+    def azimuth_degr( self ):
+        
+        pt_atan2 = atan2( self._y, self._x )
+        
+        az = degrees( pi/2.0 - pt_atan2 )
+        if az < 0:
+            az = 360.0 + az
+            
+        return az        
         
 
     def project_crs( self, srcCrs, destCrs ):
@@ -116,7 +127,15 @@ class Segment_2D( object ):
         
         return Segment_2D( self._start_pt, Point_2D( self._start_pt._x + delta_x, self._start_pt._y + delta_y ) )        
         
+
+    def azimuth_degr( self ):
         
+        x = self._end_pt._x - self._start_pt._x
+        y = self._end_pt._y - self._start_pt._y        
+        
+        return Point_2D(x,y).azimuth_degr()
+        
+                
     def to_3D( self ):
         
         return Segment_3D( self._start_pt.to_3D(), self._end_pt.to_3D() ) 
@@ -184,6 +203,17 @@ class Vector_2D( object ):
         
         return Vector_3D( self._x, self._y, z )
 
+
+def versor_from_azimuth( azimuth_degr ):
+    """
+    Azimuth is from the top axis, i.e., y
+    """    
+    
+    x = sin( radians( azimuth_degr ) )
+    y = cos( radians( azimuth_degr ) )
+    
+    return Vector_2D( x, y)
+    
 
 class Line_2D( object ):
     
@@ -1342,8 +1372,34 @@ class RectangularDomain(object):
         @return:  area - float.
         """
         return self.g_xrange() * self.g_yrange()
+    
+    
+    def g_horiz_center( self ):
+        """
+        Get 2D point center of spatial domain.
+        
+        @return:  Point_2D.
+        """
+        
+        return Point_2D( (self._llcorner._x + self._trcorner._x)/ 2.0,
+                         (self._llcorner._y + self._trcorner._y)/ 2.0 )
+                         
 
-
+    def g_max_size(self):
+        
+        if self.g_xrange() > self.g_yrange():
+            return self.g_xrange()
+        else:
+            return self.g_yrange()
+        
+        
+    def g_min_size(self):
+        
+        if self.g_xrange() < self.g_yrange():
+            return self.g_xrange()
+        else:
+            return self.g_yrange()
+        
         
 class Grid(object):
     """
@@ -1772,3 +1828,9 @@ class Grid(object):
             return xcoords_x, xcoords_y, ycoords_x, ycoords_y
         """
 
+
+    
+    
+    
+    
+    

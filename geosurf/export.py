@@ -19,7 +19,7 @@ def save_surface_vtk( output_filepath, geodata ):
     with open( output_filepath, 'w' ) as outfile:
     
         outfile.write( '# vtk DataFile Version 2.0\n' )
-        outfile.write( 'Geosurface - qgSurf vers. 0.3.0\n' ) 
+        outfile.write( 'Geosurface - qgSurf\n' ) 
         outfile.write( 'ASCII\n' )   
         outfile.write( '\nDATASET POLYDATA\n' )
         
