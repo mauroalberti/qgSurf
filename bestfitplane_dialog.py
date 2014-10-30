@@ -455,7 +455,7 @@ This module allows to calculate the best-fit plane given a DEM and a set of user
             return
 
         if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
-            QMessageBox.critical( self, "DEM", "It seems that the DEM is in polar coordinates (i.e., lat-lon). It is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters). Otherwise, the module outputs are wrong." )
+            QMessageBox.critical( self, "DEM", "Possibly the chosen DEM is in polar coordinates (i.e., lat-lon).\n\nIt is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters).\nOtherwise, the module outputs are wrong." )
                
         self.enable_point_input_buttons()
         

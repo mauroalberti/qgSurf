@@ -18,7 +18,7 @@ class about_Dialog( QDialog ):
         dialog_layout = QVBoxLayout()
         
         htmlText = """
-        <h3>qgSurf - release 0.4.0</h3>
+        <h3>qgSurf - release 0.4.1</h3>
         Created by M. Alberti (www.malg.eu).
         <br /><br />Processing of geological planes.  
         <br /><br />Licensed under the terms of GNU GPL 3.

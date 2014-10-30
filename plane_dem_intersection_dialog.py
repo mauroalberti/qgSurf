@@ -112,7 +112,7 @@ to geological convention and a source point.
 <h4>Loading of DEM data</h4>
 <b>a)</b> Load in the QGis project the required DEM(s) layers and whatsoever vector or image layers needed for your analysis.
 <br /><b>b)</b> Use "Get current raster layers" in qgSurf plugin: this will allow the plugin to know which raster layers are currently loaded.
-<br /><b>c)</b> From the "Use DEM" combo box, choose the DEM to use.
+<br /><b>c)</b> From the "Use DEM" combo box, choose the DEM to use. Do not use geographic DEMs, since the plugin will provide only approximate results.
  
 <h4>Plane-DEM intersection</h4>
 <b>d)</b> You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section. 
@@ -127,7 +127,8 @@ with "Cancel intersections".
 within the current project.
 
 <h4>Known limitations</h4>
-- Rotation angles for input rasters (DEM) are not supported. Errors with DEM reading will be generated.
+- DEMs in geographic coordinates (i.e., lat-lon) are not supported. Using the plugin with them will only provide approximate results, particularly with regards to the dip angle.
+<br />- Rotation angles for input rasters (DEM) are not supported. Errors with DEM reading will be generated.
   
 <h4>Known bugs</h4>
 - Very large DEM could produce memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
@@ -428,7 +429,7 @@ a message warning can be repeated more that once.
         for layer in self.rasterLayers: 
             self.dem_comboBox.addItem( layer.name() )            
         self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
-        QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'.\n\nWarnings\nthe source DEM must have the elevations measured in same unit as the horizontal ones of the current project CRS (i.e., do not mix elevations in feet and horizontal distances in meters). Otherwise, results will be wrong." % len( self.rasterLayers ))
+        QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'.\n\nWarnings\n1) DEMs in geographic coordinates (i.e., lat-lon) are not correctly supported. Using them will provide only approximate results, particularly for the dip angle value.\n2) The source DEM must have the elevations measured in same unit as the horizontal ones of the current project CRS (i.e., do not mix elevations in feet and horizontal distances in meters). Otherwise, results will be wrong." % len( self.rasterLayers ))
 
               
     def get_dem( self, ndx_DEM_file = 0 ): 
@@ -449,6 +450,10 @@ a message warning can be repeated more that once.
             QMessageBox.critical( self, "DEM", str( e ) )
             return
 
+        if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
+            QMessageBox.critical( self, "DEM", "Possibly the chosen DEM is in polar coordinates (i.e., lat-lon). The plugin does not support correctly geographic DEMs and will provide only approximate results, particularly for dip angle values.\n\nPlease choose a DEM in planar coordinates." )
+               
+               
         if self.grid is None: 
             QMessageBox.critical( self, "DEM", "DEM was not read" )
             return
@@ -664,7 +669,7 @@ a message warning can be repeated more that once.
         # geoplane attitude in DEM CRS
         src_dip_direction, src_dip_angle = self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value()
         if self.on_the_fly_projection:       
-            corr_dip_direction, corr_dip_angle = self.get_corrected_plane_attitude( src_dip_direction, src_dip_angle ) 
+            corr_dip_direction, corr_dip_angle = self.corrected_plane_attitude( src_dip_direction, src_dip_angle ) 
         else:
             corr_dip_direction, corr_dip_angle = src_dip_direction, src_dip_angle      
         
@@ -694,63 +699,91 @@ a message warning can be repeated more that once.
         y = s_y_dir * sin( radians( direction_azim ) )
         
         return sqrt( x*x + y*y )
-        
-        
-    def get_corrected_plane_attitude( self, src_dip_direction, src_dip_angle ):
-        
-        # 1 - DEM center in DEM CRS
-        dem_center_pt2d_dem_crs = self.grid.domain.g_horiz_center()
 
-        # 2 - dummy distance displacement in DEM CRS
-        dummy_factor = 100.0
-        dem_crs_displacement_distance = self.grid.domain.g_min_size() / dummy_factor
+
+    def changed_projection_params( self, pt2d_prj_crs, pt2d_dem_crs, azimuth_prj_crs, dem_crs_displacement_distance ):
+
+        # get suitable project CRS displacement distance
+        dem_crs_top_vector = Vector_2D( 0, 1 ).scale( dem_crs_displacement_distance )
+        dem_crs_displaced_top_pt2d = pt2d_dem_crs.displaced_by_vector( dem_crs_top_vector )
+        prj_crs_displaced_demtop_pt2d_x, prj_crs_displaced_demtop_pt2d_y = self.get_prj_crs_coords( dem_crs_displaced_top_pt2d._x, dem_crs_displaced_top_pt2d._y )
+        prj_crs_displaced_demtop_pt2d = Point_2D( prj_crs_displaced_demtop_pt2d_x, prj_crs_displaced_demtop_pt2d_y )
+        prj_crs_displacement_length = pt2d_prj_crs.distance( prj_crs_displaced_demtop_pt2d )
+
+        # finds azimuth and length in DEM CRS space
+        azimuth_prj_crs_rad = radians( azimuth_prj_crs )
+        prj_crs_displacement_vector = Vector_2D( sin( azimuth_prj_crs_rad ), cos( azimuth_prj_crs_rad ) ).scale( prj_crs_displacement_length )
+        prj_crs_displacement_pt2d = pt2d_prj_crs.displaced_by_vector( prj_crs_displacement_vector )
+        dem_crs_displaced_pt2d_x, dem_crs_displaced_pt2d_y = self.get_dem_crs_coords( prj_crs_displacement_pt2d._x, prj_crs_displacement_pt2d._y )
+        dem_crs_displaced_pt2d = Point_2D( dem_crs_displaced_pt2d_x, dem_crs_displaced_pt2d_y )
+        dem_crs_displacement_length = pt2d_dem_crs.distance( dem_crs_displaced_pt2d )
+        prj_dem_length_ratio = prj_crs_displacement_length / dem_crs_displacement_length
+        azimuth_dem_crs = Segment_2D( pt2d_dem_crs, dem_crs_displaced_pt2d ).azimuth_degr()
+        
+        return prj_dem_length_ratio, azimuth_dem_crs
+
  
-        # 3 - displacement vectors in x and y dirs of DEM CRS
-        dem_crs_displacement_vector_x_dir = Vector_2D( dem_crs_displacement_distance, 0 )
-        dem_crs_displacement_vector_y_dir = Vector_2D( 0, dem_crs_displacement_distance )
-        
-        # 4 - displaced pts in x & y dirs of DEM CRS
-        dem_displaced_pt2d_dem_crs_x_dir = dem_center_pt2d_dem_crs.displaced_by_vector( dem_crs_displacement_vector_x_dir )
-        dem_displaced_pt2d_dem_crs_y_dir = dem_center_pt2d_dem_crs.displaced_by_vector( dem_crs_displacement_vector_y_dir ) 
+    def analysis_projection_deformation_params( self, pt2d_prj_crs, pt2d_dem_crs, azimuth_dem_crs, dem_crs_displacement_distance ):
 
-        # 5 - DEM center in project CRS
-        prj_crs_center_pt_x, prj_crs_center_pt_y = self.get_prj_crs_coords( dem_center_pt2d_dem_crs._x, dem_center_pt2d_dem_crs._y )
+        azimuth_dem_crs_rad = radians( azimuth_dem_crs )
+        dem_crs_vector = Vector_2D( sin( azimuth_dem_crs_rad ), cos( azimuth_dem_crs_rad ) ).scale( dem_crs_displacement_distance )
+        dem_crs_displaced_pt2d = pt2d_dem_crs.displaced_by_vector( dem_crs_vector )
+        prj_crs_displaced_pt2d_x, prj_crs_displaced_pt2d_y = self.get_prj_crs_coords( dem_crs_displaced_pt2d._x, dem_crs_displaced_pt2d._y )
+        prj_crs_displaced_pt2d = Point_2D( prj_crs_displaced_pt2d_x, prj_crs_displaced_pt2d_y )
+        prj_crs_displacement_ratio = pt2d_prj_crs.distance( prj_crs_displaced_pt2d ) / dem_crs_displacement_distance         
+        prj_crs_displacement_azimuth = Segment_2D( pt2d_prj_crs, prj_crs_displaced_pt2d ).azimuth_degr() 
 
-        # 6 - displaced pt coords in x' and y' dirs of Proj CRS
-        prj_crs_displaced_pt2d_x_dir_x, prj_crs_displaced_pt2d_x_dir_y = self.get_prj_crs_coords( dem_displaced_pt2d_dem_crs_x_dir._x, dem_displaced_pt2d_dem_crs_x_dir._y )
-        prj_crs_displaced_pt2d_y_dir_x, prj_crs_displaced_pt2d_y_dir_y = self.get_prj_crs_coords( dem_displaced_pt2d_dem_crs_y_dir._x, dem_displaced_pt2d_dem_crs_y_dir._y )
+        return prj_crs_displacement_ratio, prj_crs_displacement_azimuth
         
-        # 7 - displacement distances in x' and y' dirs of Proj CRS
-        prj_crs_displacement_distance_x_dir = Point_2D( prj_crs_center_pt_x, prj_crs_center_pt_y ).distance( Point_2D( prj_crs_displaced_pt2d_x_dir_x, prj_crs_displaced_pt2d_x_dir_y ))         
-        prj_crs_displacement_distance_y_dir = Point_2D( prj_crs_center_pt_x, prj_crs_center_pt_y ).distance( Point_2D( prj_crs_displaced_pt2d_y_dir_x, prj_crs_displaced_pt2d_y_dir_y ))      
-             
-        # 8 - point displaced from DEM center along RHR strike by given amount, in project CRS
-        rhr_strike = src_dip_direction - 90.0
-        if rhr_strike < 0.0:
-            rhr_strike += 360.0
-        prj_crs_displacement_versor = versor_from_azimuth( rhr_strike )
-        prj_crs_displacement_vector = prj_crs_displacement_versor.scale( prj_crs_displacement_distance_x_dir )
-        prj_crs_distanced_pt2d = Point_2D( prj_crs_center_pt_x, prj_crs_center_pt_y ).displaced_by_vector(prj_crs_displacement_vector)
-        
-        # 9 - point displaced from DEM center along RHR strike, in DEM CRS
-        dem_crs_distanced_pt_x, dem_crs_distanced_pt_y = self.get_dem_crs_coords( prj_crs_distanced_pt2d._x, prj_crs_distanced_pt2d._y )
-        distanced_pt2d_dem_crs = Point_2D( dem_crs_distanced_pt_x, dem_crs_distanced_pt_y )
-        
-        # 10 - azimuth of segment joining DEM center with displaced point, in DEM CRS
-        corr_rhr_strike = Segment_2D( dem_center_pt2d_dem_crs, distanced_pt2d_dem_crs ).azimuth_degr()
-        corr_dip_direction = corr_rhr_strike + 90.0
-        if corr_dip_direction > 360.0:
-            corr_dip_direction -= 360.0
 
-        ## part for dip angle correction
-        direction_azim = 90.0 - corr_dip_direction
+    def projection_deformations_list( self, pt2d_dem_crs, dummy_factor = 100.0 ):
 
-        distorsion_lenght = self.get_directional_distorsion_length( direction_azim, prj_crs_displacement_distance_x_dir, prj_crs_displacement_distance_y_dir )
-        distorsion_ratio = distorsion_lenght / dem_crs_displacement_distance
+        # point coordinates in project CRS
+        prj_crs_pt2d_x, prj_crs_pt2d_y = self.get_prj_crs_coords( pt2d_dem_crs._x, pt2d_dem_crs._y )
+        pt2d_prj_crs = Point_2D( prj_crs_pt2d_x, prj_crs_pt2d_y )
         
-        corr_dip_angle_degr = degrees( atan( distorsion_ratio * tan( radians( src_dip_angle ) ) ) )
+        # dummy distance displacement in DEM CRS
+        dem_crs_displacement_distance = self.grid.domain.g_min_size() / dummy_factor       
+        
+        # create list of displacement ratios and azimuths in project CRS for 0-359 DEM CRS orientations
+        projection_deformation_list = []
+        for azimuth_dem_crs in range(360):            
+            prj_crs_displacement_ratio, prj_crs_displacement_azimuth = self.analysis_projection_deformation_params( pt2d_prj_crs, pt2d_dem_crs, azimuth_dem_crs, dem_crs_displacement_distance )
+            projection_deformation_list.append([prj_crs_displacement_ratio, prj_crs_displacement_azimuth])
+ 
+        return projection_deformation_list
+        
+        
+    def corrected_plane_attitude( self, dip_direction_prj_crs, dip_angle_prj_crs, dummy_factor = 100.0 ):
+        
+        # dummy distance displacement in DEM CRS
+        dem_crs_displacement_distance = self.grid.domain.g_min_size() / dummy_factor   
+        
+        # DEM center in DEM and prj CRSes
+        dem_center_pt2d_dem_crs = self.grid.domain.g_horiz_center()
+        dem_center_pt2d_prj_crs_x, dem_center_pt2d_prj_crs_y = self.get_prj_crs_coords( dem_center_pt2d_dem_crs._x, dem_center_pt2d_dem_crs._y )
+        dem_center_pt2d_prj_crs = Point_2D( dem_center_pt2d_prj_crs_x, dem_center_pt2d_prj_crs_y )
+        
+        """
+        # ANALYSIS - projection deformation list
+        projection_deformation_ellipse_dict = self.projection_deformations_list( dem_center_pt2d_dem_crs )
+        """
+        
+        # analysed direction in prj CRS    
+        rhr_strike_prj_crs = dip_direction_prj_crs - 90.0
+        if rhr_strike_prj_crs < 0.0:
+            rhr_strike_prj_crs += 360.0
+        
+        # deformation parameters  
+        prj_dem_length_ratio, rhr_strike_dem_crs = self.changed_projection_params( dem_center_pt2d_prj_crs, dem_center_pt2d_dem_crs, rhr_strike_prj_crs, dem_crs_displacement_distance )
+
+        dip_direction_dem_crs = rhr_strike_dem_crs + 90.0
+        if dip_direction_dem_crs > 360.0:
+            dip_direction_dem_crs -= 360.0
+        
+        dip_angle_dem_crs = degrees( atan( prj_dem_length_ratio * tan( radians( dip_angle_prj_crs ) ) ) )
    
-        return corr_dip_direction, corr_dip_angle_degr
+        return dip_direction_dem_crs, dip_angle_dem_crs
 
                 
     def plot_intersections(self):

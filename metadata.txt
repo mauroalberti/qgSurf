@@ -2,7 +2,7 @@
 name=qgSurf
 description=Processing of geological planes and surfaces
 category=Plugins
-version=version 0.4.0
+version=version 0.4.1
 experimental=False
 qgisMinimumVersion=2.0
 author=Mauro Alberti
@@ -22,7 +22,8 @@ changelog=
   0.3.4: removed (for QGis compatibility issues) both "geosurface_simulation" and "geosurface_deformation" modules: they are now an independent, stand-alone Python project (simSurf, available in GitHub)
   0.3.5: fixed bug related to the use of polar CRS (i.e., lat-lon)
   0.4.0: added support for geographic DEMs; fixed conceptual bug related to the use of the project CRS 
-  
+  0.4.1: fixed bug related to deformation orientation; (re)added warning on geographic DEMs, still not correctly supported
+    
 ; tags are in comma separated value format, spaces are allowed
 tags=raster, dem, intersection, structural geology, geological planes
 
