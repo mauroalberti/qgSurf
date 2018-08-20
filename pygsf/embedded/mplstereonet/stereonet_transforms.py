@@ -33,7 +33,7 @@ class BaseStereonetTransform(Transform):
     transform_path_non_affine.__doc__ = \
             Transform.transform_path_non_affine.__doc__
 
-    # We need to override transform_path with mpl <= v1.1.x, as well. See
+    # We need to override transform_path with mpl_utils <= v1.1.x, as well. See
     # <http://matplotlib.org/1.1.1/examples/api/custom_projection_example.html>
     # for a full discussion...
     transform_path = transform_path_non_affine

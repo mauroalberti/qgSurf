@@ -1,24 +1,28 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+from builtins import zip
+from builtins import str
+from builtins import range
 from math import sqrt, sin, cos, tan, atan, degrees, radians
 
 import numpy as np
 
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+from qgis.PyQt.QtCore import *
+from qgis.PyQt.QtGui import *
+from qgis.PyQt.QtWidgets import *
 
 from qgis.core import *
 from qgis.gui import *
     
 from osgeo import ogr
 
-from geosurf.geoio import read_dem
-from geosurf.spatial import Point_2D, Segment_2D, Vector_2D, Point_3D, GeolPlane, versor_from_azimuth
-from geosurf.intersections import Intersection_Parameters, Intersections
+from .geosurf.geoio import read_dem
+from .geosurf.spatial import Point_2D, Segment_2D, Vector_2D, Point_3D, GeolPlane
+from .geosurf.intersections import Intersection_Parameters, Intersections
 
-from geosurf.qgs_tools import loaded_raster_layers, project_qgs_point, \
-     qgs_point
-from geosurf.qgs_tools import PointMapToolEmitPoint
+from .geosurf.qgs_tools import loaded_raster_layers, project_qgs_point, qgs_point
+from .geosurf.qgs_tools import PointMapToolEmitPoint
 
 
 class plane_dem_intersection_QWidget( QWidget ):
@@ -30,7 +34,6 @@ class plane_dem_intersection_QWidget( QWidget ):
     line_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
     dem_default_text = '--  required  --'
 
-
     def __init__( self, canvas, plugin ):
 
         super( plane_dem_intersection_QWidget, self ).__init__()       
@@ -38,7 +41,6 @@ class plane_dem_intersection_QWidget( QWidget ):
         self.init_params()                 
         self.setup_gui() 
 
-            
     def init_params(self):
 
         self.reset_values() 
@@ -48,7 +50,6 @@ class plane_dem_intersection_QWidget( QWidget ):
         self.intersection_PointMapTool = None         
         self.intersection_markers_list = []
 
-        
     def setup_gui( self ):
 
         dialog_layout = QVBoxLayout()
@@ -60,7 +61,6 @@ class plane_dem_intersection_QWidget( QWidget ):
         self.adjustSize()                       
         self.setWindowTitle( 'qgSurf - DEM-plane intersection' )        
 
-
     def setup_fplane_tab( self ):
         
         plansurfaceWidget = QWidget()  
@@ -69,7 +69,6 @@ class plane_dem_intersection_QWidget( QWidget ):
         plansurfaceLayout.addWidget( self.setup_tabs() )                                       
         plansurfaceWidget.setLayout( plansurfaceLayout ) 
         return plansurfaceWidget 
-
 
     def setup_source_dem( self ):
 
@@ -87,7 +86,6 @@ class plane_dem_intersection_QWidget( QWidget ):
         sourcedemWidget.setLayout( sourcedemLayout )        
         return sourcedemWidget
 
-
     def setup_tabs( self ):  
 
         intersectionWidget = QWidget() 
@@ -98,8 +96,7 @@ class plane_dem_intersection_QWidget( QWidget ):
         intersection_toolbox.addItem ( self.setup_output_sect(), 'Output' )             
         intersectionLayout.addWidget( intersection_toolbox )
         intersectionWidget.setLayout( intersectionLayout )        
-        return intersectionWidget 
-    
+        return intersectionWidget
 
     def setup_about_tab( self ):
         
@@ -142,8 +139,7 @@ a message warning can be repeated more that once.
         helpLayout.addWidget( helpQTextBrowser )
         helpWidget.setLayout(helpLayout)                  
         return helpWidget 
-        
-                  
+
     def setup_geographicdata_sect( self ):        
         
         inputWidget = QWidget()  
@@ -182,30 +178,26 @@ a message warning can be repeated more that once.
         
         return inputWidget
 
-
     def update_crs_settings( self ):
 
-        self.on_the_fly_projection = True if self.canvas.hasCrsTransformEnabled() else False
+        self.on_the_fly_projection = True
         if self.on_the_fly_projection: 
-            self.projectCrs = self.canvas.mapRenderer().destinationCrs()
+            self.projectCrs = self.canvas.mapSettings().destinationCrs()
         else:
             self.projectCrs = None       
- 
-       
+
     def reset_values(self):
 
         self.current_z_value = None
         self.intersection_z_from_dem = False
         self.reset_srcpt()
         self.reset_results()
-        
- 
+
     def reset_srcpt(self):        
 
         self.intersection_srcpt_x = None
         self.intersection_srcpt_y = None        
         self.intersection_sourcepoint_marker = None
-                
         
     def reset_results(self):
 
@@ -214,7 +206,6 @@ a message warning can be repeated more that once.
         self.intersections_xprt = {}        
         self.inters = None
        
-
     def check_z_congruence_with_dem( self ):
         
         if self.intersection_z_from_dem and float( self.Pt_z_QLineEdit.text() ) != self.current_z_value:
@@ -223,14 +214,12 @@ a message warning can be repeated more that once.
             
         self.current_z_value = float( self.Pt_z_QLineEdit.text() )
 
-
     def reset_src_point( self ):
         
         self.intersection_resetsrcpt_pButton.setEnabled( False )
         self.reset_srcpoint_QLineEdit()                           
         self.reset_markers()
-        self.reset_values() 
-                                   
+        self.reset_values()
                     
     def setup_geologicdata_sect( self ):
 
@@ -301,7 +290,6 @@ a message warning can be repeated more that once.
         planeorientationWidget.setLayout(planeorientationLayout)              
 
         return planeorientationWidget
-    
         
     def setup_output_sect( self ):
 
@@ -341,7 +329,6 @@ a message warning can be repeated more that once.
 
         return outputWidget
 
-                
     def set_intersection_point(self):
         
         try:
@@ -357,19 +344,16 @@ a message warning can be repeated more that once.
         self.intersection_PointMapTool.setCursor( Qt.CrossCursor )                
         self.canvas.setMapTool( self.intersection_PointMapTool )
 
-                
     def reset_all( self ):
 
         self.reset_markers() 
         self.reset_input()
         self.reset_values()
 
-
     def reset_input(self):
 
         self.disable_tools()
-        self.reset_srcpoint_QLineEdit()        
-        
+        self.reset_srcpoint_QLineEdit()
 
     def disable_tools(self):
         
@@ -385,32 +369,27 @@ a message warning can be repeated more that once.
             self.disable_MapTool( self.intersection_PointMapTool )
         except: 
             pass
-                        
-                
+
     def reset_markers(self):       
         
         self.reset_intersections()
         self.remove_srcpt_marker_from_canvas()
-          
-        
+
     def reset_intersections(self):
         
         self.remove_markers_from_canvas()
         self.intersection_markers_list = []
         self.reset_results()        
 
-
     def remove_markers_from_canvas( self ):
 
         for mrk in self.intersection_markers_list:
             self.canvas.scene().removeItem( mrk ) 
 
-
     def remove_srcpt_marker_from_canvas(self):
         
         if self.intersection_sourcepoint_marker is not None:
             self.canvas.scene().removeItem( self.intersection_sourcepoint_marker )
-        
 
     def refresh_raster_layer_list( self ):
 
@@ -431,7 +410,6 @@ a message warning can be repeated more that once.
         self.dem_comboBox.currentIndexChanged[int].connect( self.get_dem )                
         QMessageBox.information( self, "Source DEMs", "Found %d raster layers. Select one in 'Use DEM'.\n\nWarnings\n1) DEMs in geographic coordinates (i.e., lat-lon) are not correctly supported. Using them will provide only approximate results, particularly for the dip angle value.\n2) The source DEM must have the elevations measured in same unit as the horizontal ones of the current project CRS (i.e., do not mix elevations in feet and horizontal distances in meters). Otherwise, results will be wrong." % len( self.rasterLayers ))
 
-              
     def get_dem( self, ndx_DEM_file = 0 ): 
         
         self.dem = None        
@@ -446,7 +424,7 @@ a message warning can be repeated more that once.
         self.dem = self.rasterLayers[ndx_DEM_file-1]        
         try:
             self.grid = read_dem( self.dem.source() )               
-        except IOError, e:
+        except IOError as e:
             QMessageBox.critical( self, "DEM", str( e ) )
             return
 
@@ -460,7 +438,6 @@ a message warning can be repeated more that once.
     
         self.intersection_definepoint_pButton.setEnabled( True )
         self.intersection_resetsrcpt_pButton.setEnabled( True )
-        
 
     def coords_within_dem_bndr( self, dem_crs_coord_x, dem_crs_coord_y):
         
@@ -468,7 +445,6 @@ a message warning can be repeated more that once.
            dem_crs_coord_y <= self.grid.ymin or dem_crs_coord_y >= self.grid.ymax:
             return False        
         return True        
-        
 
     def create_marker(self, canvas, prj_crs_x, prj_crs_y, pen_width= 2, icon_type = 2, icon_size = 18, icon_color = 'limegreen' ):
         
@@ -477,10 +453,9 @@ a message warning can be repeated more that once.
         marker.setIconSize( icon_size )
         marker.setPenWidth( pen_width )
         marker.setColor( QColor( icon_color ) )
-        marker.setCenter(QgsPoint( prj_crs_x, prj_crs_y ))         
+        marker.setCenter(QgsPointXY( prj_crs_x, prj_crs_y ))
         return marker        
 
-                   
     def update_intersection_point_pos( self, qgs_point = None, button = None ): # Add point to analyze
 
         if self.grid is None:
@@ -534,7 +509,6 @@ a message warning can be repeated more that once.
                                                                    icon_color = QColor( str( self.Intersection_color_comboBox.currentText() ) ) )        
         self.canvas.refresh()
 
-
     def update_z_value (self):
         """
         Update z value.
@@ -564,7 +538,6 @@ a message warning can be repeated more that once.
             return None
         
         return z
-        
 
     def disable_MapTool( self, mapTool ):
                             
@@ -578,13 +551,11 @@ a message warning can be repeated more that once.
         except:
             pass
 
-         
     def reset_srcpoint_QLineEdit(self):
         
         for qlineedit in ( self.Pt_x_QLineEdit, self.Pt_y_QLineEdit, self.Pt_z_QLineEdit ):
             qlineedit.clear()
 
-        
     def update_dipdir_slider(self):
         """
         Update the value of the dip direction in the slider.""
@@ -592,8 +563,7 @@ a message warning can be repeated more that once.
         transformed_dipdirection = self.DDirection_spinBox.value() + 180.0
         if transformed_dipdirection > 360.0: transformed_dipdirection -= 360.0            
         self.DDirection_dial.setValue( transformed_dipdirection ) 
-  
-           
+
     def update_dipdir_spinbox(self):            
         """
         Update the value of the dip direction in the spinbox.
@@ -602,22 +572,19 @@ a message warning can be repeated more that once.
         if real_dipdirection < 0.0: real_dipdirection += 360.0            
         self.DDirection_spinBox.setValue( real_dipdirection ) 
 
-                 
     def update_dipang_slider(self):
         """
         Update the value of the dip angle in the slider.
         """
         
         self.DAngle_verticalSlider.setValue( self.DAngle_spinBox.value() )    
- 
-                  
+
     def update_dipang_spinbox(self):            
         """
         Update the value of the dip angle in the spinbox.
         """        
         
         self.DAngle_spinBox.setValue( self.DAngle_verticalSlider.value() ) 
-
 
     def project_coords( self, x, y, source_crs, dest_crs ):
         
@@ -626,18 +593,15 @@ a message warning can be repeated more that once.
             return  dest_crs_qgs_pt.x(), dest_crs_qgs_pt.y() 
         else:
             return  x, y        
-       
 
     def get_dem_crs_coords( self, x, y ):
     
         return self.project_coords( x, y, self.projectCrs, self.dem.crs() )
 
-
     def get_prj_crs_coords( self, x, y ):
 
         return self.project_coords( x, y, self.dem.crs(), self.projectCrs )
-        
-                               
+
     def calculate_intersection( self ):
         """
         Calculate intersection points.
@@ -691,7 +655,6 @@ a message warning can be repeated more that once.
         self.intersections_xprt = dict( data = intersection_data, plane = intersection_plane, point = intersection_point)
 
         self.plot_intersections()
-        
 
     def get_directional_distorsion_length( self, direction_azim, s_x_dir, s_y_dir ):
         
@@ -699,7 +662,6 @@ a message warning can be repeated more that once.
         y = s_y_dir * sin( radians( direction_azim ) )
         
         return sqrt( x*x + y*y )
-
 
     def changed_projection_params( self, pt2d_prj_crs, pt2d_dem_crs, azimuth_prj_crs, dem_crs_displacement_distance ):
 
@@ -722,7 +684,6 @@ a message warning can be repeated more that once.
         
         return prj_dem_length_ratio, azimuth_dem_crs
 
- 
     def analysis_projection_deformation_params( self, pt2d_prj_crs, pt2d_dem_crs, azimuth_dem_crs, dem_crs_displacement_distance ):
 
         azimuth_dem_crs_rad = radians( azimuth_dem_crs )
@@ -734,7 +695,6 @@ a message warning can be repeated more that once.
         prj_crs_displacement_azimuth = Segment_2D( pt2d_prj_crs, prj_crs_displaced_pt2d ).azimuth_degr() 
 
         return prj_crs_displacement_ratio, prj_crs_displacement_azimuth
-        
 
     def projection_deformations_list( self, pt2d_dem_crs, dummy_factor = 100.0 ):
 
@@ -752,8 +712,7 @@ a message warning can be repeated more that once.
             projection_deformation_list.append([prj_crs_displacement_ratio, prj_crs_displacement_azimuth])
  
         return projection_deformation_list
-        
-        
+
     def corrected_plane_attitude( self, dip_direction_prj_crs, dip_angle_prj_crs, dummy_factor = 100.0 ):
         
         # dummy distance displacement in DEM CRS
@@ -785,7 +744,6 @@ a message warning can be repeated more that once.
    
         return dip_direction_dem_crs, dip_angle_dem_crs
 
-                
     def plot_intersections(self):
         
         try:
@@ -807,18 +765,16 @@ a message warning can be repeated more that once.
         self.intersection_markers_list += current_markers_list   
         self.canvas.refresh()
 
-
     def selectOutputVectorFile( self ):
             
-        output_filename = QFileDialog.getSaveFileName(self, 
+        output_filename, __ = QFileDialog.getSaveFileName(self,
                                                       self.tr( "Save shapefile" ), 
                                                       "*.shp", 
                                                       "shp (*.shp *.SHP)" )        
         if not output_filename: 
             return        
         self.Output_FileName_Input.setText( output_filename ) 
-                      
-                
+
     def write_results( self ):
         """
         Write intersection results in the output shapefile.
@@ -895,12 +851,11 @@ a message warning can be repeated more that once.
         if self.Load_output_checkBox.isChecked():
             try:
                 intersection_layer = QgsVectorLayer(self.output_filename, QFileInfo(self.output_filename).baseName(), "ogr")                    
-                QgsMapLayerRegistry.instance().addMapLayer( intersection_layer )
+                QgsProject.instance().addMapLayer( intersection_layer )
             except:            
                 QMessageBox.critical( self, "Result", "Unable to load layer in project" )
                 return
-                         
-        
+
     def write_intersections_as_points( self ):
         """
         Write intersection results in the output shapefile.
@@ -960,7 +915,6 @@ a message warning can be repeated more that once.
         # destroy output geometry
         self.out_shape.Destroy() 
 
-
     def write_intersections_as_lines( self ):
         """
         Write intersection results in a line shapefile.
@@ -974,7 +928,7 @@ a message warning can be repeated more that once.
         # networks of connected intersections
         self.inters.networks = self.inters.define_networks()   
         
-        for curr_path_id, curr_path_points in self.inters.networks.iteritems():                                    
+        for curr_path_id, curr_path_points in self.inters.networks.items():
             line = ogr.Geometry( ogr.wkbLineString )            
             for curr_point_id in curr_path_points:                            
                 curr_intersection = self.inters.links[ curr_point_id-1 ]                           
