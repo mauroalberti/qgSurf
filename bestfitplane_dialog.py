@@ -63,7 +63,7 @@ class bestfitplane_QWidget(QWidget):
 
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
-        main_widget.addTab(self.setup_fplane_tab(), "Processing")         
+        main_widget.addTab(self.setup_processing_tab(), "Processing")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
         dialog_layout.addWidget(main_widget)                                     
@@ -71,13 +71,13 @@ class bestfitplane_QWidget(QWidget):
         self.adjustSize()                       
         self.setWindowTitle('qgSurf - best fit plane')        
 
-    def setup_fplane_tab(self):
+    def setup_processing_tab(self):
         
         plansurfaceWidget = QWidget()  
         plansurfaceLayout = QVBoxLayout()        
         plansurfaceLayout.addWidget(self.setup_source_dem())         
         plansurfaceLayout.addWidget(self.setup_source_points())   
-        plansurfaceLayout.addWidget(self.setup_export_points())
+        plansurfaceLayout.addWidget(self.setup_results_io())
         plansurfaceWidget.setLayout(plansurfaceLayout) 
         return plansurfaceWidget 
 
@@ -108,12 +108,8 @@ class bestfitplane_QWidget(QWidget):
 
         self.bestfitplane_definepoints_pButton = QPushButton("Define source points in map")
         self.bestfitplane_definepoints_pButton.clicked.connect(self.bfp_inpoint_from_map_click)
-        source_points_Layout.addWidget(self.bestfitplane_definepoints_pButton, 0, 0, 1, 1)
+        source_points_Layout.addWidget(self.bestfitplane_definepoints_pButton, 0, 0, 1, 2)
 
-        self.bestfitplane_resetpoints_pButton = QPushButton("Reset all source points")
-        self.bestfitplane_resetpoints_pButton.clicked.connect(self.bfp_reset_all_inpoints)
-        source_points_Layout.addWidget(self.bestfitplane_resetpoints_pButton, 0, 1, 1, 1)
-        
         self.bestfitplane_getpointsfromlyr_pButton = QPushButton("Get source points from layer")
         self.bestfitplane_getpointsfromlyr_pButton.clicked.connect(self.bfp_points_from_lyr)
         source_points_Layout.addWidget(self.bestfitplane_getpointsfromlyr_pButton, 1, 0, 1, 1)
@@ -129,28 +125,32 @@ class bestfitplane_QWidget(QWidget):
         
         self.bestfitplane_src_points_ListWdgt = QListWidget()
         source_points_Layout.addWidget(self.bestfitplane_src_points_ListWdgt, 2, 0, 1, 2)
-        
+
         self.bestfitplane_calculate_pButton = QPushButton("Calculate best-fit plane")
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 3, 0, 1, 2)   
+        source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 3, 0, 1, 2)
+
+        self.bestfitplane_resetpoints_pButton = QPushButton("Reset all source points")
+        self.bestfitplane_resetpoints_pButton.clicked.connect(self.bfp_reset_all_inpoints)
+        source_points_Layout.addWidget(self.bestfitplane_resetpoints_pButton, 4, 0, 1, 2)
 
         source_points_QGroupBox.setLayout(source_points_Layout) 
                  
         return source_points_QGroupBox
 
-    def setup_export_points(self):
+    def setup_results_io(self):
         
         export_points_QGroupBox = QGroupBox(self.tr("Save points"))  
         
         export_points_Layout = QGridLayout()        
         
-        self.create_shapefile_pButton = QPushButton("Create shapefile for storing results")
+        self.create_shapefile_pButton = QPushButton("Create new shapefile for result storage")
         self.create_shapefile_pButton.clicked.connect(self.make_shapefiles)
         self.create_shapefile_pButton.setEnabled(False)
         export_points_Layout.addWidget(self.create_shapefile_pButton, 0, 0, 1, 1)   
         
-        self.use_shapefile_pButton = QPushButton("Use previous shapefile")
+        self.use_shapefile_pButton = QPushButton("Load previous shapefile")
         self.use_shapefile_pButton.clicked.connect(self.use_shapefile)
         self.use_shapefile_pButton.setEnabled(False)
         export_points_Layout.addWidget(self.use_shapefile_pButton, 0, 1, 1, 1)   
