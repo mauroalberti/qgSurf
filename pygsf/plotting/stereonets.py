@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 
 
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['backend'] = 'Qt5Agg'
+try:
+    import matplotlib.pyplot as plt
+except:
+    pass
 
 
 from ..embedded import mplstereonet as ms
-
 
 from ..orientations.type_checks import *
 from ..utils.dicts import *

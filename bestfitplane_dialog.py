@@ -25,7 +25,10 @@ from .geosurf.qt_utils import define_save_file_name, define_existing_file_name
 from .geosurf.qgs_tools import *
 from .geosurf.ogr_tools import create_shapefile, open_shapefile, write_point_result
 from .geosurf.errors import OGR_IO_Errors, VectorIOException
-   
+
+from .pygsf.orientations.orientations import *
+from .pygsf.plotting.stereonets import splot
+
 
 class bestfitplane_QWidget(QWidget):
 
@@ -113,27 +116,32 @@ class bestfitplane_QWidget(QWidget):
         self.bestfitplane_getpointsfromlyr_pButton = QPushButton("Get source points from layer")
         self.bestfitplane_getpointsfromlyr_pButton.clicked.connect(self.bfp_points_from_lyr)
         source_points_Layout.addWidget(self.bestfitplane_getpointsfromlyr_pButton, 1, 0, 1, 1)
-                
+
         self.bestfitplane_inpts_lyr_list_QComboBox = QComboBox()
         source_points_Layout.addWidget(self.bestfitplane_inpts_lyr_list_QComboBox, 1, 1, 1, 1)
+
+        self.bestfitplane_resetpoints_pButton = QPushButton("Reset source points")
+        self.bestfitplane_resetpoints_pButton.clicked.connect(self.bfp_reset_all_inpoints)
+        source_points_Layout.addWidget(self.bestfitplane_resetpoints_pButton, 2, 0, 1, 2)
 
         self.refresh_inpts_layer_list()
         QgsProject.instance().layerWasAdded.connect(self.refresh_inpts_layer_list)
         QgsProject.instance().layerRemoved.connect(self.refresh_inpts_layer_list)
-                
-        self.enable_point_input_buttons(False)        
         
         self.bestfitplane_src_points_ListWdgt = QListWidget()
-        source_points_Layout.addWidget(self.bestfitplane_src_points_ListWdgt, 2, 0, 1, 2)
+        source_points_Layout.addWidget(self.bestfitplane_src_points_ListWdgt, 3, 0, 1, 2)
 
         self.bestfitplane_calculate_pButton = QPushButton("Calculate best-fit plane")
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 3, 0, 1, 2)
+        source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
 
-        self.bestfitplane_resetpoints_pButton = QPushButton("Reset all source points")
-        self.bestfitplane_resetpoints_pButton.clicked.connect(self.bfp_reset_all_inpoints)
-        source_points_Layout.addWidget(self.bestfitplane_resetpoints_pButton, 4, 0, 1, 2)
+        self.qpbBFPViewInStereonet = QPushButton("View in stereonet")
+        self.qpbBFPViewInStereonet.clicked.connect(self.view_plane_in_stereonet)
+        self.qpbBFPViewInStereonet.setEnabled(False)
+        source_points_Layout.addWidget(self.qpbBFPViewInStereonet, 5, 0, 1, 2)
+
+        self.enable_point_input_buttons(False)
 
         source_points_QGroupBox.setLayout(source_points_Layout) 
                  
@@ -295,7 +303,7 @@ class bestfitplane_QWidget(QWidget):
     def reset_input_point_states(self):
        
         self.reset_point_input_values()        
-        self.disable_point_input_tools()
+        self.disable_point_tools()
 
     def reset_point_input_values(self):
 
@@ -328,9 +336,10 @@ class bestfitplane_QWidget(QWidget):
         self.save_solution_pButton.setEnabled(choice)
         self.stop_edit_pButton.setEnabled(choice)
 
-    def disable_point_input_tools(self):
+    def disable_point_tools(self):
 
         self.enable_point_input_buttons(False)
+        self.qpbBFPViewInStereonet.setEnabled(False)
         self.enable_point_save_buttons(False)
         
         try: 
@@ -450,13 +459,25 @@ class bestfitplane_QWidget(QWidget):
         
         QMessageBox.information(self, "Best fit geological plane", 
                                  "Dip direction: %.1f - dip angle: %.1f" %(self.bestfitplane._dipdir, self.bestfitplane._dipangle))
-    
+
+        self.qpbBFPViewInStereonet.setEnabled(True)
         self.create_shapefile_pButton.setEnabled(True)
         self.use_shapefile_pButton.setEnabled(True)
+
+    def view_plane_in_stereonet(self):
+        """
+        Plot plane solution in stereonet.
+
+        :return: None
+        """
+
+        plane = self.bestfitplane
+        splot([(plane, "c=blue")])
 
     def disable_points_definition(self):
         
         self.enable_point_input_buttons(False)
+        self.qpbBFPViewInStereonet.setEnabled(False)
         
         self.disable_points_MapTool()
         self.reset_point_markers()

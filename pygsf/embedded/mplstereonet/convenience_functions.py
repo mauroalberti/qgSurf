@@ -1,3 +1,9 @@
+
+import matplotlib
+matplotlib.rcParams['backend'] = 'Qt5Agg'
+import matplotlib.pyplot as plt
+
+
 def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
             subplot_kw=None, hemisphere='lower', projection='equal_area',
             **fig_kw):
@@ -98,7 +104,7 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
            of the resulting array can be controlled with the squeeze
            keyword, see above.
     """
-    import matplotlib.pyplot as plt
+    #import matplotlib.pyplot as plt
     if projection in ['equal_area', 'equal_angle']:
         projection += '_stereonet'
     if subplot_kw == None:

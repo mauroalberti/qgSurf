@@ -1,6 +1,7 @@
 import numpy as np
 
-import matplotlib as mpl
+import matplotlib
+matplotlib.rcParams['backend'] = 'Qt5Agg'
 from matplotlib.transforms import Affine2D
 from matplotlib.projections import register_projection, LambertAxes
 from matplotlib.axes import Axes
