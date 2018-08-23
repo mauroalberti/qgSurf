@@ -2,6 +2,13 @@ import numpy as np
 
 import matplotlib
 matplotlib.rcParams['backend'] = 'Qt5Agg'
+
+
+
+
+
+
+
 from matplotlib.transforms import Affine2D
 from matplotlib.projections import register_projection, LambertAxes
 from matplotlib.axes import Axes
@@ -451,13 +458,6 @@ class StereonetAxes(LambertAxes):
         --------
         A matplotlib ContourSet.
 
-        See Also:
-        ---------
-        mplstereonet.density_grid
-        mplstereonet.StereonetAxes.density_contourf
-        matplotlib.pyplot.contour
-        matplotlib.pyplot.clabel
-
         Examples:
         ---------
         Plot density contours of poles to the specified planes using a
@@ -574,13 +574,6 @@ class StereonetAxes(LambertAxes):
         Returns:
         --------
         A matplotlib `QuadContourSet`.
-
-        See Also:
-        ---------
-        `mplstereonet.density_grid`
-        `mplstereonet.StereonetAxes.density_contour`
-        `matplotlib.pyplot.contourf`
-        `matplotlib.pyplot.clabel`
 
         Examples:
         ---------

@@ -3,10 +3,8 @@
 
 import matplotlib
 matplotlib.rcParams['backend'] = 'Qt5Agg'
-try:
-    import matplotlib.pyplot as plt
-except:
-    pass
+from matplotlib.figure import Figure
+from matplotlib import axes
 
 
 from ..embedded import mplstereonet as ms
@@ -158,7 +156,7 @@ def splot(data, force=''):
                     color=color)
 
     ax.grid()
-    plt.show()
+    Figure().show()
 
 
 def splotDirect(gvect):
@@ -174,7 +172,7 @@ def splotDirect(gvect):
 
     ax.line(plunge, bearing, marker=symbol)
     ax.grid()
-    plt.show()
+    Figure().show()
 
 
 class PlotException(Exception):
