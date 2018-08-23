@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib
-matplotlib.rcParams['backend'] = 'Qt5Agg'
 from matplotlib.path import Path
 from matplotlib.transforms import Transform
 

@@ -4,8 +4,8 @@ from __future__ import absolute_import
 from builtins import str
 
 import os
+import sys
 
-import numpy as np
 
 import webbrowser
 
@@ -27,7 +27,6 @@ from .geosurf.ogr_tools import create_shapefile, open_shapefile, write_point_res
 from .geosurf.errors import OGR_IO_Errors, VectorIOException
 
 from .pygsf.orientations.orientations import *
-from .pygsf.plotting.stereonets import splot
 
 
 class bestfitplane_QWidget(QWidget):
@@ -135,11 +134,6 @@ class bestfitplane_QWidget(QWidget):
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
         source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
-
-        self.qpbBFPViewInStereonet = QPushButton("View in stereonet")
-        self.qpbBFPViewInStereonet.clicked.connect(self.view_plane_in_stereonet)
-        self.qpbBFPViewInStereonet.setEnabled(False)
-        source_points_Layout.addWidget(self.qpbBFPViewInStereonet, 5, 0, 1, 2)
 
         self.enable_point_input_buttons(False)
 
@@ -339,7 +333,6 @@ class bestfitplane_QWidget(QWidget):
     def disable_point_tools(self):
 
         self.enable_point_input_buttons(False)
-        self.qpbBFPViewInStereonet.setEnabled(False)
         self.enable_point_save_buttons(False)
         
         try: 
@@ -418,7 +411,7 @@ class bestfitplane_QWidget(QWidget):
             return
 
         if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
-            QMessageBox.critical(self, "DEM", "Possibly the chosen DEM is in polar coordinates (i.e., lat-lon).\n\nIt is crucial to assign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the current QGis project so that both horizontal and vertical measure units are the same (e.g., meters).\nOtherwise, the module outputs are wrong.")
+            QMessageBox.critical(self, "DEM", "The used DEM appears to be in polar coordinates (i.e., lat-lon).\n\nAssign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the project to avoid getting incorrect results.")
                
         self.enable_point_input_buttons()
 
@@ -460,7 +453,6 @@ class bestfitplane_QWidget(QWidget):
         QMessageBox.information(self, "Best fit geological plane", 
                                  "Dip direction: %.1f - dip angle: %.1f" %(self.bestfitplane._dipdir, self.bestfitplane._dipangle))
 
-        self.qpbBFPViewInStereonet.setEnabled(True)
         self.create_shapefile_pButton.setEnabled(True)
         self.use_shapefile_pButton.setEnabled(True)
 
@@ -471,14 +463,22 @@ class bestfitplane_QWidget(QWidget):
         :return: None
         """
 
-        plane = self.bestfitplane
-        splot([(plane, "c=blue")])
+        # plane = self.bestfitplane
+        # splot([(plane, "c=blue")])
+
+        x = np.linspace(0, 10, 501)
+        y = np.tan(x)
+
+        qapp = QApplication(sys.argv)
+
+        app = PlotWindow(x, y)
+        app.show()
+        qapp.exec_()
 
     def disable_points_definition(self):
         
         self.enable_point_input_buttons(False)
-        self.qpbBFPViewInStereonet.setEnabled(False)
-        
+
         self.disable_points_MapTool()
         self.reset_point_markers()
         self.bestfitplane_src_points_ListWdgt.clear()

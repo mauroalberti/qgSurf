@@ -1,14 +1,18 @@
-
-import matplotlib
-matplotlib.rcParams['backend'] = 'Qt5Agg'
-from matplotlib.figure import Figure
-from matplotlib import axes
-
-
 def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
             subplot_kw=None, hemisphere='lower', projection='equal_area',
             **fig_kw):
     """
+    Identical to matplotlib.pyplot.subplots, except that this will default to
+    producing equal-area stereonet axes.
+
+    This prevents constantly doing:
+
+        >>> fig, ax = plt.subplot(subplot_kw=dict(projection='stereonet'))
+
+    or
+
+        >>> fig = plt.figure()
+        >>> ax = fig.add_subplot(111, projection='stereonet')
 
     Using this function also avoids having ``mplstereonet`` continually appear
     to be an unused import when one of the above methods are used.
@@ -94,12 +98,12 @@ def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
            of the resulting array can be controlled with the squeeze
            keyword, see above.
     """
-
+    import matplotlib.pyplot as plt
     if projection in ['equal_area', 'equal_angle']:
         projection += '_stereonet'
     if subplot_kw == None:
         subplot_kw = {}
     subplot_kw['projection'] = projection
-    return Figure().add_subplot(nrows, ncols, 1, sharex=sharex, sharey=sharey,
+    return plt.subplots(nrows, ncols, sharex=sharex, sharey=sharey,
                         squeeze=squeeze, subplot_kw=subplot_kw, **fig_kw)
 
