@@ -3,8 +3,20 @@
 <head>
 <title>qgSurf - Best Fit Plane</title>
 	<style>
+
+html *
+{
+   font-family: sans-serif !important;
+}
+
 h5 { font-size: 95%; color: #333; }
 img { max-width: 95%; }
+figure {
+  display: table;
+}
+figcaption {
+  font-size: 85%; color: #333; font-style: oblique;
+}
 </style>
 </head>
 
@@ -20,12 +32,13 @@ img { max-width: 95%; }
 
 <div>
 	By coupling mapping or remote sensing information with topographic data, this plugin allows to estimate the attitude
-	of best-fit-plane to a set of points or lines lying on a topographic surface (example in Fig. 1).
+	of the best-fit-plane to a set of points or lines lying on a topographic surface (example in Fig. 1).
 	This is a common task in geological mapping and analysis.
 </div>
-
+<br /><br />
 <figure>
 	<img src="images/Fig_01.png"/>
+	<br>
 	<figcaption>
 		Fig. 1. Example of estimation of a fault attitude in the western border of Mt. Alpi zone (Southern Italy).
 	</figcaption>
@@ -38,7 +51,7 @@ img { max-width: 95%; }
 	on the map canvas or alternatively loaded from a point/line layers.
 	When the source DEM crs is in polar coordinates (i.e., latitude and longitude) or its vertical distance unit is
 	different from the horizontal one (e.g., meters for the height and decimal degrees for the horizontal location),
-	it is crucial to assign to the project a planar CRS (e.g., UTM) with resulting
+	it is crucial to assign to the project a planar CRS with resulting
 	horizontal and vertical measures expressed in the same distance units (e.g., meters both for horizontal and vertical
 	distances), in order to avoid incorrect results.
 </div>
@@ -47,31 +60,31 @@ img { max-width: 95%; }
 
 <div>
 	The user defines the DEM to be used as elevation source, by choosing from the rasters loaded in the project (ref. 1 in Fig. 2).
-	Afterwards the locations defining the geological plane to be estimated are entered, via digitization of three or more
-	points in the map canvas (ref. 2), or alternatively by choosing a loaded point/line layer (ref. 5 and then 4).
+	Afterwards the locations to be used for defining the geological plane, are entered via digitization of three or more
+	points in the map canvas (ref. 2), or alternatively by choosing a loaded point/line layer (ref. 3 and 4).
 	In the latter case, selected elements will be used for the best-fit-plane calculation. When there is no active selection, all records will be used.
-	The coordinates of the points defined in the map are added in the list of source points [6].
-	It is possible to reset the list of points by clicking the <b>Reset all source points</b> button (#3).
-	Data can also originate from a loaded layer, chosen in the [5] list and then clicking the <b>Get source points from layer</b>.
+	The coordinates of the points defined in the map are added in the list of source points (ref. 6).
+	It is possible to reset the list of points by clicking the <b>Reset source points</b> button (ref. 5).
 	<br /><br />
 	When finished with the point definition, the best-fit-plane can be calculated by pressing the
-	<b>Calculate best-fit plane</b> button [7]. A pop-up window should normally display the resulting plane dip direction
-	and dip angle (see example in Fig. 1).
+	<b>Calculate best-fit plane</b> button (ref. 7). A pop-up window will display the resulting plane dip direction
+	and dip angle (example in Fig. 1).
 	<br /><br />
-	It is possible to save one or more set of best-fit plane solutions, together with their source points, in a shapefile.
-	To this purpose, the user can create a new, ad-hoc shapefile with the <b>Create shapefile for storing results</b> button [8].
-	Computed results can be added to this shapefile with the <b>Add current solution to shapefile</b> button [10],
-	that opens a window when the user can insert a description of the computed solution (max. of 50 characters allowed).
+	It is possible to save one or more set of best-fit plane solutions, coupled to their source points, in a shapefile.
+	The user can create a new shapefile with the <b>Create new shapefile for result storage</b> button (ref. 8).
+	Computed results are added with the <b>Add current solution in shapefile</b> button (ref. 10),
+	together with a short description (max. 50 characters).
 	<br /><br />
-	When completed an analysis session, the results can be saved to the shapefile with the
-	<b>Save and stop edits in shapefile</b> button [11] and loaded in the QGis project.
+	The added results can be permanently saved to the shapefile with the
+	<b>Save and stop edits in shapefile</b> button (ref. 11) and then loaded in the QGIS project.
 	<br />
-	In a successive session, the previously created shapefile can be loaded with the <b>Use previous shapefile</b> button
-	[9] and then new results added with the described commands.
+	During following sessions, this shapefile can be loaded with the <b>Use previous shapefile</b> button
+	(ref. 9) for adding new results.
 </div>
-
+<br /><br />
 <figure>
 	<img src="images/Fig_02.png"/>
+	<br>
 	<figcaption>
 		Fig. 2. Screenshot of the module window.
 	</figcaption>
@@ -80,8 +93,8 @@ img { max-width: 95%; }
 <h4>Methodology</h4>
 
 <div>
-	The basis of the algorithm is the application of singular value decomposition to derive the eigenvectors of a set of measures.
-	<br />See, for instance, the discussion in
+	The algorithm is based on the application of singular value decomposition technique, in order to derive the eigenvectors of a set of measures.
+	<br />See the discussion in
 	<a href="http://stackoverflow.com/questions/15959411/fit-points-to-a-plane-algorithms-how-to-iterpret-results">
 		Best fit plane algorithms why different results?</a>.
 </div>
@@ -91,7 +104,7 @@ img { max-width: 95%; }
 <div style="font-size: 85%; font-style: italic;">
 -----
 <br /><br /><br />
-Doc version 2018-08-21, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
+Doc version 2018-08-24, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
 </div>
 
 <br /><br /><br />
