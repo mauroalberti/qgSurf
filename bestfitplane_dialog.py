@@ -42,6 +42,8 @@ class bestfitplane_QWidget(QWidget):
                          dict(name='dip_ang', ogr_type=ogr.OFTReal),
                          dict(name='descript', ogr_type=ogr.OFTString, width=50)]
 
+    bfp_calc_update = pyqtSignal()
+
     def __init__(self, canvas, plugin):
 
         super(bestfitplane_QWidget, self).__init__()         
@@ -49,13 +51,21 @@ class bestfitplane_QWidget(QWidget):
         self.init_params()                 
         self.setup_gui()
 
+
+
+        self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
+
     def init_params(self):
  
         self.reset_dem_input_states()
         self.previousTool = None        
         self.input_points = None
         self.bestfitplane_point_markers = []  
-        self.res_id = 0 
+        self.res_id = 0
+
+        self.out_point_shapefile, self.out_point_shapelayer = None, None
+        self.bestfitplane = None
+        self.stop_shapefile_edits = False
 
     def reset_dem_input_states(self):
         
@@ -149,12 +159,12 @@ class bestfitplane_QWidget(QWidget):
         
         self.create_shapefile_pButton = QPushButton("Create new shapefile for result storage")
         self.create_shapefile_pButton.clicked.connect(self.make_shapefiles)
-        self.create_shapefile_pButton.setEnabled(False)
+        self.create_shapefile_pButton.setEnabled(True)
         export_points_Layout.addWidget(self.create_shapefile_pButton, 0, 0, 1, 1)   
         
         self.use_shapefile_pButton = QPushButton("Load previous shapefile")
         self.use_shapefile_pButton.clicked.connect(self.use_shapefile)
-        self.use_shapefile_pButton.setEnabled(False)
+        self.use_shapefile_pButton.setEnabled(True)
         export_points_Layout.addWidget(self.use_shapefile_pButton, 0, 1, 1, 1)   
                 
         self.save_solution_pButton = QPushButton("Add current solution in shapefile")
@@ -214,13 +224,13 @@ class bestfitplane_QWidget(QWidget):
         
         self.bestfitplane_points.append([prj_crs_x, prj_crs_y, dem_z_value])        
         self.bestfitplane_src_points_ListWdgt.addItem("%.3f %.3f %.3f" % (prj_crs_x, prj_crs_y, dem_z_value))
-        
-        if not self.bestfitplane_calculate_pButton.isEnabled() and self.bestfitplane_src_points_ListWdgt.count () >= 3:
-            self.bestfitplane_calculate_pButton.setEnabled(True)
+
+        self.bfp_calc_update.emit()
 
     def bfp_reset_all_inpoints(self):
         
         self.reset_point_input_values()
+        self.bfp_calc_update.emit()
                        
     def bfp_inpoint_from_map_click(self):
        
@@ -299,6 +309,8 @@ class bestfitplane_QWidget(QWidget):
         self.reset_point_input_values()        
         self.disable_point_tools()
 
+        self.bfp_calc_update.emit()
+
     def reset_point_input_values(self):
 
         self.reset_point_markers()
@@ -322,12 +334,8 @@ class bestfitplane_QWidget(QWidget):
         self.bestfitplane_inpts_lyr_list_QComboBox.setEnabled(choice)
         self.bestfitplane_resetpoints_pButton.setEnabled(choice)
 
-    def enable_point_save_buttons(self, choice = True):
-        
-        self.create_shapefile_pButton.setEnabled(choice)
-        self.use_shapefile_pButton.setEnabled(choice)
-        
-        self.save_solution_pButton.setEnabled(choice)
+    def enable_point_save_buttons(self, choice=True):
+
         self.stop_edit_pButton.setEnabled(choice)
 
     def disable_point_tools(self):
@@ -432,6 +440,15 @@ class bestfitplane_QWidget(QWidget):
         marker.setCenter(QgsPointXY(prj_crs_x, prj_crs_y))
         return marker        
 
+    def update_bfpcalc_btn_state(self):
+
+        if self.bestfitplane_src_points_ListWdgt.count () >= 3:
+            state = True
+        else:
+            state = False
+
+        self.bestfitplane_calculate_pButton.setEnabled(state)
+
     def calculate_bestfitplane(self):        
 
         xyz_list = self.bestfitplane_points        
@@ -453,8 +470,15 @@ class bestfitplane_QWidget(QWidget):
         QMessageBox.information(self, "Best fit geological plane", 
                                  "Dip direction: %.1f - dip angle: %.1f" %(self.bestfitplane._dipdir, self.bestfitplane._dipangle))
 
-        self.create_shapefile_pButton.setEnabled(True)
-        self.use_shapefile_pButton.setEnabled(True)
+        self.update_save_solution_state()
+
+    def update_save_solution_state(self):
+
+        if self.out_point_shapefile is not None and self.out_point_shapelayer is not None and \
+                self.bestfitplane is not None and not self.stop_shapefile_edits:
+            self.save_solution_pButton.setEnabled(True)
+        else:
+            self.save_solution_pButton.setEnabled(False)
 
     def view_plane_in_stereonet(self):
         """
@@ -519,46 +543,26 @@ class bestfitplane_QWidget(QWidget):
 
         dialog = NewShapeFilesDialog(self)
 
-        # create_point_shape, create_polygon_shape = False, False
         if dialog.exec_():
-            # create_point_shape = dialog.pointCheckBox.isChecked()
             point_shapefile_path = dialog.output_point_shape_QLineEdit.text()
-            # create_polygon_shape = dialog.polygonCheckBox.isChecked()
-            # polygon_shapefile_path = dialog.output_polygon_shape_QLineEdit.text()
         else:
             return
-         
-        """   
-        if not (create_point_shape or create_polygon_shape):
-            return
-        """
+
         if point_shapefile_path == "": 
             QMessageBox.critical(self, 
                                   "Point shapefile", 
                                   "No path provided")
             return
-        """
-        if create_polygon_shape and polygon_shapefile_path == "": 
-            QMessageBox.critical(self, 
-                                  "Polygon shapefile", 
-                                  "No path provided")
-            return
-        """
-        
-        # self.update_point_shape = create_point_shape
-        # self.update_polygon_shape = create_polygon_shape
+
         self.point_shapefile_path = point_shapefile_path
-        # self.polygon_shapefile_path = polygon_shapefile_path
-                        
-        #if self.update_point_shape:            
+
         self.out_point_shapefile, self.out_point_shapelayer = create_shapefile(point_shapefile_path, 
                                                                                   ogr.wkbPoint, 
-                                                                                  bestfitplane_QWidget.fields_dict_list
-                                                                                  #,  self.projectCrs, ## adegua def crs con funzione chiamata 
-                                                                                )
+                                                                                  bestfitplane_QWidget.fields_dict_list,
+                                                                                  self.projectCrs)
         QMessageBox.information(self, "Shapefile", "Point shapefile created ")
-            
-        self.save_solution_pButton.setEnabled(True)
+
+        self.update_save_solution_state()
 
     def use_shapefile(self):
         
@@ -566,38 +570,22 @@ class bestfitplane_QWidget(QWidget):
 
         # update_point_shape, update_polygon_shape = False, False
         if dialog.exec_():
-            # update_point_shape = dialog.pointCheckBox.isChecked()
             point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
-            # update_polygon_shape = dialog.polygonCheckBox.isChecked()
-            # polygon_shapefile_path = dialog.input_polygon_shape_QLineEdit.text()
         else:
             return
-        
-        """    
-        if not (update_point_shape or update_polygon_shape):
-            return
-        """
+
         if point_shapefile_path == "": 
             QMessageBox.critical(self, 
                                   "Point shapefile", 
                                   "No path provided")
             return
-        """
-        if update_polygon_shape and polygon_shapefile_path == "": 
-            QMessageBox.critical(self, 
-                                  "Polygon shapefile", 
-                                  "No path provided")
-            return
-        """
 
-        #self.update_point_shape = update_point_shape
-        #self.update_polygon_shape = update_polygon_shape
         self.point_shapefile_path = point_shapefile_path
-        #self.polygon_shapefile_path = polygon_shapefile_path
-        
+
         try:
             self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list = open_shapefile(self.point_shapefile_path, bestfitplane_QWidget.fields_dict_list)
         except OGR_IO_Errors:
+            self.out_point_shapefile, self.out_point_shapelayer = None, None
             QMessageBox.critical(self, 
                                   "Point shapefile", 
                                   "Shapefile cannot be edited")
@@ -612,8 +600,8 @@ class bestfitplane_QWidget(QWidget):
         write_point_result(self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list)
 
         self.res_id = max([rec[0] for rec in prev_solution_list ])
-         
-        self.save_solution_pButton.setEnabled(True) 
+
+        self.update_save_solution_state()
 
     def save_in_shapefile(self):
                 
@@ -630,8 +618,9 @@ class bestfitplane_QWidget(QWidget):
             solution_list.append([self.res_id, rec[0], rec[1], rec[2], self.bestfitplane._dipdir, self.bestfitplane._dipangle, str(description) ])
 
         # if self.update_point_shape:          
-        write_point_result(self.out_point_shapefile, self.out_point_shapelayer, solution_list)  
- 
+        write_point_result(self.out_point_shapefile, self.out_point_shapelayer, solution_list)
+
+        self.save_solution_pButton.setEnabled(False)
         self.stop_edit_pButton.setEnabled(True)
 
     def stop_editing(self):
@@ -644,8 +633,10 @@ class bestfitplane_QWidget(QWidget):
             
         except:
             pass
-        finally:
-            self.enable_point_save_buttons(False)
+
+        self.stop_shapefile_edits = True
+        self.enable_point_save_buttons(False)
+        self.update_save_solution_state()
 
     def open_html_help(self):        
 
