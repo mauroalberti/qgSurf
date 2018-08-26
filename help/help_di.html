@@ -1,0 +1,94 @@
+<html>
+
+<head>
+<title>qgSurf - DEM-plane intersection</title>
+	<style>
+
+html *
+{
+   font-family: sans-serif !important;
+}
+
+h5 { font-size: 95%; color: #333; }
+img { max-width: 95%; }
+figure {
+  display: table;
+}
+figcaption {
+  font-size: 85%; color: #333; font-style: oblique;
+}
+</style>
+</head>
+
+<body style="margin: 20px 30px 10px 30px;">
+
+<h3>qgSurf - DEM-plane intersection - help</h3>
+
+<div style="font-size: 90%; font-style: italic;">
+	Version 1.0.0 - plugin creator: Mauro Alberti.
+</div>
+
+<h4>Rationale</h4>
+
+<div>
+  This module allows to calculate the intersections of a plane with the DEM, given the plane attitude expressed according
+  to geological convention and a source point.
+</div>
+<br /><br />
+<figure>
+	<img src="images/di/fig_01.png"/>
+	<br>
+	<figcaption>
+		Fig. 1. Example of estimation of a fault attitude in the western border of Mt. Alpi zone (Southern Italy).
+	</figcaption>
+</figure>
+
+<h4>Loading of DEM data</h4>
+<div>
+	Load in the QGis project the required DEM layer and whatsoever vector or image layers needed for your analysis.
+	From the "Choose current DEM layer" combo box, choose the DEM to use.
+	Do not use geographic DEMs, since the plugin will provide only approximate results.
+	If you load a new raster that you want to use after opening the tool, you can update the raster list
+	with the "Update raster layer list" command.
+</div>
+
+<h4>Plane-DEM intersection</h4>
+<div>
+	You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section.
+	You can erase the current value with "Reset source point" or just define a new one by simply clicking in the map.
+	<br /><br />In the X, Y and Z spinboxes, the coordinates of the source point are displayed. You can modify them from within the spinboxes.
+	You can also choose to use Z values not fixed to the DEM surfaces, by setting the 'lock z value to DEM surface' checkbox off.
+	<br /><br /> In the "Geological parameters" section, you can define the dip direction and the dip angle, and then calculate the
+	theoretical intersections by pressing "Calculate intersection".
+	<br /><br /> You can change the last intersection color by choosing a color from the "Intersection color" combo box, and delete all the intersections
+	with "Cancel intersections".
+	<br /><br /> In the "Output" section, you can save the last intersections as a point or line shapefile, also loading it
+	within the current project.
+</div>
+
+<h4>Known limitations</h4>
+
+<div>
+- DEMs in geographic coordinates (i.e., lat-lon) are not supported. Using the plugin with them will only provide approximate results, particularly with regards to the dip angle.
+<br />- Rotation angles for input rasters (DEM) are not supported. Errors with DEM reading will be generated.
+</div>
+
+<h4>Known bugs</h4>
+<div>
+- Very large DEM could produce memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
+<br />- If you try to define source points outside the DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM),
+a message warning can be repeated more that once.
+</div>
+
+<br /><br />
+<div style="font-size: 85%; font-style: italic;">
+-----
+<br /><br /><br />
+Doc version 2018-08-26, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
+</div>
+
+<br /><br /><br />
+
+</body>
+
+</html>

@@ -4,6 +4,8 @@ from __future__ import absolute_import
 from builtins import zip
 from builtins import str
 from builtins import range
+
+import os
 from math import sqrt, sin, cos, tan, atan, degrees, radians
 
 import numpy as np
@@ -55,7 +57,7 @@ class plane_dem_intersection_QWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_fplane_tab(), "Processing")         
-        main_widget.addTab(self.setup_about_tab(), "Help")  
+        main_widget.addTab(self.setup_help_tab(), "Help")
         
         dialog_layout.addWidget(main_widget)                                     
         self.setLayout(dialog_layout)                    
@@ -104,47 +106,22 @@ class plane_dem_intersection_QWidget(QWidget):
         intersectionWidget.setLayout(intersectionLayout)        
         return intersectionWidget
 
-    def setup_about_tab(self):
+    def setup_help_tab(self):
         
-        helpWidget = QWidget()  
-        helpLayout = QVBoxLayout()        
-        htmlText = """
-This module allows to calculate the intersections of a plane with the DEM, given the plane attitude expressed according
-to geological convention and a source point.
+        qwdtHelp = QWidget()
+        qlytHelp = QVBoxLayout()
 
-<h4>Loading of DEM data</h4>
-<b>a)</b> Load in the QGis project the required DEM(s) layers and whatsoever vector or image layers needed for your analysis.
-<br /><b>b)</b> Use "Get current raster layers" in qgSurf plugin: this will allow the plugin to know which raster layers are currently loaded.
-<br /><b>c)</b> From the "Use DEM" combo box, choose the DEM to use. Do not use geographic DEMs, since the plugin will provide only approximate results.
- 
-<h4>Plane-DEM intersection</h4>
-<b>d)</b> You have to define the source point in the map, with "Set source point in map" in the "Plane-DEM intersection" tab, "Geographic parameters" section. 
-You can erase the current value with "Reset source point" or just define a new one by simply clicking in the map.
-<br /><b>e)</b> In the X, Y and Z spinboxes, the coordinates of the source point are displayed. You can modify them from within the spinboxes.
-You can also choose to use Z values not fixed to the DEM surfaces, by setting the 'lock z value to DEM surface' checkbox off.
-<br /><b>f)</b> In the "Geological parameters" section, you can define the dip direction and the dip angle, and then calculate the
-theoretical intersections by pressing "Calculate intersection".
-<br /><b>g)</b> You can change the last intersection color by choosing a color from the "Intersection color" combo box, and delete all the intersections
-with "Cancel intersections".
-<br /><b>h)</b> In the "Output" section, you can save the last intersections as a point or line shapefile, also loading it 
-within the current project.
+        # About section
 
-<h4>Known limitations</h4>
-- DEMs in geographic coordinates (i.e., lat-lon) are not supported. Using the plugin with them will only provide approximate results, particularly with regards to the dip angle.
-<br />- Rotation angles for input rasters (DEM) are not supported. Errors with DEM reading will be generated.
-  
-<h4>Known bugs</h4>
-- Very large DEM could produce memory errors. Please resize your DEM to a smaller extent or resample it to a larger cell size.
-<br />- If you try to define source points outside the DEM extent (for instance, because you have on-the-fly reprojection to a project CRS different from that of the DEM), 
-a message warning can be repeated more that once.
+        qtbrHelp = QTextBrowser(qwdtHelp)
+        url_path = "file:///{}/help/help_di.html".format(os.path.dirname(__file__))
+        qtbrHelp.setSource(QUrl(url_path))
+        qtbrHelp.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
+        qlytHelp.addWidget(qtbrHelp)
 
-        """
-        
-        helpQTextBrowser = QTextBrowser(helpWidget)        
-        helpQTextBrowser.insertHtml(htmlText) 
-        helpLayout.addWidget(helpQTextBrowser)
-        helpWidget.setLayout(helpLayout)                  
-        return helpWidget 
+        qwdtHelp.setLayout(qlytHelp)
+
+        return qwdtHelp
 
     def setup_geographicdata_sect(self):        
         

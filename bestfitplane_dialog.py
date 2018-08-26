@@ -183,20 +183,20 @@ class bestfitplane_QWidget(QWidget):
 
     def setup_help_tab(self):
 
-        qwdtAbout = QWidget()
-        qlytAbout = QVBoxLayout()
+        qwdtHelp = QWidget()
+        qlytHelp = QVBoxLayout()
 
         # About section
 
-        about_textBrwsr = QTextBrowser(qwdtAbout)
+        qtbrHelp = QTextBrowser(qwdtHelp)
         url_path = "file:///{}/help/help_bfp.html".format(os.path.dirname(__file__))
-        about_textBrwsr.setSource(QUrl(url_path))
-        about_textBrwsr.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
-        qlytAbout.addWidget(about_textBrwsr)
+        qtbrHelp.setSource(QUrl(url_path))
+        qtbrHelp.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
+        qlytHelp.addWidget(qtbrHelp)
 
-        qwdtAbout.setLayout(qlytAbout)
+        qwdtHelp.setLayout(qlytHelp)
 
-        return qwdtAbout
+        return qwdtHelp
 
     def add_marker(self, prj_crs_x, prj_crs_y):
         
@@ -637,10 +637,6 @@ class bestfitplane_QWidget(QWidget):
         self.stop_shapefile_edits = True
         self.enable_point_save_buttons(False)
         self.update_save_solution_state()
-
-    def open_html_help(self):        
-
-        webbrowser.open('{}/help/help_bfp.html'.format(os.path.dirname(__file__)), new = True)
 
         
 class NewShapeFilesDialog(QDialog):

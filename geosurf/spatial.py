@@ -1069,11 +1069,8 @@ class GeolPlane(object):
         @return:  GeolPlane.
     
         """
-        
-        assert 0.0 <= float( srcDipDir ) < 360.0
-        assert 0.0 <= float( srcDipAngle ) <= 90.0
-  
-        self._dipdir = float( srcDipDir )
+
+        self._dipdir = float( srcDipDir ) % 360.0
         self._dipangle = float( srcDipAngle )
         
         
