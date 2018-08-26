@@ -419,7 +419,7 @@ class bestfitplane_QWidget(QWidget):
             return
 
         if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
-            QMessageBox.critical(self, "DEM", "The used DEM appears to be in polar coordinates (i.e., lat-lon).\n\nAssign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the project to avoid getting incorrect results.")
+            QMessageBox.warning(self, "DEM", "The used DEM appears to be in polar coordinates (i.e., lat-lon).\n\nAssign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the project to avoid getting incorrect results.")
                
         self.enable_point_input_buttons()
 
