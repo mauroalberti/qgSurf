@@ -1,3 +1,31 @@
+"""
+/***************************************************************************
+ qgSurf - plugin for Quantum GIS
+
+ Processing of geological planes and surfaces
+
+                              -------------------
+        begin                : 2011-12-21
+        copyright            : (C) 2011-2018 by Mauro Alberti
+        email                : alberti.m65@gmail.com
+
+ ***************************************************************************/
+
+# licensed under the terms of GNU GPL 3
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+"""
+
+# -*- coding: utf-8 -*-
+
+
 from __future__ import absolute_import
 
 
@@ -9,9 +37,12 @@ from qgis.PyQt.QtWidgets import *
 
 from . import resources
 
-from .bestfitplane_dialog import bestfitplane_QWidget
-from .plane_dem_intersection_dialog import plane_dem_intersection_QWidget
-from .about_dialog import about_Dialog
+from .BestFitPlaneTool import bestfitplane_QWidget
+from .DEMPlaneIntersectionTool import plane_dem_intersection_QWidget
+from .AboutDialog import about_Dialog
+
+from .config.tools import *
+from .pygsf.libs_utils.qt.tools import *
 
 
 class qgSurf_gui(object):    
@@ -24,15 +55,19 @@ class qgSurf_gui(object):
 
     def initGui(self):
 
-        self.bestfitplane_processing = QAction(QIcon(":/plugins/qgSurf/icons/bestfitplane.png"), "Best fit plane", self.main_window)
-        self.bestfitplane_processing.setWhatsThis("Best fit plane from points")                   
-        self.bestfitplane_processing.triggered.connect(self.run_bestfitplane_processing)
-        self.interface.addPluginToMenu("&qgSurf", self.bestfitplane_processing)
+        self.bestfitplane_geoproc = make_qaction(
+            params=bestfitplane_tool_params,
+            parent=self.main_window)
+
+        self.bestfitplane_geoproc = QAction(QIcon(":/plugins/qgSurf/icons/bestfitplane.png"), "Best fit plane", self.main_window)
+        self.bestfitplane_geoproc.setWhatsThis("Best fit plane from points")
+        self.bestfitplane_geoproc.triggered.connect(self.run_bestfitplane_geoproc)
+        self.interface.addPluginToMenu("&qgSurf", self.bestfitplane_geoproc)
         
-        self.plane_geoprocessing = QAction(QIcon(":/plugins/qgSurf/icons/qgsurf.png"), "DEM-plane intersection", self.main_window)
-        self.plane_geoprocessing.setWhatsThis("Geoprocessing of planar surfaces")                   
-        self.plane_geoprocessing.triggered.connect(self.run_plane_geoprocessing)
-        self.interface.addPluginToMenu("&qgSurf", self.plane_geoprocessing)
+        self.demplaneinters_geoproc = QAction(QIcon(":/plugins/qgSurf/icons/qgsurf.png"), "DEM-plane intersection", self.main_window)
+        self.demplaneinters_geoproc.setWhatsThis("Intersection of planar surfaces with topography")
+        self.demplaneinters_geoproc.triggered.connect(self.run_demplaneinters_geoproc)
+        self.interface.addPluginToMenu("&qgSurf", self.demplaneinters_geoproc)
         
         self.qgsurf_about = QAction(QIcon(":/plugins/qgSurf/icons/about.png"), "About", self.main_window)
         self.qgsurf_about.setWhatsThis("qgSurf about")                   
@@ -74,15 +109,27 @@ class qgSurf_gui(object):
         except:
             pass   
                        
-    def run_bestfitplane_processing(self):
+    def run_bestfitplane_geoproc(self):
 
         bestfitplane_DockWidget = QDockWidget('Best fit plane', self.interface.mainWindow())        
         bestfitplane_DockWidget.setAttribute(Qt.WA_DeleteOnClose)
-        bestfitplane_DockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)        
-        self.bestfitplane_Qwidget = bestfitplane_QWidget(self.canvas, self.bestfitplane_processing)    
+        bestfitplane_DockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        self.bestfitplane_Qwidget = bestfitplane_QWidget(self.canvas, self.bestfitplane_geoproc)
         bestfitplane_DockWidget.setWidget(self.bestfitplane_Qwidget)
         bestfitplane_DockWidget.destroyed.connect(self.bfp_win_closeEvent)                  
         self.interface.addDockWidget(Qt.RightDockWidgetArea, bestfitplane_DockWidget)
+
+    def run_demplaneinters_geoproc(self):
+
+        plane_geoprocessing_DockWidget = QDockWidget('DEM-plane intersection', self.interface.mainWindow())
+        plane_geoprocessing_DockWidget.setAttribute(Qt.WA_DeleteOnClose)
+        plane_geoprocessing_DockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        self.planeProcess_Qwidget = plane_dem_intersection_QWidget(self.canvas, self.demplaneinters_geoproc)
+        plane_geoprocessing_DockWidget.setWidget(self.planeProcess_Qwidget)
+        plane_geoprocessing_DockWidget.destroyed.connect(self.pdint_closeEvent)
+        self.interface.addDockWidget(Qt.RightDockWidgetArea, plane_geoprocessing_DockWidget)
 
     def pdint_closeEvent(self, event):
 
@@ -97,15 +144,7 @@ class qgSurf_gui(object):
         except:
             pass  
 
-    def run_plane_geoprocessing(self):
-     
-        plane_geoprocessing_DockWidget = QDockWidget('DEM-plane intersection', self.interface.mainWindow())        
-        plane_geoprocessing_DockWidget.setAttribute(Qt.WA_DeleteOnClose)
-        plane_geoprocessing_DockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)        
-        self.planeProcess_Qwidget = plane_dem_intersection_QWidget(self.canvas, self.plane_geoprocessing)      
-        plane_geoprocessing_DockWidget.setWidget(self.planeProcess_Qwidget) 
-        plane_geoprocessing_DockWidget.destroyed.connect(self.pdint_closeEvent)       
-        self.interface.addDockWidget(Qt.RightDockWidgetArea, plane_geoprocessing_DockWidget)
+
         
     def run_qgsurf_about(self):
      
@@ -115,8 +154,8 @@ class qgSurf_gui(object):
         
     def unload(self):
 
-        self.interface.removePluginMenu("&qgSurf", self.bestfitplane_processing)
-        self.interface.removePluginMenu("&qgSurf", self.plane_geoprocessing)
+        self.interface.removePluginMenu("&qgSurf", self.bestfitplane_geoproc)
+        self.interface.removePluginMenu("&qgSurf", self.demplaneinters_geoproc)
         self.interface.removePluginMenu("&qgSurf", self.qgsurf_about)
 
 

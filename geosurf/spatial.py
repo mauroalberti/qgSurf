@@ -19,8 +19,6 @@ from .algebr_utils import point_solution
 from functools import reduce
 
 
-
-
 MINIMUM_SEPARATION_THRESHOLD = 1e-10
 MINIMUM_VECTOR_MAGNITUDE = 1e-10
 
@@ -207,17 +205,6 @@ class Vector_2D( object ):
         
         return Vector_3D( self._x, self._y, z )
 
-
-def versor_from_azimuth( azimuth_degr ):
-    """
-    Azimuth is from the top axis, i.e., y
-    """    
-    
-    x = sin( radians( azimuth_degr ) )
-    y = cos( radians( azimuth_degr ) )
-    
-    return Vector_2D( x, y)
-    
 
 class Line_2D( object ):
     
@@ -799,52 +786,7 @@ class Line_3D(object):
             slopes_list.append( degrees( vector.slope_radians() ) ) 
         slopes_list.append( np.nan ) # slope value for last point is unknown         
         return slopes_list        
- 
-  
-class MultiLine_3D(object):
-    # MultiLine_3D is a list of Line_3D objects
-    
-    def __init__( self, lines_list ):
-     
-        self._lines = lines_list    
-    
-    
-    def num_parts( self ):
-        
-        return len( self._lines )
-    
-    
-    def num_points( self ):
-        
-        num_points = 0
-        for line in self._lines:
-            num_points += line.num_points()            
-        return num_points
-    
 
-    def is_continuous( self ):
-        
-        for line_ndx in range( len(self._lines) - 1 ):
-            if not self._lines[line_ndx]._pts[-1].is_coincident_with( self._lines[line_ndx+1]._pts[0] ) or \
-               not self._lines[line_ndx]._pts[-1].is_coincident_with( self._lines[line_ndx+1]._pts[-1] ):
-                return False
-            
-        return True
-        
-            
-    def is_unidirectional( self ):        
-        
-        for line_ndx in range( len(self._lines) - 1):
-            if not self._lines[line_ndx]._pts[-1].is_coincident_with( self._lines[line_ndx+1]._pts[0] ):
-                return False
-            
-        return True
-
-
-    def to_line( self ):
-
-        return Line_3D( [ point for line in self._lines for point in line._pts ] )
-      
                         
 class Point_4D( Point_3D ):
     
@@ -954,7 +896,6 @@ class GeolAxis( object ):
         return GeolPlane( dipdir, dipangle ) 
 
 
-
 class CartesianPlane(object):
     """
     Cartesian plane, expressed by equation:
@@ -1025,31 +966,7 @@ class CartesianPlane(object):
             angle_degr = 180.0 - angle_degr
         return angle_degr   
                 
-        
-def cartes_plane_from_points( pt1, pt2, pt3 ):
-    
-    matr_a = np.array([[pt1._y, pt1._z, 1], 
-                       [pt2._y, pt2._z, 1],
-                       [pt3._y, pt3._z, 1] ])
 
-    matr_b = - np.array([[pt1._x, pt1._z, 1], 
-                       [pt2._x, pt2._z, 1],
-                       [pt3._x, pt3._z, 1] ])  
-    
-    matr_c = np.array([[pt1._x, pt1._y, 1], 
-                       [pt2._x, pt2._y, 1],
-                       [pt3._x, pt3._y, 1] ])
-    
-    matr_d = - np.array([[pt1._x, pt1._y, pt1._z], 
-                       [pt2._x, pt2._y, pt2._z],
-                       [pt3._x, pt3._y, pt3._z] ])
-    
-    return CartesianPlane( np.linalg.det(matr_a),
-                           np.linalg.det(matr_b),
-                           np.linalg.det(matr_c),
-                           np.linalg.det(matr_d) ) 
-     
-        
 class GeolPlane(object):
     """
     Structural plane, following geological conventions:
@@ -1154,37 +1071,6 @@ def remove_equal_consecutive_xypairs( xy_list ):
             
     return out_xy_list
     
-           
-def xytuple_list_to_Line_2D( xy_list ):
-
-    return Line_2D( [ Point_2D(x,y) for (x,y) in xy_list ] )
-
-    
-def xytuple_list2_to_MultiLine_2D( xytuple_list2 ):
-    # input is a list of list of (x,y) values
-    
-    assert len( xytuple_list2 ) > 0
-    lines_list = []
-    for xy_list in xytuple_list2:
-        assert len( xy_list ) > 0
-        lines_list.append( xytuple_list_to_Line_2D( xy_list ) )
-        
-    return MultiLine_2D( lines_list )
-
-
-def list2_to_list( list2 ):
-    """
-    input: a list of list of (x,y) tuples
-    output: a list of (x,y) tuples
-    """
-
-    out_list = []
-    for list1 in list2:
-        for el in list1:
-            out_list.append( el )
-        
-    return out_list
-
 
 def list3_to_list( list3 ):
     """
@@ -1199,29 +1085,7 @@ def list3_to_list( list3 ):
         
     return out_list
 
-     
-def merge_lines( lines, progress_ids ):
-    """
-    lines: a list of list of (x,y,z) tuples for multilines
-    """
 
-    sorted_line_list = [line for (_, line) in sorted(zip( progress_ids, lines))]
-
-    line_list = []
-    for line in sorted_line_list:
-       
-        line_type, line_geometry = line 
-     
-        if line_type == 'multiline': 
-            path_line = xytuple_list2_to_MultiLine_2D( line_geometry ).to_line()
-        elif line_type == 'line':            
-            path_line = xytuple_list_to_Line_2D( line_geometry ) 
-        line_list.append( path_line )  # now a list of Lines     
-                
-    # now the list of Lines is transformed into a single Line_2D 
-    return MultiLine_2D( line_list ).to_line().remove_coincident_successive_points()
-               
-                   
 class ArrCoord(object):
     """
     2D Array coordinates.

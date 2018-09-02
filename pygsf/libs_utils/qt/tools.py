@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QComboBox, QMessageBox
@@ -45,8 +45,24 @@ def error(parent, header, msg):
 
     QMessageBox.error(parent, header, msg)
     
-    
-def update_ComboBox(combobox: QComboBox, init_text: str, texts: List[str]):
+def make_qaction(params: Dict, parent: 'QObject'):
+    """
+    Creates a QAction instance.
+    Expected keys in params dictionary:
+        tool_nm: the tool name, string;
+        icon_nm: the name of the icon, string;
+        whtsths_dscr: the action description, string.
+    Used for QGIS Python plugin.
+
+    :param params: QAction text parameters.
+    :type params: dictionary.
+    :param parent: the parent widget.
+    :type parent: QObject or null pointer.
+    :return:
+    """
+
+
+def update_combo_box(combobox: QComboBox, init_text: str, texts: List[str]):
     """
     Updates a combo box content using a list of strings.
 

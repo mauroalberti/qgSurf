@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import QSettings, QFileInfo
+from PyQt5.QtWidgets import QFileDialog
 
 
 def lastUsedDir(module_nm):

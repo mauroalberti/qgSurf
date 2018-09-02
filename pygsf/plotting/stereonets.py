@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import matplotlib
-from matplotlib import pyplot as plt
+
+import matplotlib.pyplot as plt
+
 
 from ..embedded import mplstereonet as ms
 
@@ -152,7 +153,7 @@ def splot(data, force=''):
                     color=color)
 
     ax.grid()
-    matplotlib.pyplot.show()
+    plt.show()
 
 
 def splotDirect(gvect):
@@ -168,7 +169,7 @@ def splotDirect(gvect):
 
     ax.line(plunge, bearing, marker=symbol)
     ax.grid()
-    matplotlib.pyplot.show()
+    plt.show()
 
 
 class PlotException(Exception):

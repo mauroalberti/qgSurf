@@ -1,6 +1,8 @@
 
 
 from builtins import object
+
+
 class Raster_Parameters_Errors(Exception):
     """
     Exception for raster parameters.

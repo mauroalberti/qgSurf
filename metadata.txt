@@ -12,6 +12,7 @@ icon=./icons/qgsurf.png
 
 ; start of optional metadata
 changelog=
+  1.1.0: added stereonet tool from geocouche; code refactoring;
   1.0.0: added pygsf; minor modifications to GUI and help for best-fit-plane calculations
   0.5.0: porting to QGIS 3
   0.4.1: fixed bug related to deformation orientation; (re)added warning on geographic DEMs, still not correctly supported
