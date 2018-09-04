@@ -48,8 +48,8 @@ from .geosurf.geoio import read_dem
 from .geosurf.spatial import Point_2D, Segment_2D, Vector_2D, Point_3D, GeolPlane
 from .geosurf.intersections import Intersection_Parameters, Intersections
 
-from .geosurf.qgs_tools import loaded_raster_layers, project_qgs_point, qgs_point
-from .geosurf.qgs_tools import PointMapToolEmitPoint
+from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, project_qgs_point, qgs_point
+from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
 
 
 class plane_dem_intersection_QWidget(QWidget):

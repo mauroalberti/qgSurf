@@ -26,13 +26,9 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
-from builtins import str
 
 import os
 import sys
-
-
-import webbrowser
 
 from osgeo import ogr
 
@@ -43,18 +39,107 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
-from .geosurf.geoio import read_dem
-from .geosurf.spatial import Vector_3D, list3_to_list, remove_equal_consecutive_xypairs
-from .geosurf.svd import xyz_svd
-from .geosurf.qt_utils import define_save_file_name, define_existing_file_name
-from .geosurf.qgs_tools import *
-from .geosurf.ogr_tools import create_shapefile, open_shapefile, write_point_result
-from .geosurf.errors import OGR_IO_Errors, VectorIOException
 
+from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
+from .pygsf.libs_utils.gdal.exceptions import OGRIOException
+from .pygsf.libs_utils.gdal.ogr import shapefile_create
+from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
+from .pygsf.libs_utils.qgis.qgs_tools import *
+from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
+from .pygsf.mathematics.arrays import xyzSvd
 
 
-class bestfitplane_QWidget(QWidget):
+def remove_equal_consecutive_xypairs(xy_list):
+    out_xy_list = [xy_list[0]]
+
+    for n in range(1, len(xy_list)):
+        if not eq_xy_pair(xy_list[n], out_xy_list[-1]):
+            out_xy_list.append(xy_list[n])
+
+    return out_xy_list
+
+
+def list3_to_list(list3):
+    """
+    input: a list of list of (x,y) tuples
+    output: a list of (x,y) tuples
+    """
+
+    out_list = []
+    for list2 in list3:
+        for list1 in list2:
+            out_list += list1
+
+    return out_list
+
+
+def open_shapefile(path, fields_dict_list):
+
+    driver = ogr.GetDriverByName("ESRI Shapefile")
+
+    dataSource = driver.Open(str(path), 0)
+
+    if dataSource is None:
+        raise OGRIOException('Unable to open shapefile in provided path')
+
+    point_shapelayer = dataSource.GetLayer()
+
+    prev_solution_list = []
+    in_point = point_shapelayer.GetNextFeature()
+    while in_point:
+        rec_id = int(in_point.GetField('id'))
+        x = in_point.GetField('x')
+        y = in_point.GetField('y')
+        z = in_point.GetField('z')
+        dip_dir = in_point.GetField('dip_dir')
+        dip_ang = in_point.GetField('dip_ang')
+        descript = in_point.GetField('descript')
+        prev_solution_list.append([rec_id, x, y, z, dip_dir, dip_ang, descript])
+        in_point.Destroy()
+        in_point = point_shapelayer.GetNextFeature()
+
+        # point_shapelayer.Destroy()
+    dataSource.Destroy()
+
+    if os.path.exists(path):
+        driver.DeleteDataSource(str(path))
+
+    outShapefile, outShapelayer = create_shapefile(path, ogr.wkbPoint, fields_dict_list, crs=None, layer_name="layer")
+    return outShapefile, outShapelayer, prev_solution_list
+
+
+def write_point_result(point_shapefile, point_shapelayer, recs_list2):
+    outshape_featdef = point_shapelayer.GetLayerDefn()
+
+    for curr_Pt in recs_list2:
+        # pre-processing for new feature in output layer
+        curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
+        curr_Pt_geom.AddPoint(curr_Pt[1], curr_Pt[2], curr_Pt[3])
+
+        # create a new feature
+        curr_Pt_shape = ogr.Feature(outshape_featdef)
+        curr_Pt_shape.SetGeometry(curr_Pt_geom)
+        curr_Pt_shape.SetField('id', curr_Pt[0])
+
+        curr_Pt_shape.SetField('x', curr_Pt[1])
+        curr_Pt_shape.SetField('y', curr_Pt[2])
+        curr_Pt_shape.SetField('z', curr_Pt[3])
+
+        curr_Pt_shape.SetField('dip_dir', curr_Pt[4])
+        curr_Pt_shape.SetField('dip_ang', curr_Pt[5])
+
+        curr_Pt_shape.SetField('descript', curr_Pt[6])
+
+        # add the feature to the output layer
+        point_shapelayer.CreateFeature(curr_Pt_shape)
+
+        # destroy no longer used objects
+        curr_Pt_geom.Destroy();
+        curr_Pt_shape.Destroy()
+
+
+class BestFitPlaneWidget(QWidget):
 
     dem_default_text = '--  required  --'
     ptlnlyr_default_text = '--  choose  --'
@@ -71,12 +156,10 @@ class bestfitplane_QWidget(QWidget):
 
     def __init__(self, canvas, plugin):
 
-        super(bestfitplane_QWidget, self).__init__()         
+        super(BestFitPlaneWidget, self).__init__()
         self.canvas, self.plugin = canvas, plugin       
         self.init_params()                 
         self.setup_gui()
-
-
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
 
@@ -232,21 +315,20 @@ class bestfitplane_QWidget(QWidget):
     def set_bfp_input_point(self, qgs_pt, add_marker = True): 
 
         prj_crs_x, prj_crs_y = qgs_pt.x(), qgs_pt.y()
+
         if self.on_the_fly_projection:     
             dem_crs_coord_x, dem_crs_coord_y = self.get_dem_crs_coords(prj_crs_x, prj_crs_y)
         else:
             dem_crs_coord_x, dem_crs_coord_y = prj_crs_x, prj_crs_y
-                                
-        if not self.coords_within_dem_bndr(dem_crs_coord_x, dem_crs_coord_y):
-            return        
-       
+
+        dem_z_value = self.geoarray.interpolate_bilinear(dem_crs_coord_x, dem_crs_coord_y)
+
+        if dem_z_value is None:
+            return
+
         if add_marker:
             self.add_marker(prj_crs_x, prj_crs_y)
-       
-        curr_point = Point_2D(float(dem_crs_coord_x), float(dem_crs_coord_y))        
-        currArrCoord = self.grid.geog2array_coord(curr_point)     
-        dem_z_value = self.grid.interpolate_bilinear(currArrCoord)
-        
+
         self.bestfitplane_points.append([prj_crs_x, prj_crs_y, dem_z_value])        
         self.bestfitplane_src_points_ListWdgt.addItem("%.3f %.3f %.3f" % (prj_crs_x, prj_crs_y, dem_z_value))
 
@@ -413,7 +495,7 @@ class bestfitplane_QWidget(QWidget):
         except:
             return
         
-        self.bestfitplane_inpts_lyr_list_QComboBox.addItem(bestfitplane_QWidget.ptlnlyr_default_text)
+        self.bestfitplane_inpts_lyr_list_QComboBox.addItem(BestFitPlaneWidget.ptlnlyr_default_text)
                                   
         self.inpts_Layers = loaded_point_layers() + loaded_line_layers()                
         if self.inpts_Layers is None or len(self.inpts_Layers) == 0:
@@ -433,19 +515,20 @@ class bestfitplane_QWidget(QWidget):
             return             
 
         self.dem = self.rasterLayers[ndx_DEM_file-1]        
-        try:
-            self.grid = read_dem(self.dem.source())               
-        except IOError as e:
-            QMessageBox.critical(self, "DEM", str(e))
+
+        success, cnt = try_read_raster_band(self.dem.source())
+        if not success:
+            QMessageBox.critical(self, "DEM", cnt)
             return
 
-        if self.grid is None: 
-            QMessageBox.critical(self, "DEM", "DEM was not read")
-            return
+        geotransform, projection, band_params, data = cnt
 
-        if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
-            QMessageBox.warning(self, "DEM", "The used DEM appears to be in polar coordinates (i.e., lat-lon).\n\nAssign a planar CRS (e.g., UTM, Lambert Conformal Conic) to the project to avoid getting incorrect results.")
-               
+        self.geoarray = GeoArray(
+            inGeotransform=geotransform,
+            inProjection=projection,
+            inLevels=[data]
+        )
+
         self.enable_point_input_buttons()
 
     def coords_within_dem_bndr(self, dem_crs_coord_x, dem_crs_coord_y):
@@ -479,7 +562,7 @@ class bestfitplane_QWidget(QWidget):
         xyz_list = self.bestfitplane_points        
         xyz_array = np.array(xyz_list, dtype=np.float64)
         self.xyz_mean = np.mean(xyz_array, axis = 0)
-        svd = xyz_svd(xyz_array - self.xyz_mean)
+        svd = xyzSvd(xyz_array - self.xyz_mean)
         if svd['result'] == None:
             QMessageBox.critical(self, 
                                   "Best fit plane", 
@@ -488,9 +571,9 @@ class bestfitplane_QWidget(QWidget):
         _, _, eigenvectors = svd['result'] 
         lowest_eigenvector = eigenvectors[-1, : ]  # Solution is last row
         normal = lowest_eigenvector[: 3 ] / np.linalg.norm(lowest_eigenvector[: 3 ])        
-        normal_vector = Vector_3D(normal[0], normal[1], normal[2])
-        normal_axis = normal_vector.to_geol_axis()
-        self.bestfitplane = normal_axis.to_normal_geolplane()
+        normal_vector = Vect(normal[0], normal[1], normal[2])
+        normal_direct = Direct.fromVect(normal_vector)
+        self.bestfitplane = normal_direct.normPlane()
         
         QMessageBox.information(self, "Best fit geological plane", 
                                  "Dip direction: %.1f - dip angle: %.1f" %(self.bestfitplane._dipdir, self.bestfitplane._dipangle))
@@ -581,10 +664,10 @@ class bestfitplane_QWidget(QWidget):
 
         self.point_shapefile_path = point_shapefile_path
 
-        self.out_point_shapefile, self.out_point_shapelayer = create_shapefile(point_shapefile_path, 
-                                                                                  ogr.wkbPoint, 
-                                                                                  bestfitplane_QWidget.fields_dict_list,
-                                                                                  self.projectCrs)
+        self.out_point_shapefile, self.out_point_shapelayer = shapefile_create(point_shapefile_path,
+                                                                               ogr.wkbPoint,
+                                                                               BestFitPlaneWidget.fields_dict_list,
+                                                                               self.projectCrs)
         QMessageBox.information(self, "Shapefile", "Point shapefile created ")
 
         self.update_save_solution_state()
@@ -608,8 +691,8 @@ class bestfitplane_QWidget(QWidget):
         self.point_shapefile_path = point_shapefile_path
 
         try:
-            self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list = open_shapefile(self.point_shapefile_path, bestfitplane_QWidget.fields_dict_list)
-        except OGR_IO_Errors:
+            self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list = open_shapefile(self.point_shapefile_path, BestFitPlaneWidget.fields_dict_list)
+        except OGRIOException:
             self.out_point_shapefile, self.out_point_shapelayer = None, None
             QMessageBox.critical(self, 
                                   "Point shapefile", 
@@ -705,7 +788,7 @@ class NewShapeFilesDialog(QDialog):
 
     def set_out_point_shapefile_name(self):
         
-        out_shapefile_name = define_save_file_name(self, 
+        out_shapefile_name = new_file_path(self,
                                                     "Choose shapefile name", 
                                                     "*.shp", 
                                                     "shp (*.shp *.SHP)")
@@ -714,7 +797,7 @@ class NewShapeFilesDialog(QDialog):
 
     def set_out_polygon_shapefile_name(self):
         
-        out_shapefile_name = define_save_file_name(self, 
+        out_shapefile_name = new_file_path(self,
                                                     "Choose shapefile name", 
                                                     "*.shp", 
                                                     "shp (*.shp *.SHP)")
@@ -755,7 +838,7 @@ class PrevShapeFilesDialog(QDialog):
 
     def set_in_point_shapefile_name(self):
         
-        in_shapefile_name = define_existing_file_name(self, 
+        in_shapefile_name = old_file_path(self,
                                                     "Choose shapefile name", 
                                                     "*.shp", 
                                                     "shp (*.shp *.SHP)")
@@ -764,7 +847,7 @@ class PrevShapeFilesDialog(QDialog):
 
     def set_in_polygon_shapefile_name(self):
         
-        in_shapefile_name = define_existing_file_name(self, 
+        in_shapefile_name = old_file_path(self,
                                                     "Choose shapefile name", 
                                                     "*.shp", 
                                                     "shp (*.shp *.SHP)")

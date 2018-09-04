@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import *
 
 from . import resources
 
-from .BestFitPlaneTool import bestfitplane_QWidget
+from .BestFitPlaneTool import BestFitPlaneWidget
 from .DEMPlaneIntersectionTool import plane_dem_intersection_QWidget
 from .AboutDialog import about_Dialog
 
@@ -115,7 +115,7 @@ class qgSurf_gui(object):
         bestfitplane_DockWidget.setAttribute(Qt.WA_DeleteOnClose)
         bestfitplane_DockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        self.bestfitplane_Qwidget = bestfitplane_QWidget(self.canvas, self.bestfitplane_geoproc)
+        self.bestfitplane_Qwidget = BestFitPlaneWidget(self.canvas, self.bestfitplane_geoproc)
         bestfitplane_DockWidget.setWidget(self.bestfitplane_Qwidget)
         bestfitplane_DockWidget.destroyed.connect(self.bfp_win_closeEvent)                  
         self.interface.addDockWidget(Qt.RightDockWidgetArea, bestfitplane_DockWidget)

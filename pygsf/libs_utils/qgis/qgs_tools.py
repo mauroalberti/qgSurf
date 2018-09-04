@@ -9,8 +9,8 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
-from .spatial import Point_2D, Line_2D
-from .errors import VectorIOException
+from ...spatial.vectorial.vectorial import Point, Line
+from ...spatial.vectorial.exceptions import VectorIOException
 
 
 def vector_type( layer ):
@@ -224,11 +224,11 @@ def project_qgs_point( qgsPt, srcCrs, destCrs ):
     
 def project_line_2d( srcLine, srcCrs, destCrs ):
     
-    destLine = Line_2D()    
+    destLine = Line()
     for pt in srcLine._pts:        
         srcPt = QgsPointXY(pt._x, pt._y)
         destPt = project_qgs_point( srcPt, srcCrs, destCrs )
-        destLine = destLine.add_pt( Point_2D( destPt.x(), destPt.y() ) )
+        destLine = destLine.add_pt( Point( destPt.x(), destPt.y() ) )
         
     return destLine
         
