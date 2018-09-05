@@ -70,7 +70,7 @@ def new_file_path(parent, show_msg, path, filter_text):
     :return:
     """
 
-    output_filename = QFileDialog.getSaveFileName(parent,
+    output_filename, _ = QFileDialog.getSaveFileName(parent,
                                                   show_msg,
                                                   path,
                                                   filter_text)
@@ -91,7 +91,7 @@ def old_file_path(parent, show_msg, filter_extension, filter_text):
     :return:
     """
 
-    input_filename = QFileDialog.getOpenFileName(parent,
+    input_filename, _ = QFileDialog.getOpenFileName(parent,
                                                  parent.tr(show_msg),
                                                  filter_extension,
                                                  filter_text)
@@ -99,4 +99,5 @@ def old_file_path(parent, show_msg, filter_extension, filter_text):
         return ''
     else:
         return input_filename
+
 

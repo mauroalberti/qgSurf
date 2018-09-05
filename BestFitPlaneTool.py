@@ -50,6 +50,7 @@ from .pygsf.libs_utils.qgis.qgs_tools import *
 from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
+from .pygsf.plotting.stereonets import splot
 
 
 def remove_equal_consecutive_xypairs(xy_list):
@@ -320,7 +321,7 @@ class BestFitPlaneWidget(QWidget):
 
     def view_in_stereonet(self):
 
-        pass
+        splot([(self.bestfitplane, "c=brown")])
 
     def add_value_to_results(self):
 
@@ -446,7 +447,8 @@ class BestFitPlaneWidget(QWidget):
     def reset_point_inputs(self):
 
         self.bestfitplane_src_points_ListWdgt.clear()
-        self.bestfitplane_points = []  
+        self.bestfitplane_points = []
+        self.bestfitplane = None
 
     def reset_point_markers(self):
 
@@ -577,6 +579,8 @@ class BestFitPlaneWidget(QWidget):
 
         self.bestfitplane_calculate_pButton.setEnabled(state)
 
+        self.update_save_solution_state()
+
     def calculate_bestfitplane(self):        
 
         xyz_list = self.bestfitplane_points        
@@ -602,30 +606,18 @@ class BestFitPlaneWidget(QWidget):
 
     def update_save_solution_state(self):
 
+        if self.bestfitplane is not None:
+            self.view_result_in_stereonet_pButton.setEnabled(True)
+            self.add_result_to_stored_pButton.setEnabled(True)
+        else:
+            self.view_result_in_stereonet_pButton.setEnabled(False)
+            self.add_result_to_stored_pButton.setEnabled(False)
+
         if self.out_point_shapefile is not None and self.out_point_shapelayer is not None and \
                 self.bestfitplane is not None and not self.stop_shapefile_edits:
             self.save_solution_pButton.setEnabled(True)
         else:
             self.save_solution_pButton.setEnabled(False)
-
-    def view_plane_in_stereonet(self):
-        """
-        Plot plane solution in stereonet.
-
-        :return: None
-        """
-
-        # plane = self.bestfitplane
-        # splot([(plane, "c=blue")])
-
-        x = np.linspace(0, 10, 501)
-        y = np.tan(x)
-
-        qapp = QApplication(sys.argv)
-
-        app = PlotWindow(x, y)
-        app.show()
-        qapp.exec_()
 
     def disable_points_definition(self):
         
@@ -808,19 +800,21 @@ class NewShapeFilesDialog(QDialog):
 
     def set_out_point_shapefile_name(self):
         
-        out_shapefile_name = new_file_path(self,
-                                                    "Choose shapefile name", 
-                                                    "*.shp", 
-                                                    "shp (*.shp *.SHP)")
+        out_shapefile_name = new_file_path(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
         
         self.output_point_shape_QLineEdit.setText(out_shapefile_name)
 
     def set_out_polygon_shapefile_name(self):
         
-        out_shapefile_name = new_file_path(self,
-                                                    "Choose shapefile name", 
-                                                    "*.shp", 
-                                                    "shp (*.shp *.SHP)")
+        out_shapefile_name = new_file_path(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
         
         self.output_polygon_shape_QLineEdit.setText(out_shapefile_name)
 
@@ -858,19 +852,21 @@ class PrevShapeFilesDialog(QDialog):
 
     def set_in_point_shapefile_name(self):
         
-        in_shapefile_name = old_file_path(self,
-                                                    "Choose shapefile name", 
-                                                    "*.shp", 
-                                                    "shp (*.shp *.SHP)")
+        in_shapefile_name = old_file_path(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
         
         self.input_point_shape_QLineEdit.setText(in_shapefile_name)
 
     def set_in_polygon_shapefile_name(self):
         
-        in_shapefile_name = old_file_path(self,
-                                                    "Choose shapefile name", 
-                                                    "*.shp", 
-                                                    "shp (*.shp *.SHP)")
+        in_shapefile_name = old_file_path(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
         
         self.input_polygon_shape_QLineEdit.setText(in_shapefile_name)
     
