@@ -57,6 +57,7 @@ def interp_bilinear(i: Number, j: Number, v00: Number, v01: Number, v10: Number,
 
     grid_val_y0 = v00 + (v10 - v00) * i
     grid_val_y1 = v01 + (v11 - v01) * i
+
     return grid_val_y0 + (grid_val_y1 - grid_val_y0) * j
 
 

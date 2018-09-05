@@ -39,6 +39,8 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
+from .config.constants import *
+from .config.tools import *
 
 from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
@@ -196,7 +198,7 @@ class BestFitPlaneWidget(QWidget):
         plansurfaceWidget = QWidget()  
         plansurfaceLayout = QVBoxLayout()        
         plansurfaceLayout.addWidget(self.setup_source_dem())         
-        plansurfaceLayout.addWidget(self.setup_source_points())   
+        plansurfaceLayout.addWidget(self.setup_data_processing())
         plansurfaceLayout.addWidget(self.setup_results_io())
         plansurfaceWidget.setLayout(plansurfaceLayout) 
         return plansurfaceWidget 
@@ -220,7 +222,7 @@ class BestFitPlaneWidget(QWidget):
               
         return sourcedem_QGroupBox
 
-    def setup_source_points(self):
+    def setup_data_processing(self):
         
         source_points_QGroupBox = QGroupBox(self.tr("Best-fit plane from points"))  
         
@@ -252,6 +254,16 @@ class BestFitPlaneWidget(QWidget):
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
         source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
+
+        self.view_result_in_stereonet_pButton = QPushButton("View in stereonet")
+        self.view_result_in_stereonet_pButton.clicked.connect(self.view_in_stereonet)
+        self.view_result_in_stereonet_pButton.setEnabled(False)
+        source_points_Layout.addWidget(self.view_result_in_stereonet_pButton, 5, 0, 1, 1)
+
+        self.add_result_to_stored_pButton = QPushButton("Add computed value to results")
+        self.add_result_to_stored_pButton.clicked.connect(self.add_value_to_results)
+        self.add_result_to_stored_pButton.setEnabled(False)
+        source_points_Layout.addWidget(self.add_result_to_stored_pButton, 5, 1, 1, 1)
 
         self.enable_point_input_buttons(False)
 
@@ -305,6 +317,14 @@ class BestFitPlaneWidget(QWidget):
         qwdtHelp.setLayout(qlytHelp)
 
         return qwdtHelp
+
+    def view_in_stereonet(self):
+
+        pass
+
+    def add_value_to_results(self):
+
+        pass
 
     def add_marker(self, prj_crs_x, prj_crs_y):
         
@@ -380,7 +400,7 @@ class BestFitPlaneWidget(QWidget):
         else:
             raise VectorIOException("Geometry type of chosen layer is not point or line")
         
-        if len(xypair_list) > 50:
+        if len(xypair_list) > ciMaxPointsNumberForBFP:
             QMessageBox.critical(self, 
                                   "Input point layer", 
                                   "More than 50 points to handle. Please use less features") 
