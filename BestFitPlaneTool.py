@@ -50,7 +50,8 @@ from .pygsf.libs_utils.qgis.qgs_tools import *
 from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
-from .pygsf.plotting.stereonets import splot
+
+from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
 
 
 def remove_equal_consecutive_xypairs(xy_list):
@@ -256,15 +257,10 @@ class BestFitPlaneWidget(QWidget):
         self.bestfitplane_calculate_pButton.setEnabled(False)
         source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
 
-        self.view_result_in_stereonet_pButton = QPushButton("View in stereonet")
-        self.view_result_in_stereonet_pButton.clicked.connect(self.view_in_stereonet)
-        self.view_result_in_stereonet_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.view_result_in_stereonet_pButton, 5, 0, 1, 1)
-
         self.add_result_to_stored_pButton = QPushButton("Add computed value to results")
         self.add_result_to_stored_pButton.clicked.connect(self.add_value_to_results)
         self.add_result_to_stored_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.add_result_to_stored_pButton, 5, 1, 1, 1)
+        source_points_Layout.addWidget(self.add_result_to_stored_pButton, 5, 0, 1, 2)
 
         self.enable_point_input_buttons(False)
 
@@ -320,8 +316,14 @@ class BestFitPlaneWidget(QWidget):
         return qwdtHelp
 
     def view_in_stereonet(self):
+        """
+        Plot plane solution in stereonet.
 
-        splot([(self.bestfitplane, "c=brown")])
+        :return: None
+        """
+
+        stereonet_dialog = StereonetDialog(self.bestfitplane)
+        stereonet_dialog.exec_()
 
     def add_value_to_results(self):
 
@@ -599,18 +601,15 @@ class BestFitPlaneWidget(QWidget):
         normal_direct = Direct.fromVect(normal_vector)
         self.bestfitplane = normal_direct.normPlane()
         
-        QMessageBox.information(self, "Best fit geological plane", 
-                                 "Dip direction: %.1f - dip angle: %.1f" %(self.bestfitplane._dipdir, self.bestfitplane._dipangle))
+        self.view_in_stereonet()
 
         self.update_save_solution_state()
 
     def update_save_solution_state(self):
 
         if self.bestfitplane is not None:
-            self.view_result_in_stereonet_pButton.setEnabled(True)
             self.add_result_to_stored_pButton.setEnabled(True)
         else:
-            self.view_result_in_stereonet_pButton.setEnabled(False)
             self.add_result_to_stored_pButton.setEnabled(False)
 
         if self.out_point_shapefile is not None and self.out_point_shapelayer is not None and \
@@ -900,5 +899,22 @@ class SolutionDescriptDialog(QDialog):
         okButton.clicked.connect(self.accept)
         cancelButton.clicked.connect(self.reject)
         
+        self.setWindowTitle("Solution")
+
+
+class StereonetDialog(QDialog):
+
+    def __init__(self, plane, parent=None):
+
+        super(StereonetDialog, self).__init__(parent)
+
+        layout = QVBoxLayout()
+
+        layout.addWidget(QTextEdit("Solution: {:05.1f}, {:04.1f}".format(*plane.dda)))
+        mpl_widget = MplWidget(window_title="Stereoplot", type="Stereonet", data=plane)
+        layout.addWidget(mpl_widget)
+
+        self.setLayout(layout)
+
         self.setWindowTitle("Solution")
 

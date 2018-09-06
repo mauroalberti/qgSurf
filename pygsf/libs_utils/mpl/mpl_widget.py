@@ -20,6 +20,7 @@ from qgis.PyQt.QtWidgets import *
 
 
 from .utils import valid_intervals
+from ...plotting.stereonets import plot
 
 
 class MplCanvas(FigureCanvas):
@@ -27,12 +28,17 @@ class MplCanvas(FigureCanvas):
     Class to represent the FigureCanvas widget.
     """
 
-    def __init__(self):
+    def __init__(self, plot_type, data_plot):
 
         self.set_rcParams()
 
-        self.fig = Figure()
-        FigureCanvas.__init__(self, self.fig)
+        if plot_type == "Stereonet":
+            self.fig, self.ax = plot(data_plot)
+        else:
+            self.fig = Figure()
+            FigureCanvas.__init__(self, self.fig)
+
+        super().__init__(self.fig)
 
     def set_rcParams(self):
 
@@ -59,37 +65,22 @@ class NavigatioToolbarModif(NavigationToolbar):
 
 class MplWidget(QWidget):
 
-    def __init__(self, window_title):
+    def __init__(self, window_title, type, data):
 
-        # initialization of Qt MainWindow widget
-        QWidget.__init__(self)
+        super().__init__()
+
         self.setWindowTitle(window_title)
 
         # set the canvas and the navigation toolbar
-        self.canvas = MplCanvas()
-        self.ntb = NavigatioToolbarModif(self.canvas, self)
-
-        inputWidget = QWidget()
-        inputLayout = QHBoxLayout()
-        inputLayout.addWidget(QLabel(self.tr("Set profile colors")))
-        inputWidget.setLayout(inputLayout)
-
-        # manage the navigation toolbar
-        self.window_tabs = QTabWidget()
-        self.window_tabs.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
-        self.window_tabs.addTab(self.ntb, "View")
+        self.canvas = MplCanvas(type, data)
 
         # create a vertical box layout
         self.vbl = QVBoxLayout()
 
-        # add widgets to the vertical box
-        self.vbl.addWidget(self.window_tabs)
         self.vbl.addWidget(self.canvas)
 
         # set the layout to the vertical box
         self.setLayout(self.vbl)
-
-        self.show()
 
 
 def plot_line(axes, x_list, y_list, linecolor, name="", linewidth=1):
@@ -129,4 +120,5 @@ def view_3D_surface(surface_3d):
     ax.plot_trisurf(X, Y, Z, cmap=cm.jet, linewidth=0.1)
     ax.autoscale(enable=True, axis='both', tight=True)
     plt.show()
-    
+
+
