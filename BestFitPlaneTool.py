@@ -175,8 +175,10 @@ class BestFitPlaneWidget(QWidget):
         self.bestfitplane_point_markers = []  
         self.res_id = 0
 
-        self.out_point_shapefile, self.out_point_shapelayer = None, None
+        self.bestfitplane_points = []
         self.bestfitplane = None
+
+        self.out_point_shapefile, self.out_point_shapelayer = None, None
         self.stop_shapefile_edits = False
 
     def reset_dem_input_states(self):
@@ -226,7 +228,7 @@ class BestFitPlaneWidget(QWidget):
 
     def setup_data_processing(self):
         
-        source_points_QGroupBox = QGroupBox(self.tr("Best-fit plane from points"))  
+        source_points_QGroupBox = QGroupBox(self.tr("Best fit plane from points"))
         
         source_points_Layout = QGridLayout() 
 
@@ -252,15 +254,10 @@ class BestFitPlaneWidget(QWidget):
         self.bestfitplane_src_points_ListWdgt = QListWidget()
         source_points_Layout.addWidget(self.bestfitplane_src_points_ListWdgt, 3, 0, 1, 2)
 
-        self.bestfitplane_calculate_pButton = QPushButton("Calculate best-fit plane")
+        self.bestfitplane_calculate_pButton = QPushButton("Calculate best fit plane")
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
         source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
-
-        self.add_result_to_stored_pButton = QPushButton("Add computed value to results")
-        self.add_result_to_stored_pButton.clicked.connect(self.add_value_to_results)
-        self.add_result_to_stored_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.add_result_to_stored_pButton, 5, 0, 1, 2)
 
         self.enable_point_input_buttons(False)
 
@@ -322,7 +319,7 @@ class BestFitPlaneWidget(QWidget):
         :return: None
         """
 
-        stereonet_dialog = StereonetDialog(self.bestfitplane)
+        stereonet_dialog = StereonetDialog(self.bestfitplane, self.bestfitplane_points)
         stereonet_dialog.exec_()
 
     def add_value_to_results(self):
@@ -395,8 +392,18 @@ class BestFitPlaneWidget(QWidget):
         layer_geom_type = vector_type(inpts_lyr)
         if layer_geom_type == 'point':
             xypair_list = pt_geoms_attrs(inpts_lyr)
+            if not xypair_list:
+                QMessageBox.critical(self,
+                                     "Input layer",
+                                     "Is chosen layer empty?")
+                return
         elif layer_geom_type == 'line':
             xypair_list3 = line_geoms_attrs(inpts_lyr)
+            if not xypair_list3:
+                QMessageBox.critical(self,
+                                     "Input layer",
+                                     "Is chosen layer empty?")
+                return
             xypair_list3_1 = [xypair_list02[0] for xypair_list02 in xypair_list3 ]
             xypair_flatlist = list3_to_list(xypair_list3_1)
             xypair_list = remove_equal_consecutive_xypairs(xypair_flatlist)
@@ -406,7 +413,7 @@ class BestFitPlaneWidget(QWidget):
         if len(xypair_list) > ciMaxPointsNumberForBFP:
             QMessageBox.critical(self, 
                                   "Input point layer", 
-                                  "More than 50 points to handle. Please use less features") 
+                                  "More than {} points to handle. Please use less features or modify value in config/constants.py".format(ciMaxPointsNumberForBFP))
             return            
 
         # for all xy tuples, project to project CRS as a qgis point
@@ -606,11 +613,6 @@ class BestFitPlaneWidget(QWidget):
         self.update_save_solution_state()
 
     def update_save_solution_state(self):
-
-        if self.bestfitplane is not None:
-            self.add_result_to_stored_pButton.setEnabled(True)
-        else:
-            self.add_result_to_stored_pButton.setEnabled(False)
 
         if self.out_point_shapefile is not None and self.out_point_shapelayer is not None and \
                 self.bestfitplane is not None and not self.stop_shapefile_edits:
@@ -899,22 +901,36 @@ class SolutionDescriptDialog(QDialog):
         okButton.clicked.connect(self.accept)
         cancelButton.clicked.connect(self.reject)
         
-        self.setWindowTitle("Solution")
+        self.setWindowTitle("Best fit plane solution")
 
 
 class StereonetDialog(QDialog):
 
-    def __init__(self, plane, parent=None):
+    def __init__(self, plane, points, parent=None):
 
         super(StereonetDialog, self).__init__(parent)
 
+        self.plane = plane
+        self.pts = points
+
         layout = QVBoxLayout()
 
-        layout.addWidget(QTextEdit("Solution: {:05.1f}, {:04.1f}".format(*plane.dda)))
+        solution_wdg = QPlainTextEdit("Solution: {:05.1f}, {:04.1f}".format(*plane.dda))
+        solution_wdg.setMaximumHeight(40)
+        layout.addWidget(solution_wdg)
+        pts_str = "\n".join(map(lambda pt: "{}, {}, {}".format(*pt), points))
+        layout.addWidget(QPlainTextEdit("Source points:\n{}".format(pts_str), self))
         mpl_widget = MplWidget(window_title="Stereoplot", type="Stereonet", data=plane)
         layout.addWidget(mpl_widget)
 
+        save_btn = QPushButton("Save solution")
+        save_btn.clicked.connect(self.save_solution)
+        layout.addWidget(save_btn)
+
         self.setLayout(layout)
 
-        self.setWindowTitle("Solution")
+        self.setWindowTitle("Best fit plane solution")
 
+    def save_solution(self):
+
+        print("I will save solution")
