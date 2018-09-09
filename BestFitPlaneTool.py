@@ -30,6 +30,8 @@ from __future__ import absolute_import
 import os
 import sys
 
+import sqlite3
+
 from osgeo import ogr
 
 from qgis.PyQt.QtCore import *
@@ -41,6 +43,7 @@ from qgis.gui import *
 
 from .config.constants import *
 from .config.tools import *
+from .config.paths import *
 
 from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
@@ -162,10 +165,49 @@ class BestFitPlaneWidget(QWidget):
 
         super(BestFitPlaneWidget, self).__init__()
         self.canvas, self.plugin = canvas, plugin       
-        self.init_params()                 
+        self.init_params()
+        self.start_inner_db()
         self.setup_gui()
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
+
+    def start_inner_db(self):
+
+        local_db_pth = os.path.join(os.path.dirname(__file__), local_db_path)
+
+        print("db path: {}".format(local_db_pth))
+
+        conn = sqlite3.connect(local_db_pth)
+
+        curs = conn.cursor()
+
+        # Create table solutions
+
+        curs.execute('''DROP TABLE IF EXISTS solutions''')
+
+        curs.execute('''CREATE TABLE solutions
+                     (id INTEGER PRIMARY KEY, dip_dir real, dip_ang real, stereoplot blob, creat_time DATE, modif_time DATE)''')
+
+        # Create table points
+
+        curs.execute('''DROP TABLE IF EXISTS points''')
+
+        curs.execute('''CREATE TABLE points
+                     (id INTEGER PRIMARY KEY, id_sol INTEGER, x real, y real, z real)''')
+
+        # Insert a row of data
+        # curs.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
+
+        # Save (commit) the changes
+
+        conn.commit()
+
+        # We can also close the connection if we are done with it.
+        # Just be sure any changes have been committed or they will be lost.
+
+        conn.close()
+
+        print("inner tables created")
 
     def init_params(self):
  
