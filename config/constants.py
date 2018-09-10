@@ -1,2 +1,0 @@
-
-ciMaxPointsNumberForBFP = 500

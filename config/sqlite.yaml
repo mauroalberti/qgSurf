@@ -1,0 +1,22 @@
+
+sqlite_db:
+  name: results.db
+  folder: results
+  tables:
+    solutions:
+      name: solutions
+      fields:
+        - id: INTEGER PRIMARY KEY
+        - dip_dir: real
+        - dip_ang: real
+        - stereoplot: blob
+        - creat_time: DATE
+        - modif_time: DATE
+    src_points:
+      name: src_pnts
+      fields:
+        - id: INTEGER PRIMARY KEY
+        - id_sol: INTEGER
+        - x: real
+        - y: real
+        - z: real

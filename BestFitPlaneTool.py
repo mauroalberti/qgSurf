@@ -148,17 +148,6 @@ def write_point_result(point_shapefile, point_shapelayer, recs_list2):
 
 class BestFitPlaneWidget(QWidget):
 
-    dem_default_text = '--  required  --'
-    ptlnlyr_default_text = '--  choose  --'
-        
-    fields_dict_list = [dict(name='id', ogr_type=ogr.OFTInteger),
-                         dict(name='x', ogr_type=ogr.OFTReal),
-                         dict(name='y', ogr_type=ogr.OFTReal),
-                         dict(name='z', ogr_type=ogr.OFTReal),
-                         dict(name='dip_dir', ogr_type=ogr.OFTReal),
-                         dict(name='dip_ang', ogr_type=ogr.OFTReal),
-                         dict(name='descript', ogr_type=ogr.OFTString, width=50)]
-
     bfp_calc_update = pyqtSignal()
 
     def __init__(self, canvas, plugin):
@@ -174,8 +163,6 @@ class BestFitPlaneWidget(QWidget):
     def start_inner_db(self):
 
         local_db_pth = os.path.join(os.path.dirname(__file__), local_db_path)
-
-        print("db path: {}".format(local_db_pth))
 
         conn = sqlite3.connect(local_db_pth)
 
@@ -425,9 +412,10 @@ class BestFitPlaneWidget(QWidget):
             inpts_lyr_qgis_ndx = self.bestfitplane_inpts_lyr_list_QComboBox.currentIndex() - 1
             inpts_lyr = self.inpts_Layers[inpts_lyr_qgis_ndx ]
         except:
-            QMessageBox.critical(self, 
-                                  "Input point layer", 
-                                  "Check chosen input layer") 
+            QMessageBox.critical(
+                self,
+                "Input point layer",
+                "Check chosen input layer")
             return
 
         # read xy tuples from layer (removed consecutive duplicates)
@@ -435,16 +423,18 @@ class BestFitPlaneWidget(QWidget):
         if layer_geom_type == 'point':
             xypair_list = pt_geoms_attrs(inpts_lyr)
             if not xypair_list:
-                QMessageBox.critical(self,
-                                     "Input layer",
-                                     "Is chosen layer empty?")
+                QMessageBox.critical(
+                    self,
+                    "Input layer",
+                    "Is chosen layer empty?")
                 return
         elif layer_geom_type == 'line':
             xypair_list3 = line_geoms_attrs(inpts_lyr)
             if not xypair_list3:
-                QMessageBox.critical(self,
-                                     "Input layer",
-                                     "Is chosen layer empty?")
+                QMessageBox.critical(
+                    self,
+                    "Input layer",
+                    "Is chosen layer empty?")
                 return
             xypair_list3_1 = [xypair_list02[0] for xypair_list02 in xypair_list3 ]
             xypair_flatlist = list3_to_list(xypair_list3_1)
@@ -453,10 +443,11 @@ class BestFitPlaneWidget(QWidget):
             raise VectorIOException("Geometry type of chosen layer is not point or line")
         
         if len(xypair_list) > ciMaxPointsNumberForBFP:
-            QMessageBox.critical(self, 
-                                  "Input point layer", 
-                                  "More than {} points to handle. Please use less features or modify value in config/constants.py".format(ciMaxPointsNumberForBFP))
-            return            
+            QMessageBox.critical(
+                self,
+                "Input point layer",
+                "More than {} points to handle. Please use less features or modify value in config/parameters.yaml".format(ciMaxPointsNumberForBFP))
+            return
 
         # for all xy tuples, project to project CRS as a qgis point
         self.update_crs_settings()
@@ -639,9 +630,10 @@ class BestFitPlaneWidget(QWidget):
         self.xyz_mean = np.mean(xyz_array, axis = 0)
         svd = xyzSvd(xyz_array - self.xyz_mean)
         if svd['result'] == None:
-            QMessageBox.critical(self, 
-                                  "Best fit plane", 
-                                  "Unable to calculate result")
+            QMessageBox.critical(
+                self,
+                "Best fit plane",
+                "Unable to calculate result")
             return
         _, _, eigenvectors = svd['result'] 
         lowest_eigenvector = eigenvectors[-1, : ]  # Solution is last row
@@ -712,9 +704,10 @@ class BestFitPlaneWidget(QWidget):
             return
 
         if point_shapefile_path == "": 
-            QMessageBox.critical(self, 
-                                  "Point shapefile", 
-                                  "No path provided")
+            QMessageBox.critical(
+                self,
+                "Point shapefile",
+                "No path provided")
             return
 
         self.point_shapefile_path = point_shapefile_path
@@ -723,7 +716,10 @@ class BestFitPlaneWidget(QWidget):
                                                                                ogr.wkbPoint,
                                                                                BestFitPlaneWidget.fields_dict_list,
                                                                                self.projectCrs)
-        QMessageBox.information(self, "Shapefile", "Point shapefile created ")
+        QMessageBox.information(
+            self,
+            "Shapefile",
+            "Point shapefile created ")
 
         self.update_save_solution_state()
 
