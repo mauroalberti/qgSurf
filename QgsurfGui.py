@@ -52,6 +52,7 @@ _settings_name_ = "alberese"
 _icon_fldr_ = "icons"
 config_fldr = "config"
 plugin_params_flnm = "plugin.yaml"
+db_params_flnm = "sqlite.yaml"
 
 
 class QgsurfGui(object):
@@ -59,13 +60,25 @@ class QgsurfGui(object):
     def __init__(self, interface):
 
         self.plugin_folder = os.path.dirname(__file__)
-        plugin_config_file = os.path.join(
+        self.config_fldrpth = os.path.join(
             self.plugin_folder,
-            config_fldr,
+            config_fldr)
+
+        plugin_config_file = os.path.join(
+            self.config_fldrpth,
             plugin_params_flnm)
+
         plugin_params = yaml.safe_load(open(plugin_config_file).read())
         self.version = plugin_params["version"]
         self.tools = plugin_params["tools"]
+
+        db_config_file = os.path.join(
+            self.config_fldrpth,
+            db_params_flnm)
+        db_params = yaml.safe_load(open(db_config_file).read())
+        self.sqlite_db_params = db_params["sqlite_db"]
+
+        self.bStereoplotWidgetOpen = False
 
         self.interface = interface
         self.main_window = self.interface.mainWindow()
@@ -111,7 +124,10 @@ class QgsurfGui(object):
         BestFitPlaneDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         BestFitPlaneDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        self.BestFitPlaneQwidget = BestFitPlaneWidget(self.canvas, self.bestfitplane_geoproc)
+        self.BestFitPlaneQwidget = BestFitPlaneWidget(
+            self.canvas,
+            self.bestfitplane_geoproc,
+            self.sqlite_db_params)
         BestFitPlaneDockWidget.setWidget(self.BestFitPlaneQwidget)
         BestFitPlaneDockWidget.destroyed.connect(self.BestFitPlaneCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, BestFitPlaneDockWidget)
@@ -148,7 +164,7 @@ class QgsurfGui(object):
 
     def RunQgsurfAbout(self):
 
-        qgsurf_about_dlg = AboutDialog()
+        qgsurf_about_dlg = AboutDialog(_plugin_nm_, self.version)
         qgsurf_about_dlg.show()
         qgsurf_about_dlg.exec_()
 

@@ -43,22 +43,15 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
-"""
-from .config.constants import *
-from .config.tools import *
-from .config.paths import *
-"""
-
 from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
 from .pygsf.libs_utils.gdal.ogr import shapefile_create
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
 from .pygsf.libs_utils.qgis.qgs_tools import *
+from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
 from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
-
-from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
 
 
 def remove_equal_consecutive_xypairs(xy_list):
@@ -154,13 +147,40 @@ class BestFitPlaneWidget(QWidget):
 
     bfp_calc_update = pyqtSignal()
 
-    def __init__(self, canvas, plugin):
+    def __init__(self, canvas, plugin_qaction, local_db_params):
 
         super(BestFitPlaneWidget, self).__init__()
-        self.canvas, self.plugin = canvas, plugin       
+        self.canvas, self.plugin = canvas, plugin_qaction
         self.plugin_folder = os.path.dirname(__file__)
+
         self.init_params()
-        self.start_inner_db()
+        #todo
+        # local_db_params
+        """
+        
+sqlite_db:
+  name: results.db
+  folder: results
+  tables:
+    solutions:
+      name: solutions
+      fields:
+        - id: INTEGER PRIMARY KEY
+        - dip_dir: real
+        - dip_ang: real
+        - stereoplot: blob
+        - creat_time: DATE
+        - modif_time: DATE
+    src_points:
+      name: src_pnts
+      fields:
+        - id: INTEGER PRIMARY KEY
+        - id_sol: INTEGER
+        - x: real
+        - y: real
+        - z: real
+        """
+        self.start_inner_db(local_db_params)
         self.setup_gui()
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)

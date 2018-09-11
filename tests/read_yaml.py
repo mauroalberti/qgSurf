@@ -2,8 +2,23 @@
 import os
 import yaml
 
-tools_config_file = r"C:\Users\mauro\Documents\projects\qgSurf\config\plugin.yaml"
-tools_params = yaml.safe_load(open(tools_config_file).read())
+db_config_file = r"C:\Users\mauro\Documents\projects\qgSurf\config\sqlite.yaml"
+db_params = yaml.safe_load(open(db_config_file).read())
+sqlite_params = db_params["sqlite_db"]
 
-print(type(tools_params))
-print(tools_params)
+db_name = sqlite_params["name"]
+db_folder = sqlite_params["folder"]
+tables = sqlite_params["tables"]
+
+solutions_pars = tables["solutions"]
+src_points_pars = tables["src_pts"]
+
+solutions_tbl_nm = solutions_pars["name"]
+solutions_tbl_flds = solutions_pars["fields"]
+
+print(db_name)
+print(db_folder)
+print(solutions_tbl_nm)
+
+for fld in solutions_tbl_flds:
+    print(fld["name"], fld["type"])
