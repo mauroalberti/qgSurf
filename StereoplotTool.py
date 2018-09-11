@@ -2,12 +2,12 @@
 /***************************************************************************
  qgSurf - plugin for Quantum GIS
 
- Processing of geological planes and surfaces
+ geologic stereoplots
+-------------------
 
-                              -------------------
-        begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti
-        email                : alberti.m65@gmail.com
+    Begin                : 2015.04.18
+    Copyright            : (C) 2015-2018 by Mauro Alberti
+    Email                : alberti dot m65 at gmail dot com
 
  ***************************************************************************/
 
@@ -23,8 +23,6 @@
  ***************************************************************************/
 """
 
-# -*- coding: utf-8 -*-
-
 
 import os
 
@@ -35,8 +33,8 @@ from .apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
 
 from .auxiliary_windows import *
 from .pygsf.orientations.orientations import Plane as GPlane, Axis as GAxis
-from .qgis_utils.qgs import pt_geoms_attrs
-from pygsf.libs_utils.mpl import FigureExportDlg
+from .pygsf.libs_utils.qgis.qgs_tools import pt_geoms_attrs
+from .pygsf.libs_utils.mpl.save_figure import FigureExportDlg
 from .pygsf.libs_utils.apsg.faults import rake_to_apsg_movsense, movsense_to_apsg_movsense
 from .pygsf.geology.exceptions import RakeInputException
 

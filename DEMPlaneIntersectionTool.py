@@ -52,7 +52,7 @@ from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, project_qgs_p
 from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
 
 
-class plane_dem_intersection_QWidget(QWidget):
+class DemPlaneIntersectionWidget(QWidget):
     """
     Constructor
     
@@ -63,7 +63,7 @@ class plane_dem_intersection_QWidget(QWidget):
 
     def __init__(self, canvas, plugin):
 
-        super(plane_dem_intersection_QWidget, self).__init__()       
+        super(DemPlaneIntersectionWidget, self).__init__()
         self.canvas, self.plugin = canvas, plugin        
         self.init_params()                 
         self.setup_gui() 

@@ -26,8 +26,8 @@ from __future__ import absolute_import
 
 
 def classFactory( iface ):    
-    from .qgSurf_gui import qgSurf_gui
-    return qgSurf_gui( iface )
+    from .QgsurfGui import QgsurfGui
+    return QgsurfGui(iface)
 
 
 

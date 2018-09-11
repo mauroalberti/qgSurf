@@ -3,8 +3,8 @@
 
 from typing import List, Tuple, Dict
 
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QComboBox, QMessageBox
+from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtWidgets import QAction, QComboBox, QMessageBox
 
 
 def info(parent, header, msg):

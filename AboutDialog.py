@@ -29,11 +29,11 @@
 from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QTextBrowser
 
     
-class about_Dialog( QDialog ):
+class AboutDialog(QDialog):
 
     def __init__( self ):
 
-        super( about_Dialog, self ).__init__() 
+        super(AboutDialog, self).__init__()
                             
         self.setup_gui()
         
