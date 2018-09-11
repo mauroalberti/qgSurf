@@ -30,6 +30,8 @@ from __future__ import absolute_import
 import os
 import sys
 
+import yaml
+
 import sqlite3
 
 from osgeo import ogr
@@ -41,9 +43,11 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
+"""
 from .config.constants import *
 from .config.tools import *
 from .config.paths import *
+"""
 
 from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
@@ -154,6 +158,7 @@ class BestFitPlaneWidget(QWidget):
 
         super(BestFitPlaneWidget, self).__init__()
         self.canvas, self.plugin = canvas, plugin       
+        self.plugin_folder = os.path.dirname(__file__)
         self.init_params()
         self.start_inner_db()
         self.setup_gui()
@@ -162,7 +167,7 @@ class BestFitPlaneWidget(QWidget):
 
     def start_inner_db(self):
 
-        local_db_pth = os.path.join(os.path.dirname(__file__), local_db_path)
+        local_db_pth = os.path.join(self.plugin_folder, local_db_path)
 
         conn = sqlite3.connect(local_db_pth)
 

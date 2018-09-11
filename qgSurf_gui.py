@@ -28,8 +28,11 @@
 
 from __future__ import absolute_import
 
-
 from builtins import object
+
+import os
+
+import yaml
 
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
@@ -41,28 +44,39 @@ from .BestFitPlaneTool import BestFitPlaneWidget
 from .DEMPlaneIntersectionTool import plane_dem_intersection_QWidget
 from .AboutDialog import about_Dialog
 
-from .config.tools import *
+#from .config.tools import *
 from .pygsf.libs_utils.qt.tools import *
 
+plugin_nm = "qgSurf"
+
+config_fldr = "config"
+plugin_tools_params_flnm = "plugin.yaml"
 
 class qgSurf_gui(object):    
 
     def __init__(self, interface):
 
+        self.plugin_folder = os.path.dirname(__file__)
         self.interface = interface
         self.main_window = self.interface.mainWindow()
         self.canvas = self.interface.mapCanvas()
 
     def initGui(self):
 
-        self.bestfitplane_geoproc = make_qaction(
-            params=bestfitplane_tool_params,
-            parent=self.main_window)
+        tools_config_file = os.path.join(
+            self.plugin_folder,
+            config_fldr,
+            plugin_tools_params_flnm)
 
-        self.bestfitplane_geoproc = QAction(QIcon(":/plugins/qgSurf/icons/bestfitplane.png"), "Best fit plane", self.main_window)
-        self.bestfitplane_geoproc.setWhatsThis("Best fit plane from points")
+        tools_params = yaml.safe_load(open(tools_config_file).read())
+
+        self.bestfitplane_geoproc = make_qaction(
+            tool_params=tools_params["bestfitplane_tool_params"],
+            parent=self.main_window)
         self.bestfitplane_geoproc.triggered.connect(self.run_bestfitplane_geoproc)
         self.interface.addPluginToMenu("&qgSurf", self.bestfitplane_geoproc)
+
+        """
         
         self.demplaneinters_geoproc = QAction(QIcon(":/plugins/qgSurf/icons/qgsurf.png"), "DEM-plane intersection", self.main_window)
         self.demplaneinters_geoproc.setWhatsThis("Intersection of planar surfaces with topography")
@@ -73,7 +87,8 @@ class qgSurf_gui(object):
         self.qgsurf_about.setWhatsThis("qgSurf about")                   
         self.qgsurf_about.triggered.connect(self.run_qgsurf_about)
         self.interface.addPluginToMenu("&qgSurf", self.qgsurf_about)
- 
+        """
+
     def bfp_win_closeEvent(self, event):
 
         for mrk in self.bestfitplane_Qwidget.bestfitplane_point_markers:

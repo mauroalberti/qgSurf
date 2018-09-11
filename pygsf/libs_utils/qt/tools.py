@@ -45,7 +45,7 @@ def error(parent, header, msg):
 
     QMessageBox.error(parent, header, msg)
     
-def make_qaction(params: Dict, parent: 'QObject'):
+def make_qaction(tool_params: Dict, plugin_nm: str, icon_fldr: str, parent: 'QObject'):
     """
     Creates a QAction instance.
     Expected keys in params dictionary:
@@ -54,12 +54,28 @@ def make_qaction(params: Dict, parent: 'QObject'):
         whtsths_dscr: the action description, string.
     Used for QGIS Python plugin.
 
-    :param params: QAction text parameters.
-    :type params: dictionary.
+    :param tool_params: QAction text parameters.
+    :type tool_params: dictionary.
+    :param plugin_nm: name of the plugin.
+    :type plugin_nm: str.
+    :param icon_fldr: icon folder name (assume single nesting).
+    :type icon_fldr: str.
     :param parent: the parent widget.
     :type parent: QObject or null pointer.
     :return:
     """
+
+    geoproc = QAction(
+        QIcon(":/plugins/{}/{}/{}".format(
+            plugin_nm,
+            icon_fldr,
+            tool_params["icon_nm"])),
+        tool_params["tool_nm"],
+        parent)
+
+    geoproc.setWhatsThis(tool_params["whtsths_dscr"])
+
+    return geoproc
 
 
 def update_combo_box(combobox: QComboBox, init_text: str, texts: List[str]):
