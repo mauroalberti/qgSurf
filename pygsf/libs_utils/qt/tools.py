@@ -65,11 +65,13 @@ def make_qaction(tool_params: Dict, plugin_nm: str, icon_fldr: str, parent: 'QOb
     :return:
     """
 
-    geoproc = QAction(
-        QIcon(":/plugins/{}/{}/{}".format(
+    q_icon_path = ":/plugins/{}/{}/{}".format(
             plugin_nm,
             icon_fldr,
-            tool_params["icon_nm"])),
+            tool_params["icon_nm"])
+
+    geoproc = QAction(
+        QIcon(q_icon_path),
         tool_params["tool_nm"],
         parent)
 

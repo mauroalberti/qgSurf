@@ -31,13 +31,11 @@ from builtins import object
 
 import os
 
-import yaml
-
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 
-from . import resources
+from .base_params import *
 
 from .BestFitPlaneTool import BestFitPlaneWidget
 from .DEMPlaneIntersectionTool import DemPlaneIntersectionWidget
@@ -45,14 +43,7 @@ from .StereoplotTool import StereoplotWidget
 from .AboutDialog import AboutDialog
 
 from .pygsf.libs_utils.qt.tools import *
-
-_plugin_nm_ = "qgSurf"
-_settings_name_ = "alberese"
-
-_icon_fldr_ = "icons"
-config_fldr = "config"
-plugin_params_flnm = "plugin.yaml"
-db_params_flnm = "sqlite.yaml"
+from .pygsf.libs_utils.yaml.io import read_yaml
 
 
 class QgsurfGui(object):
@@ -68,14 +59,14 @@ class QgsurfGui(object):
             self.config_fldrpth,
             plugin_params_flnm)
 
-        plugin_params = yaml.safe_load(open(plugin_config_file).read())
+        plugin_params = read_yaml(plugin_config_file)
         self.version = plugin_params["version"]
         self.tools = plugin_params["tools"]
 
         db_config_file = os.path.join(
             self.config_fldrpth,
             db_params_flnm)
-        db_params = yaml.safe_load(open(db_config_file).read())
+        db_params = read_yaml(db_config_file)
         self.sqlite_db_params = db_params["sqlite_db"]
 
         self.bStereoplotWidgetOpen = False
@@ -88,35 +79,43 @@ class QgsurfGui(object):
 
         self.bestfitplane_geoproc = make_qaction(
             tool_params=self.tools["bestfitplane_tool_params"],
-            plugin_nm=_plugin_nm_,
-            icon_fldr=_icon_fldr_,
+            plugin_nm=plugin_nm,
+            icon_fldr=icon_fldr,
             parent=self.main_window)
         self.bestfitplane_geoproc.triggered.connect(self.RunBestFitPlaneGeoproc)
-        self.interface.addPluginToMenu("&qgSurf", self.bestfitplane_geoproc)
+        self.interface.addPluginToMenu(
+            plugin_nm,
+            self.bestfitplane_geoproc)
 
         self.demplaneinters_geoproc = make_qaction(
             tool_params=self.tools["demplaneinters_tool_params"],
-            plugin_nm=_plugin_nm_,
-            icon_fldr=_icon_fldr_,
+            plugin_nm=plugin_nm,
+            icon_fldr=icon_fldr,
             parent=self.main_window)
         self.demplaneinters_geoproc.triggered.connect(self.RunDemPlaneIntersectionGeoproc)
-        self.interface.addPluginToMenu("&qgSurf", self.demplaneinters_geoproc)
+        self.interface.addPluginToMenu(
+            plugin_nm,
+            self.demplaneinters_geoproc)
 
         self.stereonet_geoproc = make_qaction(
             tool_params=self.tools["stereonet_tool_params"],
-            plugin_nm=_plugin_nm_,
-            icon_fldr=_icon_fldr_,
+            plugin_nm=plugin_nm,
+            icon_fldr=icon_fldr,
             parent=self.main_window)
         self.stereonet_geoproc.triggered.connect(self.RunStereonetGeoproc)
-        self.interface.addPluginToMenu("&qgSurf", self.stereonet_geoproc)
+        self.interface.addPluginToMenu(
+            plugin_nm,
+            self.stereonet_geoproc)
 
         self.qgsurf_about = make_qaction(
             tool_params=self.tools["about_dlg_params"],
-            plugin_nm=_plugin_nm_,
-            icon_fldr=_icon_fldr_,
+            plugin_nm=plugin_nm,
+            icon_fldr=icon_fldr,
             parent=self.main_window)
         self.qgsurf_about.triggered.connect(self.RunQgsurfAbout)
-        self.interface.addPluginToMenu("&qgSurf", self.qgsurf_about)
+        self.interface.addPluginToMenu(
+            plugin_nm,
+            self.qgsurf_about)
 
     def RunBestFitPlaneGeoproc(self):
 
@@ -150,12 +149,16 @@ class QgsurfGui(object):
             return
 
         dwgtStereoplotDockWidget = QDockWidget(
-            "{} - stereonet".format(_plugin_nm_),
+            "{} - stereonet".format(plugin_nm),
             self.interface.mainWindow())
         dwgtStereoplotDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         dwgtStereoplotDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        self.wdgtStereoplot = StereoplotWidget(self.canvas, _plugin_nm_, _settings_name_)
+        self.wdgtStereoplot = StereoplotWidget(
+            self.canvas,
+            plugin_nm,
+            settings_name)
+
         dwgtStereoplotDockWidget.setWidget(self.wdgtStereoplot)
         dwgtStereoplotDockWidget.destroyed.connect(self.StereoplotCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, dwgtStereoplotDockWidget)
@@ -164,7 +167,10 @@ class QgsurfGui(object):
 
     def RunQgsurfAbout(self):
 
-        qgsurf_about_dlg = AboutDialog(_plugin_nm_, self.version)
+        qgsurf_about_dlg = AboutDialog(
+            plugin_nm,
+            self.version)
+
         qgsurf_about_dlg.show()
         qgsurf_about_dlg.exec_()
 
@@ -224,10 +230,23 @@ class QgsurfGui(object):
 
     def unload(self):
 
-        self.interface.removePluginMenu("&qgSurf", self.bestfitplane_geoproc)
-        self.interface.removePluginMenu("&qgSurf", self.demplaneinters_geoproc)
-        self.interface.removePluginMenu("&qgSurf", self.stereonet_geoproc)
-        self.interface.removePluginMenu("&qgSurf", self.qgsurf_about)
+        self.interface.removePluginMenu(
+            plugin_nm,
+            self.bestfitplane_geoproc)
+
+        self.interface.removePluginMenu(
+            plugin_nm,
+            self.demplaneinters_geoproc)
+
+        self.interface.removePluginMenu(
+            plugin_nm,
+            self.stereonet_geoproc)
+
+        self.interface.removePluginMenu(
+            plugin_nm,
+            self.qgsurf_about)
+
+
 
 
         

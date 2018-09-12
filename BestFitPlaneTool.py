@@ -30,8 +30,6 @@ from __future__ import absolute_import
 import os
 import sys
 
-import yaml
-
 import sqlite3
 
 from osgeo import ogr
@@ -43,6 +41,8 @@ from qgis.PyQt.QtWidgets import *
 from qgis.core import *
 from qgis.gui import *
 
+from .base_params import *
+
 from .pygsf.libs_utils.qt.filesystem import new_file_path, old_file_path
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
 from .pygsf.libs_utils.gdal.ogr import shapefile_create
@@ -52,6 +52,19 @@ from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
 from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
+from .pygsf.libs_utils.yaml.io import read_yaml
+
+bfp_texts_flnm = "texts.yaml"
+
+def create_inner_table(cursor, tbl_nm, tbl_flds):
+    # Create table solutions
+
+    cursor.execute('''DROP TABLE IF EXISTS {tbl_nm}'''.format(tbl_nm=tbl_nm))
+
+    flds_string = ",".join(map(lambda fld: "{nm} {tp}".format(nm=fld["name"], tp=fld["type"]), tbl_flds))
+    cursor.execute('''CREATE TABLE {tbl_nm} (flds)'''.format(
+        tbl_nm=tbl_nm,
+        flds=flds_string))
 
 
 def remove_equal_consecutive_xypairs(xy_list):
@@ -154,75 +167,72 @@ class BestFitPlaneWidget(QWidget):
         self.plugin_folder = os.path.dirname(__file__)
 
         self.init_params()
-        #todo
-        # local_db_params
-        """
-        
-sqlite_db:
-  name: results.db
-  folder: results
-  tables:
-    solutions:
-      name: solutions
-      fields:
-        - id: INTEGER PRIMARY KEY
-        - dip_dir: real
-        - dip_ang: real
-        - stereoplot: blob
-        - creat_time: DATE
-        - modif_time: DATE
-    src_points:
-      name: src_pnts
-      fields:
-        - id: INTEGER PRIMARY KEY
-        - id_sol: INTEGER
-        - x: real
-        - y: real
-        - z: real
-        """
+
         self.start_inner_db(local_db_params)
         self.setup_gui()
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
 
-    def start_inner_db(self):
+    def parse_db_params(self, sqlite_params):
 
-        local_db_pth = os.path.join(self.plugin_folder, local_db_path)
+        db_name = sqlite_params["name"]
+        db_folder = sqlite_params["folder"]
+        tables = sqlite_params["tables"]
 
+        solutions_pars = tables["solutions"]
+        src_points_pars = tables["src_pts"]
+
+        solutions_tbl_nm = solutions_pars["name"]
+        solutions_tbl_flds = solutions_pars["fields"]
+
+        src_points_tbl_nm = src_points_pars["name"]
+        src_points_tbl_flds = src_points_pars["fields"]
+
+        return (
+            db_name,
+            db_folder,
+            solutions_tbl_nm,
+            solutions_tbl_flds,
+            src_points_tbl_nm,
+            src_points_tbl_flds)
+
+    def start_inner_db(self, db_params):
+
+        pars = self.parse_db_params(db_params)
+        db_name, db_folder, sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+
+        local_db_fldrpth = os.path.join(self.plugin_folder, db_folder)
+        if not os.path.exists(local_db_fldrpth):
+            os.mkdir(local_db_fldrpth)
+        local_db_pth = os.path.join(local_db_fldrpth, db_name)
         conn = sqlite3.connect(local_db_pth)
-
         curs = conn.cursor()
 
         # Create table solutions
 
-        curs.execute('''DROP TABLE IF EXISTS solutions''')
-
-        curs.execute('''CREATE TABLE solutions
-                     (id INTEGER PRIMARY KEY, dip_dir real, dip_ang real, stereoplot blob, creat_time DATE, modif_time DATE)''')
+        create_inner_table(curs, sol_tbl_nm, sol_tbl_flds)
 
         # Create table points
 
-        curs.execute('''DROP TABLE IF EXISTS points''')
-
-        curs.execute('''CREATE TABLE points
-                     (id INTEGER PRIMARY KEY, id_sol INTEGER, x real, y real, z real)''')
-
-        # Insert a row of data
-        # curs.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
-
-        # Save (commit) the changes
+        create_inner_table(curs, pts_tbl_flds, pts_tbl_flds)
 
         conn.commit()
-
-        # We can also close the connection if we are done with it.
-        # Just be sure any changes have been committed or they will be lost.
-
         conn.close()
 
-        print("inner tables created")
-
     def init_params(self):
- 
+
+        self.config_fldrpth = os.path.join(
+            self.plugin_folder,
+            config_fldr)
+
+        bfp_text_config_file = os.path.join(
+            self.config_fldrpth,
+            bfp_texts_flnm)
+
+        texts_params = read_yaml(bfp_text_config_file)
+        self.dem_default_text = texts_params["dem_default_text"]
+        self.ptlnlyr_default_text = texts_params["ptlnlyr_default_text"]
+
         self.reset_dem_input_states()
         self.previousTool = None        
         self.input_points = None
@@ -584,7 +594,7 @@ sqlite_db:
         except:
             return
         
-        self.bestfitplane_inpts_lyr_list_QComboBox.addItem(BestFitPlaneWidget.ptlnlyr_default_text)
+        self.bestfitplane_inpts_lyr_list_QComboBox.addItem(self.ptlnlyr_default_text)
                                   
         self.inpts_Layers = loaded_point_layers() + loaded_line_layers()                
         if self.inpts_Layers is None or len(self.inpts_Layers) == 0:

@@ -41,7 +41,7 @@ class AboutDialog(QDialog):
         <h3>qgSurf - release {}</h3>
         Created by M. Alberti (alberti.m65@gmail.com).
         <br /><br /><a href="https://github.com/mauroalberti/qgSurf">https://github.com/mauroalberti/qgSurf</a>
-        <br /><br />Processing of geological planes.  
+        <br /><br />Processing of geological data.  
         <br /><br />Licensed under the terms of GNU GPL 3.
         """.format(version)
                

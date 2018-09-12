@@ -1,5 +1,4 @@
 
-import os
 import yaml
 
 db_config_file = r"C:\Users\mauro\Documents\projects\qgSurf\config\sqlite.yaml"
@@ -22,3 +21,7 @@ print(solutions_tbl_nm)
 
 for fld in solutions_tbl_flds:
     print(fld["name"], fld["type"])
+
+flds_string = ",".join(map(lambda fld: "{} {}".format(fld["name"], fld["type"]), solutions_tbl_flds))
+
+print(flds_string)
