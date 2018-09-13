@@ -29,7 +29,7 @@ from __future__ import absolute_import
 
 import os
 import sys
-
+from datetime import datetime as dt
 import sqlite3
 
 from osgeo import ogr
@@ -55,6 +55,16 @@ from .pygsf.mathematics.arrays import xyzSvd
 from .pygsf.libs_utils.yaml.io import read_yaml
 
 bfp_texts_flnm = "texts.yaml"
+
+
+def get_field_dict(key_val, flds_dicts):
+
+    filt_dicts = list(filter(lambda dct: key_val in dct.keys(), flds_dicts))
+
+    if len(filt_dicts) == 1:
+        return filt_dicts[0][key_val]
+    else:
+        return None
 
 
 def parse_db_params(sqlite_params):
@@ -85,13 +95,18 @@ def create_inner_table(cursor, tbl_nm, tbl_flds):
 
     cursor.execute('''DROP TABLE IF EXISTS {tbl_nm}'''.format(tbl_nm=tbl_nm))
 
-    flds_string = ",".join(map(lambda fld: "{nm} {tp}".format(nm=fld["name"], tp=fld["type"]), tbl_flds))
+    flds_parts = []
+    for dct in tbl_flds:
+        fld_ident = list(dct.keys())[0]
+        flds_parts.append("{} {}".format(dct[fld_ident]["name"], dct[fld_ident]["type"]))
+    flds_string = ", ".join(flds_parts)
+
     query_string = '''CREATE TABLE {tbl_nm} ({flds})'''.format(
         tbl_nm=tbl_nm,
         flds=flds_string)
-    print(query_string)
+
     cursor.execute(query_string)
-    print(" -executed")
+
 
 def remove_equal_consecutive_xypairs(xy_list):
     out_xy_list = [xy_list[0]]
@@ -1028,15 +1043,25 @@ class StereonetDialog(QDialog):
 
         # Insert a row of data
 
-        # self.plane
-        # self.pts
+        values = [None, self.plane.dd, self.plane.da, dt.now(), dt.now()]
+        curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
 
-        # plane dip dir, dip angle
-        # current time -> creation and modification
-        # stereoplot ? gif
+        # Get the max id of the saved solution
 
-        values = "NULL, {}, {}, NULL, NULL, NULL".format(self.plane.dd, self.plane.da)
-        curs.execute("INSERT INTO {} VALUES ({})".format(sol_tbl_nm, values))
+        id_fld_alias = get_field_dict('id', sol_tbl_flds)["name"]
+        creat_time_alias = get_field_dict('creat_time', sol_tbl_flds)["name"]
+        query_sol_id = "select {id} from {solutions} where {creat_time} = (select MAX({creat_time}) from {solutions})".format(
+            id=id_fld_alias,
+            creat_time=creat_time_alias,
+            solutions=sol_tbl_nm)
+        curs.execute(query_sol_id)
+        last_sol_id = curs.fetchone()[0]
+
+        # Create the query strings for updating the points table
+
+        pts_vals = list(map(lambda xyz: [None, last_sol_id, *xyz], self.pts))
+
+        curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
 
         # Save (commit) the changes
 
@@ -1047,6 +1072,8 @@ class StereonetDialog(QDialog):
 
         conn.close()
 
-        print("Solution saved")
+
+
+
 
 

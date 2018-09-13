@@ -6,17 +6,16 @@ sqlite_db:
     solutions:
       name: solutions
       fields:
-        - {name: id,         type: INTEGER PRIMARY KEY}
-        - {name: dip_dir,    type: real}
-        - {name: dip_ang,    type: real}
-        - {name: stereoplot, type: blob}
-        - {name: creat_time, type: DATE}
-        - {name: modif_time, type: DATE}
+        - id:         {name: id,         type: INTEGER PRIMARY KEY}
+        - dip_dir:    {name: dip_dir,    type: real}
+        - dip_ang:    {name: dip_ang,    type: real}
+        - creat_time: {name: creat_time, type: DATE}
+        - modif_time: {name: modif_time, type: DATE}
     src_pts:
       name: src_points
       fields:
-        - {name: id,         type: INTEGER PRIMARY KEY}
-        - {name: id_sol,     type: INTEGER}
-        - {name: x,          type: real}
-        - {name: y,          type: real}
-        - {name: z,          type: real}
+        - id:         {name: id,         type: INTEGER PRIMARY KEY}
+        - id_sol:     {name: id_sol,     type: INTEGER}
+        - x:          {name: x,          type: real}
+        - y:          {name: y,          type: real}
+        - z:          {name: z,          type: real}

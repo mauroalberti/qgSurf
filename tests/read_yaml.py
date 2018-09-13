@@ -18,10 +18,13 @@ solutions_tbl_flds = solutions_pars["fields"]
 print(db_name)
 print(db_folder)
 print(solutions_tbl_nm)
+print(solutions_tbl_flds)
 
-for fld in solutions_tbl_flds:
-    print(fld["name"], fld["type"])
+flds_parts = []
+for dct in solutions_tbl_flds:
+    fld_ident = list(dct.keys())[0]
+    flds_parts.append("{} {}".format(dct[fld_ident]["name"], dct[fld_ident]["type"]))
 
-flds_string = ",".join(map(lambda fld: "{} {}".format(fld["name"], fld["type"]), solutions_tbl_flds))
+flds_string = ", ".join(flds_parts)
 
 print(flds_string)
