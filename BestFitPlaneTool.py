@@ -56,16 +56,42 @@ from .pygsf.libs_utils.yaml.io import read_yaml
 
 bfp_texts_flnm = "texts.yaml"
 
+
+def parse_db_params(sqlite_params):
+
+    db_name = sqlite_params["name"]
+    db_folder = sqlite_params["folder"]
+    tables = sqlite_params["tables"]
+
+    solutions_pars = tables["solutions"]
+    src_points_pars = tables["src_pts"]
+
+    solutions_tbl_nm = solutions_pars["name"]
+    solutions_tbl_flds = solutions_pars["fields"]
+
+    src_points_tbl_nm = src_points_pars["name"]
+    src_points_tbl_flds = src_points_pars["fields"]
+
+    return (
+        db_name,
+        db_folder,
+        solutions_tbl_nm,
+        solutions_tbl_flds,
+        src_points_tbl_nm,
+        src_points_tbl_flds)
+
+
 def create_inner_table(cursor, tbl_nm, tbl_flds):
-    # Create table solutions
 
     cursor.execute('''DROP TABLE IF EXISTS {tbl_nm}'''.format(tbl_nm=tbl_nm))
 
     flds_string = ",".join(map(lambda fld: "{nm} {tp}".format(nm=fld["name"], tp=fld["type"]), tbl_flds))
-    cursor.execute('''CREATE TABLE {tbl_nm} (flds)'''.format(
+    query_string = '''CREATE TABLE {tbl_nm} ({flds})'''.format(
         tbl_nm=tbl_nm,
-        flds=flds_string))
-
+        flds=flds_string)
+    print(query_string)
+    cursor.execute(query_string)
+    print(" -executed")
 
 def remove_equal_consecutive_xypairs(xy_list):
     out_xy_list = [xy_list[0]]
@@ -173,32 +199,11 @@ class BestFitPlaneWidget(QWidget):
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
 
-    def parse_db_params(self, sqlite_params):
-
-        db_name = sqlite_params["name"]
-        db_folder = sqlite_params["folder"]
-        tables = sqlite_params["tables"]
-
-        solutions_pars = tables["solutions"]
-        src_points_pars = tables["src_pts"]
-
-        solutions_tbl_nm = solutions_pars["name"]
-        solutions_tbl_flds = solutions_pars["fields"]
-
-        src_points_tbl_nm = src_points_pars["name"]
-        src_points_tbl_flds = src_points_pars["fields"]
-
-        return (
-            db_name,
-            db_folder,
-            solutions_tbl_nm,
-            solutions_tbl_flds,
-            src_points_tbl_nm,
-            src_points_tbl_flds)
+        self.local_db_params = local_db_params
 
     def start_inner_db(self, db_params):
 
-        pars = self.parse_db_params(db_params)
+        pars = parse_db_params(db_params)
         db_name, db_folder, sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
         local_db_fldrpth = os.path.join(self.plugin_folder, db_folder)
@@ -214,7 +219,7 @@ class BestFitPlaneWidget(QWidget):
 
         # Create table points
 
-        create_inner_table(curs, pts_tbl_flds, pts_tbl_flds)
+        create_inner_table(curs, pts_tbl_nm, pts_tbl_flds)
 
         conn.commit()
         conn.close()
@@ -259,7 +264,7 @@ class BestFitPlaneWidget(QWidget):
         dialog_layout.addWidget(main_widget)                                     
         self.setLayout(dialog_layout)                    
         self.adjustSize()                       
-        self.setWindowTitle('qgSurf - best fit plane')        
+        self.setWindowTitle('{} - best fit plane'.format(plugin_nm))
 
     def setup_processing_tab(self):
         
@@ -383,7 +388,10 @@ class BestFitPlaneWidget(QWidget):
         :return: None
         """
 
-        stereonet_dialog = StereonetDialog(self.bestfitplane, self.bestfitplane_points)
+        stereonet_dialog = StereonetDialog(
+            self.bestfitplane,
+            self.bestfitplane_points,
+            self.local_db_params)
         stereonet_dialog.exec_()
 
     def add_value_to_results(self):
@@ -979,12 +987,14 @@ class SolutionDescriptDialog(QDialog):
 
 class StereonetDialog(QDialog):
 
-    def __init__(self, plane, points, parent=None):
+    def __init__(self, plane, points, local_db_params, parent=None):
 
         super(StereonetDialog, self).__init__(parent)
 
         self.plane = plane
         self.pts = points
+        self.local_db_params = local_db_params
+        self.plugin_folder = os.path.dirname(__file__)
 
         layout = QVBoxLayout()
 
@@ -1006,4 +1016,37 @@ class StereonetDialog(QDialog):
 
     def save_solution(self):
 
-        print("I will save solution")
+        pars = parse_db_params(self.local_db_params)
+
+        db_name, db_folder, sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+
+        local_db_fldrpth = os.path.join(self.plugin_folder, db_folder)
+
+        local_db_pth = os.path.join(local_db_fldrpth, db_name)
+        conn = sqlite3.connect(local_db_pth)
+        curs = conn.cursor()
+
+        # Insert a row of data
+
+        # self.plane
+        # self.pts
+
+        # plane dip dir, dip angle
+        # current time -> creation and modification
+        # stereoplot ? gif
+
+        values = "NULL, {}, {}, NULL, NULL, NULL".format(self.plane.dd, self.plane.da)
+        curs.execute("INSERT INTO {} VALUES ({})".format(sol_tbl_nm, values))
+
+        # Save (commit) the changes
+
+        conn.commit()
+
+        # We can also close the connection if we are done with it.
+        # Just be sure any changes have been committed or they will be lost.
+
+        conn.close()
+
+        print("Solution saved")
+
+
