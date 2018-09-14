@@ -38,23 +38,25 @@ from .pygsf.libs_utils.mpl.save_figure import FigureExportDlg
 from .pygsf.libs_utils.apsg.faults import rake_to_apsg_movsense, movsense_to_apsg_movsense
 from .pygsf.geology.exceptions import RakeInputException
 
+from .base_params import *
+
 
 class StereoplotWidget(QWidget):
 
     window_closed = pyqtSignal()
 
-    def __init__(self, canvas, plugin_name, settings_name):
+    def __init__(self, tool_nm, canvas, settings_name):
 
         super(StereoplotWidget, self).__init__()
         self.setAttribute(Qt.WA_DeleteOnClose, False)
-        self.mapCanvas = canvas
+        self.canvas = canvas
 
-        self.pluginName = plugin_name
+        self.tool_nm = tool_nm
         self.settingsName = settings_name
 
         # settings stored for geocouche plugin
 
-        settings = QSettings(self.settingsName, self.pluginName)
+        settings = QSettings(self.settingsName, plugin_nm)
 
         # stored setting values for plot style
 
@@ -129,12 +131,12 @@ class StereoplotWidget(QWidget):
         self.layout.addWidget(self.pshHelp)
 
         self.setLayout(self.layout)
-        self.setWindowTitle("{} - stereonet".format(self.pluginName))
+        self.setWindowTitle("{} - {}".format(plugin_nm, self.tool_nm))
         self.adjustSize()
 
     def open_help(self):
 
-        dialog = HelpDialog(self.pluginName)
+        dialog = HelpDialog()
         dialog.exec_()
 
     def define_input(self):
@@ -318,7 +320,6 @@ class StereoplotWidget(QWidget):
                 return True, geostructural_data
             else:
                 return False, "No extracted data"
-
 
         llyrLoadedPointLayers = loaded_point_layers()
         dialog = StereoplotInputDlg(llyrLoadedPointLayers)
@@ -655,7 +656,7 @@ class StereoplotWidget(QWidget):
 
     def save_figure(self):
 
-        dialog = FigureExportDlg(self.pluginName, self.dExportParams)
+        dialog = FigureExportDlg(plugin_nm, self.dExportParams)
 
         if dialog.exec_():
             try:
@@ -687,15 +688,15 @@ class StereoplotWidget(QWidget):
 
     def info(self, msg):
 
-        QMessageBox.information(self, self.pluginName, msg)
+        QMessageBox.information(self, plugin_nm, msg)
 
     def warn(self, msg):
 
-        QMessageBox.warning(self, self.pluginName, msg)
+        QMessageBox.warning(self, plugin_nm, msg)
 
     def update_style_settings(self):
 
-        settings = QSettings(self.settingsName, self.pluginName)
+        settings = QSettings(self.settingsName, plugin_nm)
         settings.setValue("StereoplotWidget/line_color", self.dPlotStyles["line_color"])
         settings.setValue("StereoplotWidget/line_style", self.dPlotStyles["line_style"])
         settings.setValue("StereoplotWidget/line_width", self.dPlotStyles["line_width"])
@@ -710,7 +711,7 @@ class StereoplotWidget(QWidget):
 
         # todo: define if this function it's reached or not, and how to change in negative case
 
-        settings = QSettings(self.settingsName, self.pluginName)
+        settings = QSettings(self.settingsName, plugin_nm)
         settings.setValue("StereoplotWidget/size", self.size())
         settings.setValue("StereoplotWidget/position", self.pos())
 
@@ -719,7 +720,7 @@ class StereoplotWidget(QWidget):
 
 class HelpDialog(QDialog):
 
-    def __init__(self, plugin_name, parent=None):
+    def __init__(self, parent=None):
         super(HelpDialog, self).__init__(parent)
 
         layout = QVBoxLayout()
@@ -736,7 +737,7 @@ class HelpDialog(QDialog):
 
         self.setLayout(layout)
 
-        self.setWindowTitle("{} - stereonet help".format(plugin_name))
+        self.setWindowTitle("{} - {} help".format(plugin_nm, self.tool_nm))
 
 
 

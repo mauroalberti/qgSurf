@@ -28,22 +28,23 @@
 
 from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QTextBrowser
 
-    
+from .base_params import *
+
 class AboutDialog(QDialog):
 
-    def __init__(self, plugin_nm, version):
+    def __init__(self, version):
 
         super(AboutDialog, self).__init__()
 
         dialog_layout = QVBoxLayout()
         
         htmlText = """
-        <h3>qgSurf - release {}</h3>
+        <h3>{} - release {}</h3>
         Created by M. Alberti (alberti.m65@gmail.com).
         <br /><br /><a href="https://github.com/mauroalberti/qgSurf">https://github.com/mauroalberti/qgSurf</a>
         <br /><br />Processing of geological data.  
         <br /><br />Licensed under the terms of GNU GPL 3.
-        """.format(version)
+        """.format(plugin_nm, version)
                
         aboutQTextBrowser = QTextBrowser(self)
         aboutQTextBrowser.insertHtml(htmlText)         

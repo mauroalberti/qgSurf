@@ -201,9 +201,11 @@ class BestFitPlaneWidget(QWidget):
 
     bfp_calc_update = pyqtSignal()
 
-    def __init__(self, canvas, plugin_qaction, local_db_params):
+    def __init__(self, tool_nm, canvas, plugin_qaction, local_db_params):
 
         super(BestFitPlaneWidget, self).__init__()
+
+        self.tool_nm = tool_nm
         self.canvas, self.plugin = canvas, plugin_qaction
         self.plugin_folder = os.path.dirname(__file__)
 
@@ -274,82 +276,127 @@ class BestFitPlaneWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_processing_tab(), "Processing")
+        main_widget.addTab(self.setup_result_tab(), "Results")
+        main_widget.addTab(self.setup_export_tab(), "Export")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
         dialog_layout.addWidget(main_widget)                                     
         self.setLayout(dialog_layout)                    
         self.adjustSize()                       
-        self.setWindowTitle('{} - best fit plane'.format(plugin_nm))
+        self.setWindowTitle('{} - {}'.format(plugin_nm, self.tool_nm))
 
     def setup_processing_tab(self):
         
-        plansurfaceWidget = QWidget()  
-        plansurfaceLayout = QVBoxLayout()        
-        plansurfaceLayout.addWidget(self.setup_source_dem())         
-        plansurfaceLayout.addWidget(self.setup_data_processing())
-        plansurfaceLayout.addWidget(self.setup_results_io())
-        plansurfaceWidget.setLayout(plansurfaceLayout) 
-        return plansurfaceWidget 
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.setup_source_dem())
+        layout.addWidget(self.setup_source_points())
+        layout.addWidget(self.setup_bfp_calculation())
+        widget.setLayout(layout)
+        return widget
+
+    def setup_result_tab(self):
+
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.setup_result_table())
+        widget.setLayout(layout)
+        return widget
+
+    def setup_export_tab(self):
+
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.setup_results_export())
+        widget.setLayout(layout)
+        return widget
 
     def setup_source_dem(self):
 
-        sourcedem_QGroupBox = QGroupBox(self.tr("Source DEM"))  
+        main_groupbox = QGroupBox(self.tr("Source DEM"))
         
-        sourcedemLayout = QGridLayout() 
+        main_layout = QGridLayout()
     
-        sourcedemLayout.addWidget(QLabel("Choose DEM layer"), 0, 0, 1, 1)        
+        main_layout.addWidget(QLabel("Choose DEM layer"), 0, 0, 1, 1)
         self.define_dem_QComboBox = QComboBox()
         self.define_dem_QComboBox.addItem(self.dem_default_text)
-        sourcedemLayout.addWidget(self.define_dem_QComboBox, 0, 1, 1, 2)  
+        main_layout.addWidget(self.define_dem_QComboBox, 0, 1, 1, 2)
 
         self.refresh_raster_layer_list()
         QgsProject.instance().layerWasAdded.connect(self.refresh_raster_layer_list)
         QgsProject.instance().layerRemoved.connect(self.refresh_raster_layer_list)
                              
-        sourcedem_QGroupBox.setLayout(sourcedemLayout)  
+        main_groupbox.setLayout(main_layout)
               
-        return sourcedem_QGroupBox
+        return main_groupbox
 
-    def setup_data_processing(self):
+    def setup_source_points(self):
         
-        source_points_QGroupBox = QGroupBox(self.tr("Best fit plane from points"))
+        main_groupbox = QGroupBox(self.tr("Source points"))
         
-        source_points_Layout = QGridLayout() 
+        main_layout = QGridLayout()
 
         self.bestfitplane_definepoints_pButton = QPushButton("Define source points in map")
         self.bestfitplane_definepoints_pButton.clicked.connect(self.bfp_inpoint_from_map_click)
-        source_points_Layout.addWidget(self.bestfitplane_definepoints_pButton, 0, 0, 1, 2)
+        main_layout.addWidget(self.bestfitplane_definepoints_pButton, 0, 0, 1, 2)
 
         self.bestfitplane_getpointsfromlyr_pButton = QPushButton("Get source points from layer")
         self.bestfitplane_getpointsfromlyr_pButton.clicked.connect(self.bfp_points_from_lyr)
-        source_points_Layout.addWidget(self.bestfitplane_getpointsfromlyr_pButton, 1, 0, 1, 1)
+        main_layout.addWidget(self.bestfitplane_getpointsfromlyr_pButton, 1, 0, 1, 1)
 
         self.bestfitplane_inpts_lyr_list_QComboBox = QComboBox()
-        source_points_Layout.addWidget(self.bestfitplane_inpts_lyr_list_QComboBox, 1, 1, 1, 1)
+        main_layout.addWidget(self.bestfitplane_inpts_lyr_list_QComboBox, 1, 1, 1, 1)
 
         self.bestfitplane_resetpoints_pButton = QPushButton("Reset source points")
         self.bestfitplane_resetpoints_pButton.clicked.connect(self.bfp_reset_all_inpoints)
-        source_points_Layout.addWidget(self.bestfitplane_resetpoints_pButton, 2, 0, 1, 2)
+        main_layout.addWidget(self.bestfitplane_resetpoints_pButton, 2, 0, 1, 2)
 
         self.refresh_inpts_layer_list()
         QgsProject.instance().layerWasAdded.connect(self.refresh_inpts_layer_list)
         QgsProject.instance().layerRemoved.connect(self.refresh_inpts_layer_list)
         
         self.bestfitplane_src_points_ListWdgt = QListWidget()
-        source_points_Layout.addWidget(self.bestfitplane_src_points_ListWdgt, 3, 0, 1, 2)
+        main_layout.addWidget(self.bestfitplane_src_points_ListWdgt, 3, 0, 1, 2)
+
+        self.enable_point_input_buttons(False)
+
+        main_groupbox.setLayout(main_layout)
+                 
+        return main_groupbox
+
+    def setup_bfp_calculation(self):
+
+        main_groupbox = QGroupBox(self.tr("Best fit plane calculation"))
+
+        main_layout = QGridLayout()
 
         self.bestfitplane_calculate_pButton = QPushButton("Calculate best fit plane")
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
-        source_points_Layout.addWidget(self.bestfitplane_calculate_pButton, 4, 0, 1, 2)
+        main_layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
 
         self.enable_point_input_buttons(False)
 
-        source_points_QGroupBox.setLayout(source_points_Layout) 
-                 
-        return source_points_QGroupBox
+        main_groupbox.setLayout(main_layout)
 
-    def setup_results_io(self):
+        return main_groupbox
+
+    def setup_result_table(self):
+
+        main_groupbox = QGroupBox(self.tr("Results"))
+
+        main_layout = QGridLayout()
+
+        self.examplepButton = QPushButton("Example button")
+        self.examplepButton.clicked.connect(self.save_in_shapefile)
+        self.examplepButton.setEnabled(False)
+        main_layout.addWidget(self.examplepButton, 0, 0, 1, 2)
+
+        main_groupbox.setLayout(main_layout)
+
+        return main_groupbox
+
+    def setup_results_export(self):
         
         export_points_QGroupBox = QGroupBox(self.tr("Save points"))  
         
@@ -404,6 +451,7 @@ class BestFitPlaneWidget(QWidget):
         """
 
         stereonet_dialog = StereonetDialog(
+            self.tool_nm,
             self.bestfitplane,
             self.bestfitplane_points,
             self.local_db_params)
@@ -1002,10 +1050,11 @@ class SolutionDescriptDialog(QDialog):
 
 class StereonetDialog(QDialog):
 
-    def __init__(self, plane, points, local_db_params, parent=None):
+    def __init__(self, tool_nm, plane, points, local_db_params, parent=None):
 
         super(StereonetDialog, self).__init__(parent)
 
+        self.tool_nm = tool_nm
         self.plane = plane
         self.pts = points
         self.local_db_params = local_db_params
@@ -1071,6 +1120,11 @@ class StereonetDialog(QDialog):
         # Just be sure any changes have been committed or they will be lost.
 
         conn.close()
+
+        QMessageBox.information(
+            self,
+            "{}".format(self.tool_nm),
+            "Solution saved in database")
 
 
 

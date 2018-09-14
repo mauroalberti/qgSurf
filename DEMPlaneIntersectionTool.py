@@ -61,11 +61,14 @@ class DemPlaneIntersectionWidget(QWidget):
     line_colors = [ "white", "red", "blue", "yellow", "orange", "brown",]
     dem_default_text = '--  required  --'
 
-    def __init__(self, canvas, plugin):
+    def __init__(self, tool_nm, canvas, plugin_qaction):
 
         super(DemPlaneIntersectionWidget, self).__init__()
-        self.canvas, self.plugin = canvas, plugin        
-        self.init_params()                 
+
+        self.tool_nm = tool_nm
+        self.canvas, self.plugin = canvas, plugin_qaction
+
+        self.init_params()
         self.setup_gui() 
 
     def init_params(self):

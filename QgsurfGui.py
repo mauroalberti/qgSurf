@@ -63,6 +63,11 @@ class QgsurfGui(object):
         self.version = plugin_params["version"]
         self.tools = plugin_params["tools"]
 
+        self.bestfitplane_toolpars = self.tools["bestfitplane_tool_params"]
+        self.demplaneinters_toolpars = self.tools["demplaneinters_tool_params"]
+        self.stereonet_toolpars = self.tools["stereonet_tool_params"]
+        self.about_toolpars = self.tools["about_dlg_params"]
+
         db_config_file = os.path.join(
             self.config_fldrpth,
             db_params_flnm)
@@ -78,7 +83,7 @@ class QgsurfGui(object):
     def initGui(self):
 
         self.bestfitplane_geoproc = make_qaction(
-            tool_params=self.tools["bestfitplane_tool_params"],
+            tool_params=self.bestfitplane_toolpars,
             plugin_nm=plugin_nm,
             icon_fldr=icon_fldr,
             parent=self.main_window)
@@ -88,7 +93,7 @@ class QgsurfGui(object):
             self.bestfitplane_geoproc)
 
         self.demplaneinters_geoproc = make_qaction(
-            tool_params=self.tools["demplaneinters_tool_params"],
+            tool_params=self.demplaneinters_toolpars,
             plugin_nm=plugin_nm,
             icon_fldr=icon_fldr,
             parent=self.main_window)
@@ -98,7 +103,7 @@ class QgsurfGui(object):
             self.demplaneinters_geoproc)
 
         self.stereonet_geoproc = make_qaction(
-            tool_params=self.tools["stereonet_tool_params"],
+            tool_params=self.stereonet_toolpars,
             plugin_nm=plugin_nm,
             icon_fldr=icon_fldr,
             parent=self.main_window)
@@ -108,7 +113,7 @@ class QgsurfGui(object):
             self.stereonet_geoproc)
 
         self.qgsurf_about = make_qaction(
-            tool_params=self.tools["about_dlg_params"],
+            tool_params=self.about_toolpars,
             plugin_nm=plugin_nm,
             icon_fldr=icon_fldr,
             parent=self.main_window)
@@ -119,25 +124,33 @@ class QgsurfGui(object):
 
     def RunBestFitPlaneGeoproc(self):
 
-        BestFitPlaneDockWidget = QDockWidget('Best fit plane', self.interface.mainWindow())
+        BestFitPlaneDockWidget = QDockWidget(
+            "{} - {}".format(plugin_nm, self.bestfitplane_toolpars["tool_nm"]),
+            self.interface.mainWindow())
         BestFitPlaneDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         BestFitPlaneDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         self.BestFitPlaneQwidget = BestFitPlaneWidget(
-            self.canvas,
-            self.bestfitplane_geoproc,
-            self.sqlite_db_params)
+            tool_nm=self.bestfitplane_toolpars["tool_nm"],
+            canvas=self.canvas,
+            plugin_qaction=self.bestfitplane_geoproc,
+            local_db_params=self.sqlite_db_params)
         BestFitPlaneDockWidget.setWidget(self.BestFitPlaneQwidget)
         BestFitPlaneDockWidget.destroyed.connect(self.BestFitPlaneCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, BestFitPlaneDockWidget)
 
     def RunDemPlaneIntersectionGeoproc(self):
 
-        DemPlaneIntersectionDockWidget = QDockWidget('DEM-plane intersection', self.interface.mainWindow())
+        DemPlaneIntersectionDockWidget = QDockWidget(
+            "{} - {}".format(plugin_nm, self.demplaneinters_toolpars["tool_nm"]),
+            self.interface.mainWindow())
         DemPlaneIntersectionDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         DemPlaneIntersectionDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        self.DemPlaneIntersectionQwidget = DemPlaneIntersectionWidget(self.canvas, self.demplaneinters_geoproc)
+        self.DemPlaneIntersectionQwidget = DemPlaneIntersectionWidget(
+            tool_nm=self.demplaneinters_toolpars["tool_nm"],
+            canvas=self.canvas,
+            plugin_qaction=self.demplaneinters_geoproc)
         DemPlaneIntersectionDockWidget.setWidget(self.DemPlaneIntersectionQwidget)
         DemPlaneIntersectionDockWidget.destroyed.connect(self.DemPlaneIntersectionCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, DemPlaneIntersectionDockWidget)
@@ -149,15 +162,15 @@ class QgsurfGui(object):
             return
 
         dwgtStereoplotDockWidget = QDockWidget(
-            "{} - stereonet".format(plugin_nm),
+            "{} - {}".format(plugin_nm, self.stereonet_toolpars["tool_nm"]),
             self.interface.mainWindow())
         dwgtStereoplotDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         dwgtStereoplotDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         self.wdgtStereoplot = StereoplotWidget(
-            self.canvas,
-            plugin_nm,
-            settings_name)
+            tool_nm=self.stereonet_toolpars["tool_nm"],
+            canvas=self.canvas,
+            settings_name=settings_name)
 
         dwgtStereoplotDockWidget.setWidget(self.wdgtStereoplot)
         dwgtStereoplotDockWidget.destroyed.connect(self.StereoplotCloseEvent)
@@ -168,8 +181,7 @@ class QgsurfGui(object):
     def RunQgsurfAbout(self):
 
         qgsurf_about_dlg = AboutDialog(
-            plugin_nm,
-            self.version)
+            version=self.version)
 
         qgsurf_about_dlg.show()
         qgsurf_about_dlg.exec_()
