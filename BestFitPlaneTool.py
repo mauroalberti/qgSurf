@@ -69,8 +69,6 @@ def get_field_dict(key_val, flds_dicts):
 
 def parse_db_params(sqlite_params):
 
-    db_name = sqlite_params["name"]
-    db_folder = sqlite_params["folder"]
     tables = sqlite_params["tables"]
 
     solutions_pars = tables["solutions"]
@@ -83,8 +81,6 @@ def parse_db_params(sqlite_params):
     src_points_tbl_flds = src_points_pars["fields"]
 
     return (
-        db_name,
-        db_folder,
         solutions_tbl_nm,
         solutions_tbl_flds,
         src_points_tbl_nm,
@@ -201,45 +197,21 @@ class BestFitPlaneWidget(QWidget):
 
     bfp_calc_update = pyqtSignal()
 
-    def __init__(self, tool_nm, canvas, plugin_qaction, local_db_params):
+    def __init__(self, tool_nm, canvas, plugin_qaction, db_tables_params):
 
         super(BestFitPlaneWidget, self).__init__()
 
         self.tool_nm = tool_nm
         self.canvas, self.plugin = canvas, plugin_qaction
         self.plugin_folder = os.path.dirname(__file__)
-
+        self.db_tables_params = db_tables_params
         self.init_params()
 
-        self.start_inner_db(local_db_params)
         self.setup_gui()
 
         self.bfp_calc_update.connect(self.update_bfpcalc_btn_state)
 
-        self.local_db_params = local_db_params
-
-    def start_inner_db(self, db_params):
-
-        pars = parse_db_params(db_params)
-        db_name, db_folder, sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
-
-        local_db_fldrpth = os.path.join(self.plugin_folder, db_folder)
-        if not os.path.exists(local_db_fldrpth):
-            os.mkdir(local_db_fldrpth)
-        local_db_pth = os.path.join(local_db_fldrpth, db_name)
-        conn = sqlite3.connect(local_db_pth)
-        curs = conn.cursor()
-
-        # Create table solutions
-
-        create_inner_table(curs, sol_tbl_nm, sol_tbl_flds)
-
-        # Create table points
-
-        create_inner_table(curs, pts_tbl_nm, pts_tbl_flds)
-
-        conn.commit()
-        conn.close()
+        self.db_tables_params = db_tables_params
 
     def init_params(self):
 
@@ -278,6 +250,7 @@ class BestFitPlaneWidget(QWidget):
         main_widget.addTab(self.setup_processing_tab(), "Processing")
         main_widget.addTab(self.setup_result_tab(), "Results")
         main_widget.addTab(self.setup_export_tab(), "Export")
+        main_widget.addTab(self.setup_config_tab(), "Configuration")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
         dialog_layout.addWidget(main_widget)                                     
@@ -308,6 +281,14 @@ class BestFitPlaneWidget(QWidget):
         widget = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.setup_results_export())
+        widget.setLayout(layout)
+        return widget
+
+    def setup_config_tab(self):
+
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.setup_config())
         widget.setLayout(layout)
         return widget
 
@@ -366,11 +347,11 @@ class BestFitPlaneWidget(QWidget):
 
     def setup_bfp_calculation(self):
 
-        main_groupbox = QGroupBox(self.tr("Best fit plane calculation"))
+        main_groupbox = QGroupBox(self.tr("Best fit plane"))
 
         main_layout = QGridLayout()
 
-        self.bestfitplane_calculate_pButton = QPushButton("Calculate best fit plane")
+        self.bestfitplane_calculate_pButton = QPushButton("Calculate")
         self.bestfitplane_calculate_pButton.clicked.connect(self.calculate_bestfitplane)
         self.bestfitplane_calculate_pButton.setEnabled(False)
         main_layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
@@ -383,7 +364,7 @@ class BestFitPlaneWidget(QWidget):
 
     def setup_result_table(self):
 
-        main_groupbox = QGroupBox(self.tr("Results"))
+        main_groupbox = QGroupBox(self.tr("Results table"))
 
         main_layout = QGridLayout()
 
@@ -398,7 +379,7 @@ class BestFitPlaneWidget(QWidget):
 
     def setup_results_export(self):
         
-        export_points_QGroupBox = QGroupBox(self.tr("Save points"))  
+        export_points_QGroupBox = QGroupBox(self.tr("Exports results"))
         
         export_points_Layout = QGridLayout()        
         
@@ -425,6 +406,29 @@ class BestFitPlaneWidget(QWidget):
         export_points_QGroupBox.setLayout(export_points_Layout) 
                  
         return export_points_QGroupBox
+
+    def setup_config(self):
+
+        main_groupbox = QGroupBox(self.tr("Result database"))
+
+        main_layout = QGridLayout()
+
+        main_layout.addWidget(QLabel("Database (sqlite3)"), 0, 0, 1, 1)
+
+        self.result_db_path_qle = QLineEdit()
+        main_layout.addWidget(self.result_db_path_qle, 0, 1, 1, 1)
+
+        self.create_new_sqlite = QPushButton("Create new")
+        self.create_new_sqlite.clicked.connect(self.create_result_db)
+        main_layout.addWidget(self.create_new_sqlite, 1, 0, 1, 2)
+
+        self.open_existing_sqlite = QPushButton("Open existing")
+        self.open_existing_sqlite.clicked.connect(self.find_existing_db)
+        main_layout.addWidget(self.open_existing_sqlite, 2, 0, 1, 2)
+
+        main_groupbox.setLayout(main_layout)
+
+        return main_groupbox
 
     def setup_help_tab(self):
 
@@ -454,15 +458,94 @@ class BestFitPlaneWidget(QWidget):
             self.tool_nm,
             self.bestfitplane,
             self.bestfitplane_points,
-            self.local_db_params)
+            self.result_db_path_qle.text(),
+            self.db_tables_params)
         stereonet_dialog.exec_()
 
-    def add_value_to_results(self):
+    def create_result_db(self):
 
-        pass
+        db_path = new_file_path(
+            parent=self,
+            show_msg="Create sqlite3 db",
+            path=None,
+            filter_text="Database (*.sqlite3)")
+
+        if not db_path:
+            return
+
+        pars = parse_db_params(self.db_tables_params)
+        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+
+        conn = sqlite3.connect(db_path)
+        curs = conn.cursor()
+
+        # Create table solutions
+
+        create_inner_table(curs, sol_tbl_nm, sol_tbl_flds)
+
+        # Create table points
+
+        create_inner_table(curs, pts_tbl_nm, pts_tbl_flds)
+
+        conn.commit()
+        conn.close()
+
+        self.result_db_path_qle.setText(db_path)
+
+        QMessageBox.information(
+            self,
+            self.tool_nm,
+            "Result db created")
+
+    def find_existing_db(self):
+
+        def check_table_presence(table_nm):
+
+            check_query_str = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{table_name}'".format(
+                table_name=table_nm)
+
+            curs.execute(check_query_str)
+
+            return curs.fetchone()[0]
+
+        db_path = old_file_path(
+            parent=self,
+            show_msg="Open sqlite3 db",
+            filter_extension="sqlite3",
+            filter_text="Database (*.sqlite3)")
+
+        if not db_path:
+            return
+
+        pars = parse_db_params(self.db_tables_params)
+        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+
+        conn = sqlite3.connect(db_path)
+        curs = conn.cursor()
+
+        tables_to_check = [sol_tbl_nm, pts_tbl_nm]
+
+        tables_found = True
+        for table in tables_to_check:
+            if not check_table_presence(table):
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    "Table {} not found in db {}".format(table, db_path)
+                )
+                tables_found = False
+                break
+
+        if tables_found:
+
+            self.result_db_path_qle.setText(db_path)
+            QMessageBox.information(
+                self,
+                self.tool_nm,
+                "Result db set")
 
     def add_marker(self, prj_crs_x, prj_crs_y):
-        
+
         marker = self.create_marker(self.canvas, prj_crs_x, prj_crs_y)       
         self.bestfitplane_point_markers.append(marker)        
         self.canvas.refresh()        
@@ -738,7 +821,7 @@ class BestFitPlaneWidget(QWidget):
         if svd['result'] == None:
             QMessageBox.critical(
                 self,
-                "Best fit plane",
+                self.tool_nm,
                 "Unable to calculate result")
             return
         _, _, eigenvectors = svd['result'] 
@@ -1050,14 +1133,15 @@ class SolutionDescriptDialog(QDialog):
 
 class StereonetDialog(QDialog):
 
-    def __init__(self, tool_nm, plane, points, local_db_params, parent=None):
+    def __init__(self, tool_nm, plane, points, result_db_path, db_tables_params, parent=None):
 
         super(StereonetDialog, self).__init__(parent)
 
         self.tool_nm = tool_nm
         self.plane = plane
         self.pts = points
-        self.local_db_params = local_db_params
+        self.db_path = result_db_path
+        self.db_tables_params = db_tables_params
         self.plugin_folder = os.path.dirname(__file__)
 
         layout = QVBoxLayout()
@@ -1066,7 +1150,7 @@ class StereonetDialog(QDialog):
         solution_wdg.setMaximumHeight(40)
         layout.addWidget(solution_wdg)
         pts_str = "\n".join(map(lambda pt: "{}, {}, {}".format(*pt), points))
-        layout.addWidget(QPlainTextEdit("Source points:\n{}".format(pts_str), self))
+        layout.addWidget(QPlainTextEdit("Source points:\nx, y, z\n{}".format(pts_str), self))
         mpl_widget = MplWidget(window_title="Stereoplot", type="Stereonet", data=plane)
         layout.addWidget(mpl_widget)
 
@@ -1080,14 +1164,19 @@ class StereonetDialog(QDialog):
 
     def save_solution(self):
 
-        pars = parse_db_params(self.local_db_params)
+        if not self.db_path:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                "Result database not defined in Configuration tab"
+            )
+            return
 
-        db_name, db_folder, sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+        pars = parse_db_params(self.db_tables_params)
 
-        local_db_fldrpth = os.path.join(self.plugin_folder, db_folder)
+        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
-        local_db_pth = os.path.join(local_db_fldrpth, db_name)
-        conn = sqlite3.connect(local_db_pth)
+        conn = sqlite3.connect(self.db_path)
         curs = conn.cursor()
 
         # Insert a row of data
@@ -1124,7 +1213,7 @@ class StereonetDialog(QDialog):
         QMessageBox.information(
             self,
             "{}".format(self.tool_nm),
-            "Solution saved in database")
+            "Solution saved in result database")
 
 
 

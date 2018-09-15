@@ -134,7 +134,7 @@ class QgsurfGui(object):
             tool_nm=self.bestfitplane_toolpars["tool_nm"],
             canvas=self.canvas,
             plugin_qaction=self.bestfitplane_geoproc,
-            local_db_params=self.sqlite_db_params)
+            db_tables_params=self.sqlite_db_params)
         BestFitPlaneDockWidget.setWidget(self.BestFitPlaneQwidget)
         BestFitPlaneDockWidget.destroyed.connect(self.BestFitPlaneCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, BestFitPlaneDockWidget)

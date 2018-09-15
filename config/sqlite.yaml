@@ -1,7 +1,5 @@
 
 sqlite_db:
-  name: results.db
-  folder: results
   tables:
     solutions:
       name: solutions
