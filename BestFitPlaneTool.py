@@ -37,6 +37,7 @@ from osgeo import ogr
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
+from qgis.PyQt.QtSql import *
 
 from qgis.core import *
 from qgis.gui import *
@@ -248,9 +249,8 @@ class BestFitPlaneWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_processing_tab(), "Processing")
-        main_widget.addTab(self.setup_result_tab(), "Results")
+        main_widget.addTab(self.setup_results_tab(), "Results")
         main_widget.addTab(self.setup_export_tab(), "Export")
-        main_widget.addTab(self.setup_config_tab(), "Configuration")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
         dialog_layout.addWidget(main_widget)                                     
@@ -268,14 +268,6 @@ class BestFitPlaneWidget(QWidget):
         widget.setLayout(layout)
         return widget
 
-    def setup_result_tab(self):
-
-        widget = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(self.setup_result_table())
-        widget.setLayout(layout)
-        return widget
-
     def setup_export_tab(self):
 
         widget = QWidget()
@@ -284,11 +276,12 @@ class BestFitPlaneWidget(QWidget):
         widget.setLayout(layout)
         return widget
 
-    def setup_config_tab(self):
+    def setup_results_tab(self):
 
         widget = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(self.setup_config())
+        layout.addWidget(self.setup_results_view())
+        layout.addWidget(self.setup_results_configuration())
         widget.setLayout(layout)
         return widget
 
@@ -362,21 +355,6 @@ class BestFitPlaneWidget(QWidget):
 
         return main_groupbox
 
-    def setup_result_table(self):
-
-        main_groupbox = QGroupBox(self.tr("Results table"))
-
-        main_layout = QGridLayout()
-
-        self.examplepButton = QPushButton("Example button")
-        self.examplepButton.clicked.connect(self.save_in_shapefile)
-        self.examplepButton.setEnabled(False)
-        main_layout.addWidget(self.examplepButton, 0, 0, 1, 2)
-
-        main_groupbox.setLayout(main_layout)
-
-        return main_groupbox
-
     def setup_results_export(self):
         
         export_points_QGroupBox = QGroupBox(self.tr("Exports results"))
@@ -407,9 +385,23 @@ class BestFitPlaneWidget(QWidget):
                  
         return export_points_QGroupBox
 
-    def setup_config(self):
+    def setup_results_view(self):
 
-        main_groupbox = QGroupBox(self.tr("Result database"))
+        main_groupbox = QGroupBox(self.tr("Results"))
+
+        main_layout = QGridLayout()
+
+        view_results_button = QPushButton("View saved results")
+        view_results_button.clicked.connect(self.view_result_table)
+        main_layout.addWidget(view_results_button, 0, 0, 1, 2)
+
+        main_groupbox.setLayout(main_layout)
+
+        return main_groupbox
+
+    def setup_results_configuration(self):
+
+        main_groupbox = QGroupBox(self.tr("Database configuration"))
 
         main_layout = QGridLayout()
 
@@ -455,11 +447,11 @@ class BestFitPlaneWidget(QWidget):
         """
 
         stereonet_dialog = StereonetDialog(
-            self.tool_nm,
-            self.bestfitplane,
-            self.bestfitplane_points,
-            self.result_db_path_qle.text(),
-            self.db_tables_params)
+            tool_nm=self.tool_nm,
+            plane=self.bestfitplane,
+            points=self.bestfitplane_points,
+            result_db_path=self.result_db_path_qle.text(),
+            db_tables_params=self.db_tables_params)
         stereonet_dialog.exec_()
 
     def create_result_db(self):
@@ -535,6 +527,8 @@ class BestFitPlaneWidget(QWidget):
                 )
                 tables_found = False
                 break
+
+        conn.close()
 
         if tables_found:
 
@@ -971,6 +965,14 @@ class BestFitPlaneWidget(QWidget):
         self.save_solution_pButton.setEnabled(False)
         self.stop_edit_pButton.setEnabled(True)
 
+    def view_result_table(self):
+
+        table_result_dialog = TableDialog(
+            db_path=self.result_db_path_qle.text(),
+            db_tables_params=self.db_tables_params)
+
+        table_result_dialog.exec_()
+
     def stop_editing(self):
         
         try:
@@ -992,19 +994,11 @@ class NewShapeFilesDialog(QDialog):
     def __init__(self, parent=None):
         
         super(NewShapeFilesDialog, self).__init__(parent)
-    
-        #self.pointCheckBox = QCheckBox("&Point shapefile:")
+
         self.output_point_shape_QLineEdit = QLineEdit()
         self.output_point_shape_browse_QPushButton = QPushButton(".....")
         self.output_point_shape_browse_QPushButton.clicked.connect(self.set_out_point_shapefile_name)
-        
-        """"
-        self.polygonCheckBox = QCheckBox("&Polygon shapefile:")
-        self.output_polygon_shape_QLineEdit = QLineEdit()
-        self.output_polygon_shape_browse_QPushButton = QPushButton(".....")
-        self.output_polygon_shape_browse_QPushButton.clicked.connect(self.set_out_polygon_shapefile_name)
-        """
-        
+
         okButton = QPushButton("&OK")
         cancelButton = QPushButton("Cancel")
 
@@ -1214,6 +1208,50 @@ class StereonetDialog(QDialog):
             self,
             "{}".format(self.tool_nm),
             "Solution saved in result database")
+
+
+class TableDialog(QDialog):
+
+    def __init__(self, db_path, db_tables_params):
+
+        super().__init__()
+
+        pars = parse_db_params(db_tables_params)
+
+        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+
+        layout = QVBoxLayout()
+
+        db = QSqlDatabase("QSQLITE")
+
+        db.setConnectOptions("QSQLITE_OPEN_READONLY;")
+
+        db.setDatabaseName(db_path)
+
+        db.open()
+
+        model = QSqlTableModel(db=db)
+        model.setTable(sol_tbl_nm)
+        model.select()
+        model.setHeaderData(0, Qt.Horizontal, "id")
+        model.setHeaderData(1, Qt.Horizontal, "dip direction")
+        model.setHeaderData(2, Qt.Horizontal, "dip angle")
+        model.setHeaderData(3, Qt.Horizontal, "created")
+
+        view = QTableView()
+
+        view.setModel(model)
+        view.hideColumn(4)
+
+        layout.addWidget(view)
+
+        self.setLayout(layout)
+
+        db.close()
+
+        self.setMinimumSize(500, 400)
+
+        self.setWindowTitle("Stored results")
 
 
 
