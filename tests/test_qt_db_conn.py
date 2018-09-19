@@ -42,12 +42,14 @@ class TableWidget(QWidget):
         model.setHeaderData(0, Qt.Horizontal, "id")
         model.setHeaderData(1, Qt.Horizontal, "dip_dir")
         model.setHeaderData(2, Qt.Horizontal, "dip_ang")
-        model.setHeaderData(3, Qt.Horizontal, "creat_time")
+        model.setHeaderData(3, Qt.Horizontal, "label")
+        model.setHeaderData(4, Qt.Horizontal, "comments")
+        model.setHeaderData(5, Qt.Horizontal, "creat_time")
 
         view = QTableView()
 
         view.setModel(model)
-        view.hideColumn(4)
+
         layout.addWidget(view)
 
         self.setLayout(layout)

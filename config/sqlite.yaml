@@ -7,9 +7,9 @@ sqlite_db:
         - id:         {name: id,         type: INTEGER PRIMARY KEY}
         - dip_dir:    {name: dip_dir,    type: REAL}
         - dip_ang:    {name: dip_ang,    type: REAL}
-        - creat_time: {name: creat_time, type: DATE}
         - label:      {name: label,      type: TEXT}
         - comments:   {name: comments,   type: TEXT}
+        - creat_time: {name: creat_time, type: DATE}
 
     src_pts:
       name: src_points

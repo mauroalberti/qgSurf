@@ -28,7 +28,6 @@
 from __future__ import absolute_import
 
 import os
-import sys
 from datetime import datetime as dt
 import sqlite3
 
@@ -38,6 +37,7 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtSql import *
+from qgis.PyQt.uic import loadUi
 
 from qgis.core import *
 from qgis.gui import *
@@ -468,7 +468,15 @@ class BestFitPlaneWidget(QWidget):
         pars = parse_db_params(self.db_tables_params)
         sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
-        conn = sqlite3.connect(db_path)
+        try:
+            conn = sqlite3.connect(db_path)
+        except Exception as e:
+            QMessageBox.information(
+                self,
+                self.tool_nm,
+                "Unable to create database. Possibly folder permission error?")
+            return
+
         curs = conn.cursor()
 
         # Create table solutions
@@ -1136,7 +1144,7 @@ class StereonetDialog(QDialog):
         self.pts = points
         self.db_path = result_db_path
         self.db_tables_params = db_tables_params
-        self.plugin_folder = os.path.dirname(__file__)
+        self.plugin_fldrpth = os.path.dirname(__file__)
 
         layout = QVBoxLayout()
 
@@ -1170,48 +1178,51 @@ class StereonetDialog(QDialog):
 
         sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
-        noteDialog = NoteDialog()
+        noteDialog = NoteDialog(self.plugin_fldrpth, parent=self)
+
         if noteDialog.exec_():
-            note = noteDialog.note_plainTextEdit.toPlainText()
+            label = noteDialog.label.toPlainText()
+            comments = noteDialog.comments.toPlainText()
 
-        conn = sqlite3.connect(self.db_path)
-        curs = conn.cursor()
 
-        # Insert a row of data
+            conn = sqlite3.connect(self.db_path)
+            curs = conn.cursor()
 
-        values = [None, self.plane.dd, self.plane.da, dt.now(), dt.now()]
-        curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
+            # Insert a row of data
 
-        # Get the max id of the saved solution
+            values = [None, self.plane.dd, self.plane.da, label, comments, dt.now()]
+            curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
 
-        id_fld_alias = get_field_dict('id', sol_tbl_flds)["name"]
-        creat_time_alias = get_field_dict('creat_time', sol_tbl_flds)["name"]
-        query_sol_id = "select {id} from {solutions} where {creat_time} = (select MAX({creat_time}) from {solutions})".format(
-            id=id_fld_alias,
-            creat_time=creat_time_alias,
-            solutions=sol_tbl_nm)
-        curs.execute(query_sol_id)
-        last_sol_id = curs.fetchone()[0]
+            # Get the max id of the saved solution
 
-        # Create the query strings for updating the points table
+            id_fld_alias = get_field_dict('id', sol_tbl_flds)["name"]
+            creat_time_alias = get_field_dict('creat_time', sol_tbl_flds)["name"]
+            query_sol_id = "select {id} from {solutions} where {creat_time} = (select MAX({creat_time}) from {solutions})".format(
+                id=id_fld_alias,
+                creat_time=creat_time_alias,
+                solutions=sol_tbl_nm)
+            curs.execute(query_sol_id)
+            last_sol_id = curs.fetchone()[0]
 
-        pts_vals = list(map(lambda xyz: [None, last_sol_id, *xyz], self.pts))
+            # Create the query strings for updating the points table
 
-        curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
+            pts_vals = list(map(lambda xyz: [None, last_sol_id, *xyz], self.pts))
 
-        # Save (commit) the changes
+            curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
 
-        conn.commit()
+            # Save (commit) the changes
 
-        # We can also close the connection if we are done with it.
-        # Just be sure any changes have been committed or they will be lost.
+            conn.commit()
 
-        conn.close()
+            # We can also close the connection if we are done with it.
+            # Just be sure any changes have been committed or they will be lost.
 
-        QMessageBox.information(
-            self,
-            "{}".format(self.tool_nm),
-            "Solution saved in result database")
+            conn.close()
+
+            QMessageBox.information(
+                self,
+                "{}".format(self.tool_nm),
+                "Solution saved in result database")
 
 
 class TableDialog(QDialog):
@@ -1234,35 +1245,38 @@ class TableDialog(QDialog):
 
         db.open()
 
-        model = QSqlTableModel(db=db)
-        model.setTable(sol_tbl_nm)
-        model.select()
-        model.setHeaderData(0, Qt.Horizontal, "id")
-        model.setHeaderData(1, Qt.Horizontal, "dip direction")
-        model.setHeaderData(2, Qt.Horizontal, "dip angle")
-        model.setHeaderData(3, Qt.Horizontal, "created")
+        table_model = QSqlTableModel(db=db)
+        table_model.setTable(sol_tbl_nm)
+        table_model.select()
+        table_model.setHeaderData(0, Qt.Horizontal, "id")
+        table_model.setHeaderData(1, Qt.Horizontal, "dip direction")
+        table_model.setHeaderData(2, Qt.Horizontal, "dip angle")
+        table_model.setHeaderData(3, Qt.Horizontal, "label")
+        table_model.setHeaderData(4, Qt.Horizontal, "comments")
+        table_model.setHeaderData(5, Qt.Horizontal, "created")
 
+        proxy_model = QSortFilterProxyModel()
+        proxy_model.setSourceModel(table_model)
         view = QTableView()
-
-        view.setModel(model)
-        view.hideColumn(4)
-
+        view.setModel(proxy_model)
+        view.setSortingEnabled(True)
         layout.addWidget(view)
 
         self.setLayout(layout)
 
         db.close()
 
-        self.setMinimumSize(500, 400)
+        self.setMinimumSize(750, 400)
 
-        self.setWindowTitle("Stored results")
+        self.setWindowTitle("Saved results")
 
 
 class NoteDialog(QDialog):
 
-    def __init__(self):
-        super(NoteDialog, self).__init__()
-        loadUi(os.path.join(_plugin_directory_, 'solution_notes.ui'), self)
+    def __init__(self, plugin_dir, parent=None):
+        
+        super().__init__(parent=parent)
+        loadUi(os.path.join(plugin_dir, 'solution_notes.ui'), self)
         self.show()
 
 
