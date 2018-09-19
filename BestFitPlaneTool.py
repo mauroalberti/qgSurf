@@ -1170,6 +1170,10 @@ class StereonetDialog(QDialog):
 
         sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
+        noteDialog = NoteDialog()
+        if noteDialog.exec_():
+            note = noteDialog.note_plainTextEdit.toPlainText()
+
         conn = sqlite3.connect(self.db_path)
         curs = conn.cursor()
 
@@ -1253,6 +1257,13 @@ class TableDialog(QDialog):
 
         self.setWindowTitle("Stored results")
 
+
+class NoteDialog(QDialog):
+
+    def __init__(self):
+        super(NoteDialog, self).__init__()
+        loadUi(os.path.join(_plugin_directory_, 'solution_notes.ui'), self)
+        self.show()
 
 
 

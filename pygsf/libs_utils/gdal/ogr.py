@@ -108,11 +108,14 @@ def shapefile_create(path, geom_type, fields_dict_list, crs=None):
         raise OGRIOException('Unable to save shapefile in provided path')
 
     if crs is not None:
-        spatialReference = osr.SpatialReference()
-        spatialReference.ImportFromProj4(crs)
-        outShapelayer = outShapefile.CreateLayer("layer", geom_type, spatialReference)
+        spatial_reference = osr.SpatialReference()
+        spatial_reference.ImportFromProj4(crs)
+        outShapelayer = outShapefile.CreateLayer("layer", spatial_reference, geom_type)
     else:
-        outShapelayer = outShapefile.CreateLayer("layer", geom_type=geom_type)
+        outShapelayer = outShapefile.CreateLayer("layer", None, geom_type)
+
+    if not outShapelayer:
+        return None, None
 
     for field_def_params in fields_dict_list:
         field_def = shapefile_create_def_field(field_def_params)

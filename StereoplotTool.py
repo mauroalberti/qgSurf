@@ -100,44 +100,49 @@ class StereoplotWidget(QWidget):
 
     def setup_gui(self):
 
-        self.layout = QVBoxLayout()
+        dialog_layout = QVBoxLayout()
+        main_widget = QTabWidget()
+        main_widget.addTab(self.setup_stereoplot_tab(), "Stereoplot")
+        main_widget.addTab(self.setup_help_tab(), "Help")
+
+        dialog_layout.addWidget(main_widget)
+        self.setLayout(dialog_layout)
+        self.adjustSize()
+        self.setWindowTitle('{} - {}'.format(plugin_nm, self.tool_nm))
+
+    def setup_stereoplot_tab(self):
+
+        widget = QWidget()
+
+        layout = QVBoxLayout()
 
         self.stereonet = StereoNet()
 
-        self.layout.addWidget(self.stereonet.fig.canvas)
+        layout.addWidget(self.stereonet.fig.canvas)
 
         self.pshDefineInput = QPushButton(self.tr("Input data"))
         self.pshDefineInput.clicked.connect(self.define_input)
-        self.layout.addWidget(self.pshDefineInput)
+        layout.addWidget(self.pshDefineInput)
 
         self.pshDefineStyle = QPushButton(self.tr("Plot style"))
         self.pshDefineStyle.clicked.connect(self.define_style)
-        self.layout.addWidget(self.pshDefineStyle)
+        layout.addWidget(self.pshDefineStyle)
 
         self.pshDefineStereoplot = QPushButton(self.tr("Plot data"))
         self.pshDefineStereoplot.clicked.connect(self.define_stereoplot)
-        self.layout.addWidget(self.pshDefineStereoplot)
+        layout.addWidget(self.pshDefineStereoplot)
 
         self.pshClearStereoplot = QPushButton(self.tr("Clear stereonet"))
         self.pshClearStereoplot.clicked.connect(self.clear_stereoplot)
-        self.layout.addWidget(self.pshClearStereoplot)
+        layout.addWidget(self.pshClearStereoplot)
 
         self.pshSaveFigure = QPushButton(self.tr("Save figure"))
         self.pshSaveFigure.clicked.connect(self.save_figure)
-        self.layout.addWidget(self.pshSaveFigure)
+        layout.addWidget(self.pshSaveFigure)
 
-        self.pshHelp = QPushButton(self.tr("Help"))
-        self.pshHelp.clicked.connect(self.open_help)
-        self.layout.addWidget(self.pshHelp)
+        widget.setLayout(layout)
 
-        self.setLayout(self.layout)
-        self.setWindowTitle("{} - {}".format(plugin_nm, self.tool_nm))
-        self.adjustSize()
-
-    def open_help(self):
-
-        dialog = HelpDialog()
-        dialog.exec_()
+        return widget
 
     def define_input(self):
 
@@ -717,27 +722,22 @@ class StereoplotWidget(QWidget):
 
         self.window_closed.emit()
 
+    def setup_help_tab(self):
 
-class HelpDialog(QDialog):
+        qwdtHelp = QWidget()
+        qlytHelp = QVBoxLayout()
 
-    def __init__(self, parent=None):
-        super(HelpDialog, self).__init__(parent)
+        # Help section
 
-        layout = QVBoxLayout()
-
-        # About section
-
-        helpTextBrwsr = QTextBrowser(self)
-
+        qtbrHelp = QTextBrowser(qwdtHelp)
         url_path = "file:///{}/help/help_stereonet.html".format(os.path.dirname(__file__))
-        helpTextBrwsr.setSource(QUrl(url_path))
-        helpTextBrwsr.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
-        helpTextBrwsr.setMinimumSize(700, 600)
-        layout.addWidget(helpTextBrwsr)
+        qtbrHelp.setSource(QUrl(url_path))
+        qtbrHelp.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
+        qlytHelp.addWidget(qtbrHelp)
 
-        self.setLayout(layout)
+        qwdtHelp.setLayout(qlytHelp)
 
-        self.setWindowTitle("{} - {} help".format(plugin_nm, self.tool_nm))
+        return qwdtHelp
 
 
 

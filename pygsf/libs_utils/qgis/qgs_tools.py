@@ -13,6 +13,17 @@ from ...spatial.vectorial.vectorial import Point, Line
 from ...spatial.vectorial.exceptions import VectorIOException
 
 
+def get_on_the_fly_projection(canvas):
+
+    on_the_fly_projection = True
+    if on_the_fly_projection:
+        project_crs = canvas.mapSettings().destinationCrs()
+    else:
+        project_crs = None
+
+    return on_the_fly_projection, project_crs
+
+
 def vector_type( layer ):
     
     if not layer.type() == QgsMapLayer.VectorLayer:

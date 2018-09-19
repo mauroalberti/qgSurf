@@ -5,10 +5,12 @@ sqlite_db:
       name: solutions
       fields:
         - id:         {name: id,         type: INTEGER PRIMARY KEY}
-        - dip_dir:    {name: dip_dir,    type: real}
-        - dip_ang:    {name: dip_ang,    type: real}
+        - dip_dir:    {name: dip_dir,    type: REAL}
+        - dip_ang:    {name: dip_ang,    type: REAL}
         - creat_time: {name: creat_time, type: DATE}
-        - modif_time: {name: modif_time, type: DATE}
+        - label:      {name: label,      type: TEXT}
+        - comments:   {name: comments,   type: TEXT}
+
     src_pts:
       name: src_points
       fields:
