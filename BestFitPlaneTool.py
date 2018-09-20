@@ -1235,8 +1235,6 @@ class TableDialog(QDialog):
 
         sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
-        layout = QVBoxLayout()
-
         db = QSqlDatabase("QSQLITE")
 
         db.setConnectOptions("QSQLITE_OPEN_READONLY;")
@@ -1257,18 +1255,59 @@ class TableDialog(QDialog):
 
         proxy_model = QSortFilterProxyModel()
         proxy_model.setSourceModel(table_model)
-        view = QTableView()
-        view.setModel(proxy_model)
-        view.setSortingEnabled(True)
-        layout.addWidget(view)
 
-        self.setLayout(layout)
+        self.view = QTableView()
+        self.view.setModel(proxy_model)
+
+        self.view.verticalHeader().hide()
+        self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
+
+        self.selection_model = self.view.selectionModel()
+
+        self.view.resizeRowsToContents()
+        self.view.setSortingEnabled(True)
 
         db.close()
 
-        self.setMinimumSize(750, 400)
+        layout = QVBoxLayout()
+
+        layout.addWidget(self.view)
+
+        plot_selected_recs = QPushButton("Plot selected records")
+        plot_selected_recs.clicked.connect(self.plot_selected_records)
+        layout.addWidget(plot_selected_recs)
+
+        delete_selected_recs = QPushButton("Delete selected records")
+        delete_selected_recs.clicked.connect(self.delete_selected_records)
+        layout.addWidget(delete_selected_recs)
+
+        self.setLayout(layout)
+
+        self.setMinimumSize(675, 400)
 
         self.setWindowTitle("Saved results")
+
+    def plot_selected_records(self):
+
+        # get selected records attitudes
+
+        selected_records = self.selection_model.selectedRows()
+        print("Selected rows: {}".format(len(selected_records)))
+
+        selected_ids = list(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
+        print(type(selected_ids), selected_ids)  # -> <class 'list'> [4, 2, 1]
+
+        # plot in stereoplot
+
+        print("Will plot")
+
+    def delete_selected_records(self):
+
+        # get selected records attitudes
+
+        # delete them
+
+        print("Will delete")
 
 
 class NoteDialog(QDialog):
