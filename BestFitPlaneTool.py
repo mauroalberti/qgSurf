@@ -54,6 +54,8 @@ from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
 from .pygsf.libs_utils.yaml.io import read_yaml
+from .pygsf.libs_utils.sqlite3 import try_create_db_tables
+
 
 bfp_texts_flnm = "texts.yaml"
 
@@ -88,6 +90,7 @@ def parse_db_params(sqlite_params):
         src_points_tbl_flds)
 
 
+"""
 def create_inner_table(cursor, tbl_nm, tbl_flds):
 
     cursor.execute('''DROP TABLE IF EXISTS {tbl_nm}'''.format(tbl_nm=tbl_nm))
@@ -103,7 +106,7 @@ def create_inner_table(cursor, tbl_nm, tbl_flds):
         flds=flds_string)
 
     cursor.execute(query_string)
-
+"""
 
 def remove_equal_consecutive_xypairs(xy_list):
     out_xy_list = [xy_list[0]]
@@ -249,7 +252,7 @@ class BestFitPlaneWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_processing_tab(), "Processing")
-        main_widget.addTab(self.setup_results_tab(), "Results")
+        main_widget.addTab(self.setup_results_tab(), "Result database")
         main_widget.addTab(self.setup_export_tab(), "Export")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
@@ -357,29 +360,29 @@ class BestFitPlaneWidget(QWidget):
 
     def setup_results_export(self):
         
-        export_points_QGroupBox = QGroupBox(self.tr("Exports results"))
+        export_points_QGroupBox = QGroupBox(self.tr("Export as shapefile"))
         
         export_points_Layout = QGridLayout()        
         
-        self.create_shapefile_pButton = QPushButton("Create new shapefile for result storage")
+        self.create_shapefile_pButton = QPushButton("Create new shapefile")
         self.create_shapefile_pButton.clicked.connect(self.make_shapefiles)
         self.create_shapefile_pButton.setEnabled(True)
-        export_points_Layout.addWidget(self.create_shapefile_pButton, 0, 0, 1, 1)   
+        export_points_Layout.addWidget(self.create_shapefile_pButton, 0, 0, 1, 2)
         
         self.use_shapefile_pButton = QPushButton("Load previous shapefile")
         self.use_shapefile_pButton.clicked.connect(self.use_shapefile)
         self.use_shapefile_pButton.setEnabled(True)
-        export_points_Layout.addWidget(self.use_shapefile_pButton, 0, 1, 1, 1)   
+        export_points_Layout.addWidget(self.use_shapefile_pButton, 1, 0, 1, 2)
                 
         self.save_solution_pButton = QPushButton("Add current solution in shapefile")
         self.save_solution_pButton.clicked.connect(self.save_in_shapefile)
         self.save_solution_pButton.setEnabled(False)
-        export_points_Layout.addWidget(self.save_solution_pButton, 1, 0, 1, 2)   
+        export_points_Layout.addWidget(self.save_solution_pButton, 2, 0, 1, 2)
 
         self.stop_edit_pButton = QPushButton("Save and stop edits in shapefile")
         self.stop_edit_pButton.clicked.connect(self.stop_editing)
         self.stop_edit_pButton.setEnabled(False)
-        export_points_Layout.addWidget(self.stop_edit_pButton, 2, 0, 1, 2)         
+        export_points_Layout.addWidget(self.stop_edit_pButton, 3, 0, 1, 2)
         
         export_points_QGroupBox.setLayout(export_points_Layout) 
                  
@@ -465,9 +468,21 @@ class BestFitPlaneWidget(QWidget):
         if not db_path:
             return
 
-        pars = parse_db_params(self.db_tables_params)
-        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+        # pars = parse_db_params(self.db_tables_params)
+        # sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
 
+        tables = self.db_tables_params["tables"]
+
+        solutions_pars = tables["solutions"]
+        src_points_pars = tables["src_pts"]
+
+        success, msg = try_create_db_tables(
+            db_path=db_path,
+            tables_pars=[
+                solutions_pars,
+                src_points_pars])
+
+        """
         try:
             conn = sqlite3.connect(db_path)
         except Exception as e:
@@ -489,13 +504,23 @@ class BestFitPlaneWidget(QWidget):
 
         conn.commit()
         conn.close()
+        """
 
-        self.result_db_path_qle.setText(db_path)
+        if success:
 
-        QMessageBox.information(
-            self,
-            self.tool_nm,
-            "Result db created")
+            self.result_db_path_qle.setText(db_path)
+
+            QMessageBox.information(
+                self,
+                self.tool_nm,
+                "Result db created")
+
+        else:
+
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                msg)
 
     def find_existing_db(self):
 
@@ -975,7 +1000,8 @@ class BestFitPlaneWidget(QWidget):
 
     def view_result_table(self):
 
-        table_result_dialog = TableDialog(
+        table_result_dialog = StoredResultsTableDialog(
+            tool_nm=self.tool_nm,
             db_path=self.result_db_path_qle.text(),
             db_tables_params=self.db_tables_params)
 
@@ -1225,15 +1251,18 @@ class StereonetDialog(QDialog):
                 "Solution saved in result database")
 
 
-class TableDialog(QDialog):
+class StoredResultsTableDialog(QDialog):
 
-    def __init__(self, db_path, db_tables_params):
+    def __init__(self, tool_nm, db_path, db_tables_params):
 
         super().__init__()
 
+        self.tool_nm = tool_nm
+        self.db_path = db_path
+
         pars = parse_db_params(db_tables_params)
 
-        sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
+        self.sol_tbl_nm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
 
         db = QSqlDatabase("QSQLITE")
 
@@ -1244,7 +1273,7 @@ class TableDialog(QDialog):
         db.open()
 
         table_model = QSqlTableModel(db=db)
-        table_model.setTable(sol_tbl_nm)
+        table_model.setTable(self.sol_tbl_nm)
         table_model.select()
         table_model.setHeaderData(0, Qt.Horizontal, "id")
         table_model.setHeaderData(1, Qt.Horizontal, "dip direction")
@@ -1292,14 +1321,39 @@ class TableDialog(QDialog):
         # get selected records attitudes
 
         selected_records = self.selection_model.selectedRows()
-        print("Selected rows: {}".format(len(selected_records)))
 
-        selected_ids = list(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
-        print(type(selected_ids), selected_ids)  # -> <class 'list'> [4, 2, 1]
+        if not selected_records:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                "No records selected")
+            return
+
+        selected_ids = tuple(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
+
+        # print(type(selected_ids), selected_ids)  # -> <class 'list'> [4, 2, 1]
+
+        id_alias = self.sol_tbl_flds[0]["id"]["name"]
+        dip_dir_alias = self.sol_tbl_flds[1]["dip_dir"]["name"]
+        dip_ang_alias = self.sol_tbl_flds[2]["dip_ang"]["name"]
+
+        # query string
+        selected_ids_string = ",".join(map(str, selected_ids))
+        qry = "SELECT ?, ? FROM ? WHERE ? IN (?)".format(
+            dip_dir_alias, dip_ang_alias, self.sol_tbl_nm, id_alias, selected_ids_string)
+        print(qry)
+        conn = sqlite3.connect(self.db_path)
+        curs = conn.cursor()
+        curs.execute(qry) #, vals)
+        results = curs.fetchall()
+        conn.close()
+        print(results)  # -> [(152.97523162014454, 6.516836067837787), (227.97548474958654, 70.7897568221676)]
+
+        # get vals for selected records
 
         # plot in stereoplot
 
-        print("Will plot")
+        print("Will plot them")
 
     def delete_selected_records(self):
 
