@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import *
 
 from .base_params import *
 
-from .BestFitPlaneTool import BestFitPlaneWidget
+from .BestFitPlaneTool import BestFitPlaneMainWidget
 from .DEMPlaneIntersectionTool import DemPlaneIntersectionWidget
 from .StereoplotTool import StereoplotWidget
 from .AboutDialog import AboutDialog
@@ -130,7 +130,7 @@ class QgsurfGui(object):
         BestFitPlaneDockWidget.setAttribute(Qt.WA_DeleteOnClose)
         BestFitPlaneDockWidget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        self.BestFitPlaneQwidget = BestFitPlaneWidget(
+        self.BestFitPlaneQwidget = BestFitPlaneMainWidget(
             tool_nm=self.bestfitplane_toolpars["tool_nm"],
             canvas=self.canvas,
             plugin_qaction=self.bestfitplane_geoproc,

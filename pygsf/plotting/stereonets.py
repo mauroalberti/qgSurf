@@ -263,7 +263,10 @@ def splot(data, force=''):
 
         for obj in objs:
             if isDirect(obj):
-                plunge, bearing, symbol, color = params_gvect(obj, kwargs, force_emisphere=force)
+                plunge, bearing, symbol, color = params_gvect(
+                    obj,
+                    kwargs,
+                    force_emisphere=force)
                 ax.line(
                     plunge,
                     bearing,
@@ -271,7 +274,10 @@ def splot(data, force=''):
                     markerfacecolor=color,
                     markeredgecolor=color)
             elif isAxis(obj):
-                plunge, bearing, symbol, color = params_gaxis(obj, kwargs, force_emisphere=force)
+                plunge, bearing, symbol, color = params_gaxis(
+                    obj,
+                    kwargs,
+                    force_emisphere=force)
                 ax.line(
                     plunge,
                     bearing,
@@ -279,7 +285,10 @@ def splot(data, force=''):
                     markerfacecolor=color,
                     markeredgecolor=color)
             elif isPlane(obj):
-                strike, dip, linestyle, color = params_gplane(obj, kwargs, force_emisphere=force)
+                strike, dip, linestyle, color = params_gplane(
+                    obj,
+                    kwargs,
+                    force_emisphere=force)
                 ax.plane(
                     strike,
                     dip,

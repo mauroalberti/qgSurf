@@ -55,6 +55,7 @@ class MplCanvas(FigureCanvas):
 
         rcParams["figure.facecolor"] = 'white'
 
+
 # from: http://stackoverflow.com/questions/12695678/how-to-modify-the-navigation-toolbar-easily-in-a-matplotlib-figure-window
 
 class NavigatioToolbarModif(NavigationToolbar):
