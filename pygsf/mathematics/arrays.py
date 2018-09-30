@@ -206,6 +206,27 @@ def xyzSvd(xyz_array) -> dict:
     return dict(result=result)
 
 
+def svd(xyz_array) -> Optional[Tuple['np.array', 'np.array', 'np.array']]:
+    """
+    Calculates the SVD solution given a Numpy array.
+
+    # modified after:
+    # http://stackoverflow.com/questions/15959411/best-fit-plane-algorithms-why-different-results-solved
+
+    :param xyz_array:
+    :type xyz_array: numpy array.
+    :return:
+    :rtype:
+
+    Examples:
+    """
+
+    try:
+        return np.linalg.svd(xyz_array)
+    except:
+        return None
+
+
 if __name__ == "__main__":
 
     import doctest
