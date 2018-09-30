@@ -73,6 +73,45 @@ def read_line_shapefile_via_ogr(line_shp_path):
     return dict(success=True, extent=lines_extent, vertices=lines_points)
 
 
+def parse_ogr_type(ogr_type_str: str) -> 'ogr.OGRFieldType':
+    """
+    Parse the provided textual field type to return an actual OGRFieldType.
+
+    :param ogr_type_str: the string referring to the ogr field type.
+    :type ogr_type_str: str.
+    :return: the actural ogr type.
+    :rtype: OGRFieldType.
+    :raise: Exception.
+    """
+
+    if ogr_type_str.endswith("OFTInteger"):
+        return ogr.OFTInteger
+    elif ogr_type_str.endswith("OFTIntegerList"):
+        return ogr.OFTIntegerList
+    elif ogr_type_str.endswith("OFTReal"):
+        return ogr.OFTReal
+    elif ogr_type_str.endswith("OFTRealList"):
+        return ogr.OFTRealList
+    elif ogr_type_str.endswith("OFTString"):
+        return ogr.OFTString
+    elif ogr_type_str.endswith("OFTStringList"):
+        return ogr.OFTStringList
+    elif ogr_type_str.endswith("OFTBinary"):
+        return ogr.OFTBinary
+    elif ogr_type_str.endswith("OFTDate"):
+        return ogr.OFTDate
+    elif ogr_type_str.endswith("OFTTime"):
+        return ogr.OFTTime
+    elif ogr_type_str.endswith("OFTDateTime"):
+        return ogr.OFTDateTime
+    elif ogr_type_str.endswith("OFTInteger64"):
+        return ogr.OFTInteger64
+    elif ogr_type_str.endswith("OFTInteger64List"):
+        return ogr.OFTInteger64List
+    else:
+        raise Exception("Debug: not recognized ogr type")
+
+
 def shapefile_create_def_field(field_def):
     """
 
@@ -80,9 +119,12 @@ def shapefile_create_def_field(field_def):
     :return:
     """
 
-    fieldDef = ogr.FieldDefn(field_def['name'], field_def['ogr_type'])
-    if field_def['ogr_type'] == ogr.OFTString:
-        fieldDef.SetWidth(field_def['width'])
+    name = field_def['name']
+    ogr_type = parse_ogr_type(field_def['ogr_type'])
+
+    fieldDef = ogr.FieldDefn(name, ogr_type)
+    if ogr_type == ogr.OFTString:
+        fieldDef.SetWidth(int(field_def['width']))
 
     return fieldDef
 

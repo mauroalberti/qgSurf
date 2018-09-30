@@ -29,6 +29,8 @@ from __future__ import absolute_import
 
 import os
 from datetime import datetime as dt
+import yaml
+
 import sqlite3
 
 from osgeo import ogr
@@ -252,8 +254,7 @@ class BestFitPlaneMainWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_processing_tab(), "Processing")
-        main_widget.addTab(self.setup_results_tab(), "Saved solutions")
-        main_widget.addTab(self.setup_export_tab(), "Export")
+        main_widget.addTab(self.setup_results_tab(), "Solutions")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
         dialog_layout.addWidget(main_widget)                                     
@@ -284,7 +285,8 @@ class BestFitPlaneMainWidget(QWidget):
         widget = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.setup_results_tableview())
-        layout.addWidget(self.setup_results_db_params())
+        #layout.addWidget(self.setup_results_db_params())
+        layout.addWidget(self.setup_results_export())
         widget.setLayout(layout)
         return widget
 
@@ -294,7 +296,7 @@ class BestFitPlaneMainWidget(QWidget):
         
         main_layout = QGridLayout()
     
-        main_layout.addWidget(QLabel("Choose DEM layer"), 0, 0, 1, 1)
+        main_layout.addWidget(QLabel("DEM layer"), 0, 0, 1, 1)
         self.define_dem_QComboBox = QComboBox()
         self.define_dem_QComboBox.addItem(self.dem_default_text)
         main_layout.addWidget(self.define_dem_QComboBox, 0, 1, 1, 2)
@@ -360,71 +362,86 @@ class BestFitPlaneMainWidget(QWidget):
 
     def setup_results_export(self):
         
-        export_points_QGroupBox = QGroupBox(self.tr("Export as shapefile"))
+        group_box = QGroupBox(self.tr("Export"))
         
-        export_points_Layout = QGridLayout()        
-        
-        self.create_shapefile_pButton = QPushButton("Create new shapefile")
-        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
-        self.create_shapefile_pButton.setEnabled(True)
-        export_points_Layout.addWidget(self.create_shapefile_pButton, 0, 0, 1, 2)
-        
-        self.use_shapefile_pButton = QPushButton("Load previous shapefile")
-        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
-        self.use_shapefile_pButton.setEnabled(True)
-        export_points_Layout.addWidget(self.use_shapefile_pButton, 1, 0, 1, 2)
-                
-        self.save_solution_pButton = QPushButton("Add current solution in shapefile")
-        self.save_solution_pButton.clicked.connect(self.shapefile_add_result)
-        self.save_solution_pButton.setEnabled(False)
-        export_points_Layout.addWidget(self.save_solution_pButton, 2, 0, 1, 2)
+        layout = QGridLayout()
 
-        self.stop_edit_pButton = QPushButton("Save and stop edits in shapefile")
-        self.stop_edit_pButton.clicked.connect(self.shapefile_stop_editing)
-        self.stop_edit_pButton.setEnabled(False)
-        export_points_Layout.addWidget(self.stop_edit_pButton, 3, 0, 1, 2)
-        
-        export_points_QGroupBox.setLayout(export_points_Layout) 
+        self.save_results_in_shapefile_pButton = QPushButton("Add saved solutions to shapefile")
+        self.save_results_in_shapefile_pButton.clicked.connect(self.shapefile_add_results)
+        # self.save_solution_pButton.setEnabled(False)
+        layout.addWidget(self.save_results_in_shapefile_pButton, 0, 0, 1, 2)
+
+        layout.addWidget(QLabel("Current export layer (shapefile)"), 1, 0, 1, 2)
+
+        self.result_shapefile = QLineEdit()
+        layout.addWidget(self.result_shapefile, 2, 0, 1, 2)
+
+        self.use_shapefile_pButton = QPushButton("Load existing shapefile")
+        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
+        #self.use_shapefile_pButton.setEnabled(True)
+        layout.addWidget(self.use_shapefile_pButton, 3, 0, 1, 2)
+
+
+        self.create_shapefile_pButton = QPushButton("Create result shapefile")
+        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
+        #self.create_shapefile_pButton.setEnabled(True)
+        layout.addWidget(self.create_shapefile_pButton, 4, 0, 1, 2)
+
+        group_box.setLayout(layout)
                  
-        return export_points_QGroupBox
+        return group_box
 
     def setup_results_tableview(self):
 
-        main_groupbox = QGroupBox(self.tr("Stored results"))
+        group_box = QGroupBox(self.tr("Saved results"))
 
-        main_layout = QGridLayout()
+        layout = QGridLayout()
 
-        view_results_button = QPushButton("Table")
+        view_results_button = QPushButton("Show results saved in database")
         view_results_button.clicked.connect(self.view_result_table)
-        main_layout.addWidget(view_results_button, 0, 0, 1, 2)
+        layout.addWidget(view_results_button, 0, 0, 1, 2)
 
-        main_groupbox.setLayout(main_layout)
-
-        return main_groupbox
-
-    def setup_results_db_params(self):
-
-        main_groupbox = QGroupBox(self.tr("Database management"))
-
-        main_layout = QGridLayout()
-
-        main_layout.addWidget(QLabel("Current database (sqlite3)"), 0, 0, 1, 2)
+        layout.addWidget(QLabel("Current database (sqlite3)"), 1, 0, 1, 2)
 
         self.result_db_path_qle = QLineEdit()
-        main_layout.addWidget(self.result_db_path_qle, 1, 0, 1, 2)
+        layout.addWidget(self.result_db_path_qle, 2, 0, 1, 2)
 
         self.open_existing_sqlite = QPushButton("Load existing database")
         self.open_existing_sqlite.clicked.connect(self.find_existing_db)
-        main_layout.addWidget(self.open_existing_sqlite, 2, 0, 1, 2)
+        layout.addWidget(self.open_existing_sqlite, 3, 0, 1, 2)
 
         self.create_new_sqlite = QPushButton("Create new database")
         self.create_new_sqlite.clicked.connect(self.create_result_db)
-        main_layout.addWidget(self.create_new_sqlite, 3, 0, 1, 2)
+        layout.addWidget(self.create_new_sqlite, 4, 0, 1, 2)
 
+        group_box.setLayout(layout)
 
-        main_groupbox.setLayout(main_layout)
+        return group_box
 
-        return main_groupbox
+    """
+    def setup_results_db_params(self):
+
+        group_box = QGroupBox(self.tr("Database management"))
+
+        layout = QGridLayout()
+
+        layout.addWidget(QLabel("Current database (sqlite3)"), 0, 0, 1, 2)
+
+        self.result_db_path_qle = QLineEdit()
+        layout.addWidget(self.result_db_path_qle, 1, 0, 1, 2)
+
+        self.open_existing_sqlite = QPushButton("Load existing database")
+        self.open_existing_sqlite.clicked.connect(self.find_existing_db)
+        layout.addWidget(self.open_existing_sqlite, 2, 0, 1, 2)
+
+        self.create_new_sqlite = QPushButton("Create new database")
+        self.create_new_sqlite.clicked.connect(self.create_result_db)
+        layout.addWidget(self.create_new_sqlite, 3, 0, 1, 2)
+
+        group_box.setLayout(layout)
+
+        return group_box
+    """
 
     def setup_help_tab(self):
 
@@ -699,7 +716,7 @@ class BestFitPlaneMainWidget(QWidget):
         
     def get_current_canvas_crs(self):        
                 
-        self.projectCrs = self.canvas.mapSettings().destinationCrs()
+        self.projectCrs = str(self.canvas.mapSettings().destinationCrs())
 
     def reset_input_point_states(self):
        
@@ -732,14 +749,16 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_inpts_lyr_list_QComboBox.setEnabled(choice)
         self.bestfitplane_resetpoints_pButton.setEnabled(choice)
 
+    """
     def enable_point_save_buttons(self, choice=True):
 
-        self.stop_edit_pButton.setEnabled(choice)
+        #self.stop_edit_pButton.setEnabled(choice)
+    """
 
     def disable_point_tools(self):
 
         self.enable_point_input_buttons(False)
-        self.enable_point_save_buttons(False)
+        #self.enable_point_save_buttons(False)
         
         try: 
             self.bestfitplane_PointMapTool.leftClicked.disconnect(self.set_bfp_input_point)
@@ -848,7 +867,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         self.bestfitplane_calculate_pButton.setEnabled(state)
 
-        self.update_save_solution_state()
+        #self.update_save_solution_state()
 
     def calculate_bestfitplane(self):        
 
@@ -871,8 +890,9 @@ class BestFitPlaneMainWidget(QWidget):
         
         self.view_in_stereonet()
 
-        self.update_save_solution_state()
+        #self.update_save_solution_state()
 
+    """
     def update_save_solution_state(self):
 
         if self.out_point_shapefile is not None and self.out_point_shapelayer is not None and \
@@ -880,6 +900,7 @@ class BestFitPlaneMainWidget(QWidget):
             self.save_solution_pButton.setEnabled(True)
         else:
             self.save_solution_pButton.setEnabled(False)
+    """
 
     def disable_points_definition(self):
         
@@ -937,18 +958,23 @@ class BestFitPlaneMainWidget(QWidget):
                 "No path provided")
             return
 
-        self.point_shapefile_path = point_shapefile_path
+        output_shapefile_params_file = os.path.join(
+            self.config_fldrpth,
+            output_shapefile_params_flnm)
 
-        self.out_point_shapefile, self.out_point_shapelayer = shapefile_create(point_shapefile_path,
-                                                                               ogr.wkbPoint,
-                                                                               BestFitPlaneMainWidget.fields_dict_list,
-                                                                               self.projectCrs)
-        QMessageBox.information(
-            self,
-            "Shapefile",
-            "Point shapefile created ")
+        plugin_params = read_yaml(output_shapefile_params_file)
 
-        self.update_save_solution_state()
+        shape_pars = plugin_params["pt_shapefile"]
+        self.projectCrs = str(self.canvas.mapSettings().destinationCrs())
+        self.out_point_shapefile, self.out_point_shapelayer = shapefile_create(
+            point_shapefile_path,
+            ogr.wkbPoint,
+            shape_pars,
+            self.projectCrs)
+
+        self.result_shapefile.setText(point_shapefile_path)
+
+        #self.update_save_solution_state()
 
     def shapefile_load_existing(self):
         
@@ -960,37 +986,44 @@ class BestFitPlaneMainWidget(QWidget):
         else:
             return
 
-        if point_shapefile_path == "": 
-            QMessageBox.critical(self, 
-                                  "Point shapefile", 
-                                  "No path provided")
+        self.result_shapefile.setText(point_shapefile_path)
+
+    def shapefile_add_results(self):
+
+        point_shapefile_path = self.result_shapefile.text()
+        if point_shapefile_path == "":
+            QMessageBox.critical(self,
+                                 "Point shapefile",
+                                 "No path provided")
             return
 
-        self.point_shapefile_path = point_shapefile_path
+        print("Will add saved solutions to shapefile")
 
+        """
         try:
-            self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list = open_shapefile(self.point_shapefile_path, BestFitPlaneMainWidget.fields_dict_list)
+            self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list = open_shapefile(
+                self.point_shapefile_path, BestFitPlaneMainWidget.fields_dict_list)
         except OGRIOException:
             self.out_point_shapefile, self.out_point_shapelayer = None, None
-            QMessageBox.critical(self, 
-                                  "Point shapefile", 
-                                  "Shapefile cannot be edited")
-            return            
-        
+            QMessageBox.critical(self,
+                                 "Point shapefile",
+                                 "Shapefile cannot be edited")
+            return
+
         if len(prev_solution_list) == 0:
-            QMessageBox.critical(self, 
-                                  "Point shapefile", 
-                                  "Shapefile is empty")
-            return                      
-        
+            QMessageBox.critical(self,
+                                 "Point shapefile",
+                                 "Shapefile is empty")
+            return
+
         write_point_result(self.out_point_shapefile, self.out_point_shapelayer, prev_solution_list)
 
-        self.res_id = max([rec[0] for rec in prev_solution_list ])
+        self.res_id = max([rec[0] for rec in prev_solution_list])
 
-        self.update_save_solution_state()
+        # self.update_save_solution_state()
 
-    def shapefile_add_result(self):
-                
+
+
         descr_dialog = ShapefileSolutionDescriptDialog(self)
         if descr_dialog.exec_():
             description = descr_dialog.description_QLineEdit.text()
@@ -1006,9 +1039,21 @@ class BestFitPlaneMainWidget(QWidget):
         # if self.update_point_shape:          
         write_point_result(self.out_point_shapefile, self.out_point_shapelayer, solution_list)
 
-        self.save_solution_pButton.setEnabled(False)
-        self.stop_edit_pButton.setEnabled(True)
+        #self.save_results_in_shapefile_pButton.setEnabled(False)
+        #self.stop_edit_pButton.setEnabled(True)
+        
+        try:
+            self.out_point_shapefile.Destroy()
+            QMessageBox.information(self, 
+                                  self.tr("Results"), 
+                                  self.tr("Results saved in shapefile.<br />Now you can load it"))            
+            
+        except:
+            pass
 
+    """
+
+    """
     def shapefile_stop_editing(self):
         
         try:
@@ -1023,6 +1068,7 @@ class BestFitPlaneMainWidget(QWidget):
         self.stop_shapefile_edits = True
         self.enable_point_save_buttons(False)
         self.update_save_solution_state()
+    """
 
 
 class SolutionStereonetDialog(QDialog):
@@ -1062,7 +1108,7 @@ class SolutionStereonetDialog(QDialog):
             QMessageBox.warning(
                 self,
                 self.tool_nm,
-                "Result database not defined in Configuration tab"
+                "Result database not defined in 'Saved solutions' tab"
             )
             return
 
@@ -1180,9 +1226,11 @@ class StoredResultsTableDialog(QDialog):
         plot_selected_recs.clicked.connect(self.plot_selected_records)
         layout.addWidget(plot_selected_recs)
 
+        """
         delete_selected_recs = QPushButton("Delete selected records")
         delete_selected_recs.clicked.connect(self.delete_selected_records)
         layout.addWidget(delete_selected_recs)
+        """
 
         self.setLayout(layout)
 

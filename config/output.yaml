@@ -1,18 +1,11 @@
 
 pt_shapefile:
-  - name: id
-    ogr_type: ogr.OFTInteger
-  - name: x
-    ogr_type: ogr.OFTReal
-  - name: y
-    ogr_type: ogr.OFTReal
-  - name: z
-    ogr_type: ogr.OFTReal
-  - name: dip_dir
-    ogr_type: ogr.OFTReal
-  - name: dip_ang
-    ogr_type: ogr.OFTReal
-  - name: descript
-    ogr_type: ogr.OFTString
-    width: 50
+  - {name: id,       ogr_type: ogr.OFTInteger            }
+  - {name: x,        ogr_type: ogr.OFTReal               }
+  - {name: y,        ogr_type: ogr.OFTReal               }
+  - {name: z,        ogr_type: ogr.OFTReal               }
+  - {name: dip_dir,  ogr_type: ogr.OFTReal               }
+  - {name: dip_ang,  ogr_type: ogr.OFTReal               }
+  - {name: label,    ogr_type: ogr.OFTString,  width: 255}
+  - {name: comments, ogr_type: ogr.OFTString,  width: 255}
 
