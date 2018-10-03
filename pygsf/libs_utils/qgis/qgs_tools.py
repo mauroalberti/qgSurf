@@ -228,11 +228,16 @@ def qgs_point( x, y ):
     return QgsPointXY(x, y)
         
 
-def project_qgs_point( qgsPt, srcCrs, destCrs ):
-    
-    return QgsCoordinateTransform(srcCrs, destCrs, QgsProject.instance()).transform(qgsPt)
+def project_qgs_point(qgsPt, srcCrs, destCrs):
 
-    
+    coordinate_transform = QgsCoordinateTransform(
+        srcCrs,
+        destCrs,
+        QgsProject.instance())
+
+    return coordinate_transform.transform(qgsPt)
+
+
 def project_line_2d( srcLine, srcCrs, destCrs ):
     
     destLine = Line()
