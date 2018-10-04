@@ -66,21 +66,55 @@ def try_create_db_tables(db_path: str, tables_pars: List[Dict[str, Union[str, Li
             db_path,
             e)
 
-    curs = conn.cursor()
+    try:
 
-    for table_pars in tables_pars:
-        table_name = table_pars["name"]
-        table_fields_params = table_pars["fields"]
+        curs = conn.cursor()
 
-        success, msg = try_create_table(
-            cursor=curs,
-            table_name=table_name,
-            fields_pars=table_fields_params)
-        if not success:
-            return False, "Unable to create table {} with Exception: {}".format(table_name, msg)
+        for table_pars in tables_pars:
+            table_name = table_pars["name"]
+            table_fields_params = table_pars["fields"]
 
-    conn.commit()
-    conn.close()
+            success, msg = try_create_table(
+                cursor=curs,
+                table_name=table_name,
+                fields_pars=table_fields_params)
+            if not success:
+                return False, "Unable to create table {} with Exception: {}".format(table_name, msg)
 
-    return True, "Completed"
+        conn.commit()
+        conn.close()
+
+        return True, "Completed"
+
+    except Exception as e:
+
+        return False, "Exception: {}"
+
+
+def try_execute_query(db_path: str, query: str) -> Tuple:
+    """
+    Execute a query in sqlite3 and return the results as a tuple.
+
+    :param db_path: path of database.
+    :type db_path: str.
+    :param query: the query to be executed.
+    :type query: str.
+    :return: the results as a tuple.
+    :rtype: Ttple.
+    """
+
+    try:
+
+        conn = sqlite3.connect(db_path)
+        curs = conn.cursor()
+        curs.execute(query)
+        results = curs.fetchall()
+        conn.close()
+
+        return True, results
+
+    except Exception as e:
+
+        return False, "Exception: {}".format(e)
+
 

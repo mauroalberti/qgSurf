@@ -28,9 +28,10 @@ class MplCanvas(FigureCanvas):
     Class to represent the FigureCanvas widget.
     """
 
-    def __init__(self, plot_type, data_plot):
+    def __init__(self, plot_type, data_plot, set_rc_params=True):
 
-        self.set_rcParams()
+        if set_rc_params:
+            self.set_rcParams()
 
         if plot_type == "Stereonet":
             self.fig, self.ax = plot(data_plot)
@@ -66,19 +67,21 @@ class NavigatioToolbarModif(NavigationToolbar):
 
 class MplWidget(QWidget):
 
-    def __init__(self, window_title, type, data):
+    def __init__(self, window_title, type, data, set_rc_params=True):
 
         super().__init__()
 
         self.setWindowTitle(window_title)
 
         # set the canvas and the navigation toolbar
-        self.canvas = MplCanvas(type, data)
+        self.canvas = MplCanvas(type, data, set_rc_params=set_rc_params)
 
         # create a vertical box layout
         self.vbl = QVBoxLayout()
 
         self.vbl.addWidget(self.canvas)
+
+        self.canvas.adjustSize()
 
         # set the layout to the vertical box
         self.setLayout(self.vbl)

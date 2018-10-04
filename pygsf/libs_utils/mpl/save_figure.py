@@ -6,7 +6,7 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 
-from ..qt.filesystem import new_file_path, old_file_path
+from ..qt.filesystem import define_path_new_file, old_file_path
 
 
 class FigureExportDetailedDlg(QDialog):
@@ -163,7 +163,7 @@ class FigureExportDetailedDlg(QDialog):
 
     def output_graphic_params_save(self):
 
-        output_file_path = new_file_path(self, "Define output configuration file", "*.txt", "txt")
+        output_file_path = define_path_new_file(self, "Define output configuration file", "*.txt", "txt")
 
         if not output_file_path:
             return
@@ -227,7 +227,7 @@ blank height space = %f""" % (float(self.qleFigWidthInch.text()),
 
     def define_figure_outpath(self):
 
-        outfile_path = new_file_path(self, "Create", "", "Images (*.svg *.pdf *.tif)")
+        outfile_path = define_path_new_file(self, "Create", "", "Images (*.svg *.pdf *.tif)")
 
         self.qleFigureOutPath.setText(outfile_path)
 
@@ -308,7 +308,7 @@ class FigureExportDlg(QDialog):
 
     def define_figure_outpath(self):
 
-        outfile_path = new_file_path(self, "Create", "", "Images (*.svg *.pdf *.tif)")
+        outfile_path = define_path_new_file(self, "Create", "", "Images (*.svg *.pdf *.tif)")
 
         self.qleFigureOutPath.setText(outfile_path)
 

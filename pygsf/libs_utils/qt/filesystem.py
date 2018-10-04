@@ -59,7 +59,7 @@ def update_directory_key(settings: QSettings, settings_dir_key, fileName):
                       str(path))
 
 
-def new_file_path(parent, show_msg, path, filter_text):
+def define_path_new_file(parent, show_msg, path, filter_text):
     """
     Defines the path of a new file.
 

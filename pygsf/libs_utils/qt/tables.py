@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 from PyQt5.QtCore import QItemSelectionModel
 
 
-def get_selected_recs_ids(selection_model: QItemSelectionModel) -> Tuple[int, ...]:
+def get_selected_recs_ids(selection_model: QItemSelectionModel) -> Optional[Tuple[int, ...]]:
     """
     Get integer ids from selected records.
 
@@ -21,7 +21,7 @@ def get_selected_recs_ids(selection_model: QItemSelectionModel) -> Tuple[int, ..
     selected_records = selection_model.selectedRows()
 
     if not selected_records:
-        return ()
+        return None
 
     selected_ids = tuple(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
 
