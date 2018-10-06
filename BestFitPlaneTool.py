@@ -47,7 +47,7 @@ from qgis.gui import *
 from .base_params import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
-from .pygsf.libs_utils.qt.tables import get_selected_recs_ids
+from .pygsf.libs_utils.qt.tables import try_open_sqlite3_db, get_selected_recs_ids
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
 from .pygsf.libs_utils.gdal.ogr import shapefile_create
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
@@ -533,13 +533,32 @@ class BestFitPlaneMainWidget(QWidget):
 
     def view_result_table(self):
 
+        db_path = self.result_db_path_qle.text()
+
+        if not db_path:
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Database not defined")
+            return
+
+        success, db = try_open_sqlite3_db(db_path)
+        if not success:
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                db)
+            return
+
         table_result_dialog = StoredResultsTableDialog(
             tool_nm=self.tool_nm,
-            db_path=self.result_db_path_qle.text(),
+            db=db,
             db_tables_params=self.db_tables_params,
             xprt_shapefile_pth=self.result_shapefile.text())
 
         table_result_dialog.exec_()
+
+        db.close()
 
     def add_marker(self, prj_crs_x, prj_crs_y):
 
@@ -1003,24 +1022,16 @@ class SolutionNotesDialog(QDialog):
 
 class StoredResultsTableDialog(QDialog):
 
-    def __init__(self, tool_nm, db_path, db_tables_params, xprt_shapefile_pth):
+    def __init__(self, tool_nm, db, db_tables_params, xprt_shapefile_pth):
 
         super().__init__()
 
         self.tool_nm = tool_nm
-        self.db_path = db_path
+        self.db = db
         self.xprt_shapefile_pth = xprt_shapefile_pth
 
         pars = parse_db_params(db_tables_params)
         self.sol_tbl_nm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
-
-        db = QSqlDatabase("QSQLITE")
-
-        db.setConnectOptions("QSQLITE_OPEN_READONLY;")
-
-        db.setDatabaseName(db_path)
-
-        db.open()
 
         table_model = QSqlTableModel(db=db)
         table_model.setTable(self.sol_tbl_nm)
@@ -1045,8 +1056,6 @@ class StoredResultsTableDialog(QDialog):
 
         self.view.resizeRowsToContents()
         self.view.setSortingEnabled(True)
-
-        db.close()
 
         layout = QVBoxLayout()
 
@@ -1095,10 +1104,10 @@ class StoredResultsTableDialog(QDialog):
         # query the database
 
         success, results = try_execute_query(
-            db_path=self.db_path,
+            db=self.db,
             query=qry)
         if not success:
-            QMsgBox.Critical(
+            QMessageBox.critical(
                 self,
                 self.tool_nm,
                 results)
@@ -1179,20 +1188,22 @@ class StoredResultsTableDialog(QDialog):
             db_path=self.db_path,
             query=qry_solutions)
         if not success:
-            QMsgBox.Critical(
+            QMessageBox.critical(
                 self,
                 self.tool_nm,
                 solutions)
             return
+        print(solutions)
         success, points = try_execute_query(
             db_path=self.db_path,
             query=qry_points)
         if not success:
-            QMsgBox.Critical(
+            QMessageBox.critical(
                 self,
                 self.tool_nm,
                 points)
             return
+        print(points)
 
         #TODO: CONTINUE FROM HERE
         # if self.update_point_shape:          
