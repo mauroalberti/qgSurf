@@ -39,6 +39,7 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtSql import *
+#from PyQt5.QtSql import QSqlDatabase
 from qgis.PyQt.uic import loadUi
 
 from qgis.core import *
@@ -47,7 +48,7 @@ from qgis.gui import *
 from .base_params import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
-from .pygsf.libs_utils.qt.tables import try_open_sqlite3_db, get_selected_recs_ids
+from .pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt, get_selected_recs_ids
 from .pygsf.libs_utils.gdal.exceptions import OGRIOException
 from .pygsf.libs_utils.gdal.ogr import shapefile_create
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
@@ -57,8 +58,8 @@ from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.orientations.orientations import *
 from .pygsf.mathematics.arrays import xyzSvd
 from .pygsf.libs_utils.yaml.io import read_yaml
-from .pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_query
-
+from .pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_query_with_sqlite3
+from .pygsf.libs_utils.qt.databases import try_execute_query_with_qt
 
 bfp_texts_flnm = "texts.yaml"
 
@@ -442,30 +443,6 @@ class BestFitPlaneMainWidget(QWidget):
                 solutions_pars,
                 src_points_pars])
 
-        """
-        try:
-            conn = sqlite3.connect(db_path)
-        except Exception as e:
-            QMessageBox.information(
-                self,
-                self.tool_nm,
-                "Unable to create database. Possibly folder permission error?")
-            return
-
-        curs = conn.cursor()
-
-        # Create table solutions
-
-        create_inner_table(curs, sol_tbl_nm, sol_tbl_flds)
-
-        # Create table points
-
-        create_inner_table(curs, pts_tbl_nm, pts_tbl_flds)
-
-        conn.commit()
-        conn.close()
-        """
-
         if success:
 
             self.result_db_path_qle.setText(db_path)
@@ -542,23 +519,20 @@ class BestFitPlaneMainWidget(QWidget):
                 "Database not defined")
             return
 
-        success, db = try_open_sqlite3_db(db_path)
+        success, msg = try_connect_to_sqlite3_db_with_qt(db_path)
         if not success:
             QMessageBox.critical(
                 self,
                 self.tool_nm,
-                db)
+                msg)
             return
 
         table_result_dialog = StoredResultsTableDialog(
             tool_nm=self.tool_nm,
-            db=db,
             db_tables_params=self.db_tables_params,
             xprt_shapefile_pth=self.result_shapefile.text())
 
         table_result_dialog.exec_()
-
-        db.close()
 
     def add_marker(self, prj_crs_x, prj_crs_y):
 
@@ -1022,18 +996,17 @@ class SolutionNotesDialog(QDialog):
 
 class StoredResultsTableDialog(QDialog):
 
-    def __init__(self, tool_nm, db, db_tables_params, xprt_shapefile_pth):
+    def __init__(self, tool_nm, db_tables_params, xprt_shapefile_pth):
 
         super().__init__()
 
         self.tool_nm = tool_nm
-        self.db = db
         self.xprt_shapefile_pth = xprt_shapefile_pth
 
         pars = parse_db_params(db_tables_params)
         self.sol_tbl_nm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
 
-        table_model = QSqlTableModel(db=db)
+        table_model = QSqlTableModel(db=QSqlDatabase.database())
         table_model.setTable(self.sol_tbl_nm)
         table_model.select()
         table_model.setHeaderData(0, Qt.Horizontal, "id")
@@ -1103,19 +1076,24 @@ class StoredResultsTableDialog(QDialog):
 
         # query the database
 
-        success, results = try_execute_query(
-            db=self.db,
+        success, query_results = try_execute_query_with_qt(
             query=qry)
         if not success:
             QMessageBox.critical(
                 self,
                 self.tool_nm,
-                results)
+                query_results)
             return
 
         # get vals for selected records
 
-        planes = list(map(lambda dda: Plane(*dda), results))
+        planes = []
+        while query_results.next():
+            dip_dir = float(query_results.value(0))
+            dip_ang = float(query_results.value(1))
+            planes.append(Plane(dip_dir, dip_ang))
+
+        #planes = list(map(lambda dda: Plane(*dda), query_results))
 
         # plot in stereoplot
 
@@ -1184,8 +1162,8 @@ class StoredResultsTableDialog(QDialog):
 
         # query the database
 
-        success, solutions = try_execute_query(
-            db_path=self.db_path,
+        success, solutions = try_execute_query_with_sqlite3(
+            db=self.db,
             query=qry_solutions)
         if not success:
             QMessageBox.critical(
@@ -1194,8 +1172,8 @@ class StoredResultsTableDialog(QDialog):
                 solutions)
             return
         print(solutions)
-        success, points = try_execute_query(
-            db_path=self.db_path,
+        success, points = try_execute_query_with_sqlite3(
+            db=self.db,
             query=qry_points)
         if not success:
             QMessageBox.critical(

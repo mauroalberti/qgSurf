@@ -91,7 +91,7 @@ def try_create_db_tables(db_path: str, tables_pars: List[Dict[str, Union[str, Li
         return False, "Exception: {}"
 
 
-def try_execute_query(db: str, query: str) -> Tuple:
+def try_execute_query_with_sqlite3(db_path: str, query: str) -> Tuple:
     """
     Execute a query in sqlite3 and return the results as a tuple.
 

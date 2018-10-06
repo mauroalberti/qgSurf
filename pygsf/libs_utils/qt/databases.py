@@ -4,10 +4,10 @@
 from typing import List, Tuple, Dict, Optional, Union
 
 from PyQt5.QtCore import QItemSelectionModel
-from PyQt5.QtSql import QSqlDatabase
+from PyQt5.QtSql import QSqlDatabase, QSqlQuery
 
 
-def try_open_sqlite3_db(db_path: str, conn_type: str= "readwrite") -> Tuple[bool, Union[str, QSqlDatabase]]:
+def try_connect_to_sqlite3_db_with_qt(db_path: str, conn_type: str= "readwrite") -> Tuple[bool, str]:
     """
     Open ans sqlite3 database for reading/writing, based on connection option.
 
@@ -15,8 +15,8 @@ def try_open_sqlite3_db(db_path: str, conn_type: str= "readwrite") -> Tuple[bool
     :type db_path: str.
     :param conn_type: the connection type, i.e. for reading/writing.
     :type conn_type: str.
-    :return: the success status and a message error or a QSqlDatabase instance.
-    :rtype: a tuple made up by a boolean and a string or a QSqlDatabase instance.
+    :return: the success status and a message.
+    :rtype: a tuple made up by a boolean and a string.
     """
 
     try:
@@ -26,14 +26,19 @@ def try_open_sqlite3_db(db_path: str, conn_type: str= "readwrite") -> Tuple[bool
         elif conn_type == "readwrite":
             conn_opt_str = "SQLITE_OPEN_READWRITE;"
         else:
-            raise Exception("Unimplemented connection option")
+            raise Exception("Unimplemented connection option: {}".format(conn_type))
 
-        db = QSqlDatabase("QSQLITE")
+        db = QSqlDatabase.addDatabase("QSQLITE")
         db.setConnectOptions(conn_opt_str)
         db.setDatabaseName(db_path)
-        db.open()
+        success = db.open()
 
-        return True, db
+        if success:
+            return True, ""
+        else:
+            return False, "Unable to connect to {} with error {}".format(
+                db_path,
+                db.lastError().text())
 
     except Exception as e:
 
@@ -60,4 +65,24 @@ def get_selected_recs_ids(selection_model: QItemSelectionModel) -> Optional[Tupl
     selected_ids = tuple(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
 
     return selected_ids
+
+
+def try_execute_query_with_qt(query: str) -> Tuple[bool, Union[str, QSqlQuery]]:
+    """
+    Executes a query in a database using qt tools.
+
+    :param query: the query to be executed.
+    :type query: string.
+    :return: the success status and the query results.
+    :rtype: a tuple of a boolean and a string or a QSqlQuery instance.
+    """
+
+    sqlquery = QSqlQuery(QSqlDatabase.database())
+    success = sqlquery.exec(query)
+
+    if success:
+        return True, sqlquery
+    else:
+        return False, "Error with query {}".format(query)
+
 
