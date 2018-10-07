@@ -334,7 +334,7 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_calculate_pButton.setEnabled(False)
         layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
 
-        view_results_button = QPushButton("View database-saved results")
+        view_results_button = QPushButton("View saved results")
         view_results_button.clicked.connect(self.view_result_table)
         layout.addWidget(view_results_button, 1, 0, 1, 2)
 
@@ -1006,18 +1006,18 @@ class StoredResultsTableDialog(QDialog):
         pars = parse_db_params(db_tables_params)
         self.sol_tbl_nm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
 
-        table_model = QSqlTableModel(db=QSqlDatabase.database())
-        table_model.setTable(self.sol_tbl_nm)
-        table_model.select()
-        table_model.setHeaderData(0, Qt.Horizontal, "id")
-        table_model.setHeaderData(1, Qt.Horizontal, "dip direction")
-        table_model.setHeaderData(2, Qt.Horizontal, "dip angle")
-        table_model.setHeaderData(3, Qt.Horizontal, "label")
-        table_model.setHeaderData(4, Qt.Horizontal, "comments")
-        table_model.setHeaderData(5, Qt.Horizontal, "created")
+        self.table_model = QSqlTableModel(db=QSqlDatabase.database())
+        self.table_model.setTable(self.sol_tbl_nm)
+        self.table_model.select()
+        self.table_model.setHeaderData(0, Qt.Horizontal, "id")
+        self.table_model.setHeaderData(1, Qt.Horizontal, "dip direction")
+        self.table_model.setHeaderData(2, Qt.Horizontal, "dip angle")
+        self.table_model.setHeaderData(3, Qt.Horizontal, "label")
+        self.table_model.setHeaderData(4, Qt.Horizontal, "comments")
+        self.table_model.setHeaderData(5, Qt.Horizontal, "created")
 
         proxy_model = QSortFilterProxyModel()
-        proxy_model.setSourceModel(table_model)
+        proxy_model.setSourceModel(self.table_model)
 
         self.view = QTableView()
         self.view.setModel(proxy_model)
@@ -1093,8 +1093,6 @@ class StoredResultsTableDialog(QDialog):
             dip_ang = float(query_results.value(1))
             planes.append(Plane(dip_dir, dip_ang))
 
-        #planes = list(map(lambda dda: Plane(*dda), query_results))
-
         # plot in stereoplot
 
         selected_recs_stereonet_dialog = SelectedSolutionsStereonetDialog(
@@ -1108,11 +1106,79 @@ class StoredResultsTableDialog(QDialog):
 
     def delete_selected_records(self):
 
+        # get relevant fields names
+
+        id_alias = self.sol_tbl_flds[0]["id"]["name"]
+
         # get selected records attitudes
 
-        # delete them
+        selected_ids = get_selected_recs_ids(self.selection_model)
 
-        print("Will delete")
+        # create query string
+
+        if not selected_ids:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                "No record selected")
+            return
+
+        selected_ids_string = ",".join(map(str, selected_ids))
+
+        qry = "DELETE FROM {} WHERE {} IN ({})".format(
+            self.sol_tbl_nm,
+            id_alias,
+            selected_ids_string)
+
+        success, msg = try_execute_query_with_qt(qry)
+
+        if not success:
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Unable to delete solution records: {}".format(msg))
+            return
+        else:
+            self.table_model.dataChanged.emit(
+                self.table_model.createIndex(0, 0),
+                self.table_model.createIndex(self.table_model.rowCount() - 1, self.table_model.columnCount() - 1),
+                [])
+            QMessageBox.information(
+                self,
+                self.tool_nm,
+                "Emitted")
+
+            """
+            # from: https://stackoverflow.com/questions/12893904/automatically-refreshing-a-qtableview-when-data-changed
+            QModelIndex topLeft = index(0, 0);
+            QModelIndex bottomRight = index(rowCount() - 1, columnCount() - 1);
+
+            emit dataChanged(topLeft, bottomRight);
+            emit layoutChanged();
+
+            self.table_model.rowCount() - 1, self.table_model.columnCount() - 1
+            """
+            """
+            self.dataChanged.emit(QModelIndex, QModelIndex, [])"""
+            """
+            void QAbstractItemModel::dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles = ...)"""
+
+        sol_id_fk_alias = self.pts_tbl_flds[1]["id_sol"]["name"]
+
+        qry = "DELETE FROM {} WHERE {} IN ({})".format(
+            self.pts_tbl_nm,
+            sol_id_fk_alias,
+            selected_ids_string)
+
+        success, msg = try_execute_query_with_qt(qry)
+
+        if not success:
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Unable to delete location records: {}".format(msg))
+            return
+
 
     def xprt_selected_records_to_shapefile(self):
 
@@ -1121,7 +1187,7 @@ class StoredResultsTableDialog(QDialog):
         if point_shapefile_path == "":
             QMessageBox.critical(self,
                                  "Point shapefile",
-                                 "No path provided")
+                                 "No shapefile path provided in Configuration")
             return
 
         try:
