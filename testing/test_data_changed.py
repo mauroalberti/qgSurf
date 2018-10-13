@@ -3,7 +3,7 @@
 from PyQt5 import QtGui, QtCore
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QModelIndex, pyqtSignal,QAbstractListModel, pyqtSlot
+from PyQt5.QtCore import QModelIndex, pyqtSignal, QAbstractListModel, pyqtSlot
 import sys
 
 
@@ -93,3 +93,4 @@ if __name__ == '__main__':
     tableView.show()
 
     sys.exit(app.exec_())
+

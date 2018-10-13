@@ -4,18 +4,18 @@ sqlite_db:
     solutions:
       name: solutions
       fields:
-        - id:         {name: id,         type: INTEGER PRIMARY KEY}
-        - dip_dir:    {name: dip_dir,    type: REAL}
-        - dip_ang:    {name: dip_ang,    type: REAL}
+        - id:         {name: id,         type: INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL}
+        - dip_dir:    {name: dip_dir,    type: REAL NOT NULL}
+        - dip_ang:    {name: dip_ang,    type: REAL NOT NULL}
         - label:      {name: label,      type: TEXT}
         - comments:   {name: comments,   type: TEXT}
-        - creat_time: {name: creat_time, type: DATE}
+        - creat_time: {name: creat_time, type: DATE NOT NULL}
 
     src_pts:
       name: src_points
       fields:
-        - id:         {name: id,         type: INTEGER PRIMARY KEY}
-        - id_sol:     {name: id_sol,     type: INTEGER}
-        - x:          {name: x,          type: real}
-        - y:          {name: y,          type: real}
-        - z:          {name: z,          type: real}
+        - id:         {name: id,         type: INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL}
+        - id_sol:     {name: id_sol,     type: INTEGER NOT NULL}
+        - x:          {name: x,          type: REAL NOT NULL}
+        - y:          {name: y,          type: REAL NOT NULL}
+        - z:          {name: z,          type: REAL NOT NULL}
