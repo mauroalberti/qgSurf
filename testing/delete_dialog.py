@@ -12,12 +12,7 @@
 # warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
 # the GNU General Public License for more details.
 
-import os
-import sys
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtSql import *
+
 import resources
 
 
@@ -45,6 +40,27 @@ from pygsf.mathematics.arrays import xyzSvd
 from pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_query_with_sqlite3
 from pygsf.libs_utils.qt.databases import try_execute_query_with_qt
 
+MAC = "qt_mac_set_native_menubar" in dir()
+
+
+# get relevant fields names
+
+src_db_pth = "/home/mauro/Temp/results/results_10.sqlite3"
+
+sol_tbl_nm = "solutions"
+
+solutions_fields = [('id', 'INTEGER PRIMARY KEY'),
+                    ('dip_dir', 'REAL'),
+                    ('dip_ang', 'REAL'),
+                    ('label', 'TEXT'),
+                    ('comments', 'TEXT'),
+                    ('creat_time', 'DATE')]
+
+id_alias = solutions_fields[0][0]
+
+ID_SOL, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(len(solutions_fields))
+ID_PT, FK_ID_SOL, X, Y, Z = range(5)
+
 
 class MainForm(QDialog):
 
@@ -52,53 +68,177 @@ class MainForm(QDialog):
 
         super().__init__()
 
-        ID, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(len(solutions_fields))
 
-        solutionsModel = QSqlRelationalTableModel(db=db)
-        solutionsModel.setTable(sol_tbl_nm)
+        
+        self.solutionsModel = QSqlRelationalTableModel(db=db)
+        self.solutionsModel.setTable(sol_tbl_nm)
         """
-        solutionsModel.setRelation(
+        self.solutionsModel.setRelation(
             ID,
             QSqlRelation("src_points", "id", "name"))
         """
-        # solutionsModel.setSort(ROOM, Qt.AscendingOrder)
+        # self.solutionsModel.setSort(ROOM, Qt.AscendingOrder)
 
-        solutionsModel.setHeaderData(ID, Qt.Horizontal, QVariant("id"))
-        solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, QVariant("dip direction"))
-        solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, QVariant("dip angle"))
-        solutionsModel.setHeaderData(LABEL, Qt.Horizontal, QVariant("label"))
-        solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, QVariant("comments"))
-        solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, QVariant("created"))
+        self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, QVariant("id"))
+        self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, QVariant("dip direction"))
+        self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, QVariant("dip angle"))
+        self.solutionsModel.setHeaderData(LABEL, Qt.Horizontal, QVariant("label"))
+        self.solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, QVariant("comments"))
+        self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, QVariant("created"))
 
-        solutionsModel.select()
+        self.solutionsModel.select()
 
-        solutionsView = QTableView()
-        solutionsView.setModel(solutionsModel)
-        # solutionsView.setItemDelegate(AssetDelegate(self))
-        solutionsView.setSelectionMode(QTableView.SingleSelection)
-        solutionsView.setSelectionBehavior(QTableView.SelectRows)
-        solutionsView.setColumnHidden(ID, True)
-        solutionsView.resizeColumnsToContents()
-        assetLabel = QLabel("&Solutions")
-        assetLabel.setBuddy(solutionsView)
+        self.solutionsView = QTableView()
+        self.solutionsView.setModel(self.solutionsModel)
+        # self.solutionsView.setItemDelegate(AssetDelegate(self))
+        self.solutionsView.setSelectionMode(QTableView.SingleSelection)
+        self.solutionsView.setSelectionBehavior(QTableView.SelectRows)
+        self.solutionsView.setColumnHidden(ID_SOL, True)
+        self.solutionsView.resizeColumnsToContents()
+        solutionsLabel = QLabel("&Solutions")
+        solutionsLabel.setBuddy(self.solutionsView)
+
+        self.srcptsModel = QSqlTableModel(self)
+        self.srcptsModel.setTable("src_points")
+        """
+        self.srcptsModel.setRelation(ACTIONID,
+                QSqlRelation("actions", "id", "name"))
+        """
+        #self.srcptsModel.setSort(DATE, Qt.AscendingOrder)
+
+        self.srcptsModel.setHeaderData(ID_PT, Qt.Horizontal,
+                QVariant("id"))
+        self.srcptsModel.setHeaderData(FK_ID_SOL, Qt.Horizontal,
+                QVariant("id_sol"))
+        self.srcptsModel.setHeaderData(X, Qt.Horizontal,
+                QVariant("x"))
+        self.srcptsModel.setHeaderData(Y, Qt.Horizontal,
+                QVariant("y"))
+        self.srcptsModel.setHeaderData(Z, Qt.Horizontal,
+                QVariant("z"))
+        self.srcptsModel.select()
+
+        self.srcptsView = QTableView()
+        self.srcptsView.setModel(self.srcptsModel)
+        #self.srcptsView.setItemDelegate(LogDelegate(self))
+        self.srcptsView.setSelectionMode(QTableView.SingleSelection)
+        self.srcptsView.setSelectionBehavior(QTableView.SelectRows)
+        self.srcptsView.setColumnHidden(ID_PT, True)
+        self.srcptsView.setColumnHidden(FK_ID_SOL, True)
+        self.srcptsView.resizeColumnsToContents()
+        self.srcptsView.horizontalHeader().setStretchLastSection(True)
+        srcptsLabel = QLabel("Source &points")
+        srcptsLabel.setBuddy(self.srcptsView)
+
+        dataLayout = QVBoxLayout()
+        dataLayout.addWidget(solutionsLabel)
+        dataLayout.addWidget(self.solutionsView, 1)
+        dataLayout.addWidget(srcptsLabel)
+        dataLayout.addWidget(self.srcptsView)
+
+
+        deleteSolutionButton = QPushButton("&Delete solution")
+        quitButton = QPushButton("&Quit")
+        for button in (deleteSolutionButton,
+                       quitButton):
+            if MAC:
+                button.setDefault(False)
+                button.setAutoDefault(False)
+            else:
+                button.setFocusPolicy(Qt.NoFocus)
+
+        buttonLayout = QVBoxLayout()
+        #buttonLayout.addWidget(addAssetButton)
+        buttonLayout.addWidget(deleteSolutionButton)
+        #buttonLayout.addWidget(addActionButton)
+        #buttonLayout.addWidget(deleteActionButton)
+        #buttonLayout.addWidget(editActionsButton)
+        #buttonLayout.addWidget(editCategoriesButton)
+        buttonLayout.addStretch()
+        buttonLayout.addWidget(quitButton)
+
+        layout = QHBoxLayout()
+        layout.addLayout(dataLayout, 1)
+        layout.addLayout(buttonLayout)
+        self.setLayout(layout)
+
+        self.solutionsView.selectionModel().currentRowChanged.connect(self.solutionChanged)
+
+        """
+        self.connect(addAssetButton, SIGNAL("clicked()"),
+                     self.addAsset)
+        """
+        deleteSolutionButton.clicked.connect(self.deleteSolution)
+        """
+        self.connect(addActionButton, SIGNAL("clicked()"),
+                     self.addAction)
+        self.connect(deleteActionButton, SIGNAL("clicked()"),
+                     self.deleteAction)
+        self.connect(editActionsButton, SIGNAL("clicked()"),
+                     self.editActions)
+        self.connect(editCategoriesButton, SIGNAL("clicked()"),
+                     self.editCategories)
+        """
+        quitButton.clicked.connect(self.done)
+
+        self.solutionChanged(self.solutionsView.currentIndex())
+        self.setMinimumWidth(850)
+        self.setWindowTitle("Solutions Manager")
+
+    def done(self, result=1):
+
+        query = QSqlQuery()
+        query.exec_("DELETE FROM src_points WHERE src_points.id_sol NOT IN"
+                    "(SELECT id FROM solutions)")
+
+        QDialog.done(self, 1)
+
+    def deleteSolution(self):
+
+        index = self.solutionsView.currentIndex()
+        if not index.isValid():
+            return
+        QSqlDatabase.database().transaction()
+        record = self.solutionsModel.record(index.row())
+        solution_id = record.value(ID_SOL) #.toInt()[0]
+        point_records = 1
+        query = QSqlQuery("SELECT COUNT(*) FROM src_points "
+                                  "WHERE id_sol = {}".format(solution_id))
+        if query.next():
+            point_records = query.value(0) #.toInt()[0]
+        msg = "<font color=red>Delete record?</font>"
+        if point_records > 1:
+            msg += ", along with %1 point records".format(point_records)
+        msg += "?"
+        if QMessageBox.question(self, "Delete solution", msg,
+                QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+            QSqlDatabase.database().rollback()
+            return
+        query.exec_("DELETE FROM src_points WHERE id_sol = {}".format(solution_id))
+
+        self.solutionsModel.removeRow(index.row())
+        self.solutionsModel.submitAll()
+        QSqlDatabase.database().commit()
+        self.solutionChanged(self.solutionsView.currentIndex())
+        print("record deleted")
+
+    def solutionChanged(self, index):
+
+        if index.isValid():
+            record = self.solutionsModel.record(index.row())
+            id = record.value("id") #.toInt()[0]
+            self.srcptsModel.setFilter("id_sol = {}".format(id))
+        else:
+            print("Index is not valid")
+            self.srcptsModel.setFilter("id_sol = -1")
+        self.srcptsModel.select()
+        self.srcptsView.horizontalHeader().setVisible(
+                self.srcptsModel.rowCount() > 0)
 
 
 if __name__ == "__main__":
 
-    # get relevant fields names
 
-    src_db_pth = "/home/mauro/Temp/results/results_10.sqlite3"
-
-    sol_tbl_nm = "solutions"
-
-    solutions_fields = [('id', 'INTEGER PRIMARY KEY'),
-                        ('dip_dir', 'REAL'),
-                        ('dip_ang', 'REAL'),
-                        ('label', 'TEXT'),
-                        ('comments', 'TEXT'),
-                        ('creat_time', 'DATE')]
-
-    id_alias = solutions_fields[0][0]
 
 
 
