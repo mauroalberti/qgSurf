@@ -13,16 +13,10 @@
 # the GNU General Public License for more details.
 
 
-import resources
-
-
 from PyQt5.QtCore import *
-from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtSql import *
 from PyQt5.QtSql import QSqlDatabase
-
-#from PyQt5.QtWidgets import QApplication
 
 import sys
 sys.path.append("/home/mauro/Documents/projects/qgSurf/")
@@ -39,6 +33,10 @@ from pygsf.mathematics.arrays import xyzSvd
 
 from pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_query_with_sqlite3
 from pygsf.libs_utils.qt.databases import try_execute_query_with_qt
+
+
+import resources
+
 
 MAC = "qt_mac_set_native_menubar" in dir()
 
@@ -59,19 +57,20 @@ solutions_fields = [('id', 'INTEGER PRIMARY KEY'),
 id_alias = solutions_fields[0][0]
 
 ID_SOL, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(len(solutions_fields))
+
+src_pts_tbl_nm = "src_points"
+
 ID_PT, FK_ID_SOL, X, Y, Z = range(5)
 
 
 class MainForm(QDialog):
 
-    def __init__(self, db, sol_tbl_nm, solutions_fields):
+    def __init__(self, db, solutions_tblnm, srcpts_tblnm):
 
         super().__init__()
 
-
-        
-        self.solutionsModel = QSqlRelationalTableModel(db=db)
-        self.solutionsModel.setTable(sol_tbl_nm)
+        self.solutionsModel = QSqlTableModel(db=db)
+        self.solutionsModel.setTable(solutions_tblnm)
         """
         self.solutionsModel.setRelation(
             ID,
@@ -99,7 +98,7 @@ class MainForm(QDialog):
         solutionsLabel.setBuddy(self.solutionsView)
 
         self.srcptsModel = QSqlTableModel(self)
-        self.srcptsModel.setTable("src_points")
+        self.srcptsModel.setTable(srcpts_tblnm)
         """
         self.srcptsModel.setRelation(ACTIONID,
                 QSqlRelation("actions", "id", "name"))
@@ -135,7 +134,6 @@ class MainForm(QDialog):
         dataLayout.addWidget(self.solutionsView, 1)
         dataLayout.addWidget(srcptsLabel)
         dataLayout.addWidget(self.srcptsView)
-
 
         deleteSolutionButton = QPushButton("&Delete solution")
         quitButton = QPushButton("&Quit")
@@ -188,39 +186,53 @@ class MainForm(QDialog):
     def done(self, result=1):
 
         query = QSqlQuery()
-        query.exec_("DELETE FROM src_points WHERE src_points.id_sol NOT IN"
-                    "(SELECT id FROM solutions)")
+        query.exec_("DELETE FROM {0} WHERE {0}.id_sol NOT IN"
+                    "(SELECT id FROM {1})".format(
+            src_pts_tbl_nm,
+            sol_tbl_nm))
 
         QDialog.done(self, 1)
 
     def deleteSolution(self):
 
+        self.solutionsView.setSortingEnabled(False)
+        self.solutionsModel.beginResetModel()
+
         index = self.solutionsView.currentIndex()
         if not index.isValid():
+            print("Index for solution deletion is not valid")
             return
         QSqlDatabase.database().transaction()
         record = self.solutionsModel.record(index.row())
-        solution_id = record.value(ID_SOL) #.toInt()[0]
+        solution_id = record.value(ID_SOL)  #.toInt()[0]
         point_records = 1
-        query = QSqlQuery("SELECT COUNT(*) FROM src_points "
-                                  "WHERE id_sol = {}".format(solution_id))
+        query = QSqlQuery("SELECT COUNT(*) FROM {} "
+                          "WHERE id_sol = {}".format(
+            src_pts_tbl_nm,
+            solution_id))
         if query.next():
             point_records = query.value(0) #.toInt()[0]
-        msg = "<font color=red>Delete record?</font>"
+            print("There is/are {} source point(s) to delete for solution id {}".format(
+                point_records,
+                solution_id))
+        msg = "<font color=red>Delete record {}</font>".format(solution_id)
         if point_records > 1:
-            msg += ", along with %1 point records".format(point_records)
+            msg += ", along with {} point records".format(point_records)
         msg += "?"
         if QMessageBox.question(self, "Delete solution", msg,
                 QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
             QSqlDatabase.database().rollback()
             return
-        query.exec_("DELETE FROM src_points WHERE id_sol = {}".format(solution_id))
-
+        query.exec_("DELETE FROM {} WHERE id_sol = {}".format(
+            src_pts_tbl_nm,
+            solution_id))
         self.solutionsModel.removeRow(index.row())
         self.solutionsModel.submitAll()
         QSqlDatabase.database().commit()
+        self.solutionsModel.endResetModel()
+        self.solutionsView.setSortingEnabled(True)
+        self.solutionsView.repaint()
         self.solutionChanged(self.solutionsView.currentIndex())
-        print("record deleted")
 
     def solutionChanged(self, index):
 
@@ -229,8 +241,8 @@ class MainForm(QDialog):
             id = record.value("id") #.toInt()[0]
             self.srcptsModel.setFilter("id_sol = {}".format(id))
         else:
-            print("Index is not valid")
             self.srcptsModel.setFilter("id_sol = -1")
+        #self.srcptsModel.reset()
         self.srcptsModel.select()
         self.srcptsView.horizontalHeader().setVisible(
                 self.srcptsModel.rowCount() > 0)
@@ -238,17 +250,11 @@ class MainForm(QDialog):
 
 if __name__ == "__main__":
 
-
-
-
-
-    #
-
     app = QApplication(sys.argv)
 
     success, msg = try_connect_to_sqlite3_db_with_qt(
         db_path=src_db_pth,
-        conn_type="readonly")
+        conn_type="readwrite")
 
     if not success:
         print("Error: {}".format(msg))
@@ -258,8 +264,8 @@ if __name__ == "__main__":
 
     form = MainForm(
         db=db,
-        sol_tbl_nm=sol_tbl_nm,
-        solutions_fields=solutions_fields
+        solutions_tblnm=sol_tbl_nm,
+        srcpts_tblnm=src_pts_tbl_nm
     )
     form.show()
 
