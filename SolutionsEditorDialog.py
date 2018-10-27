@@ -12,17 +12,14 @@
 # warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
 # the GNU General Public License for more details.
 
+import sys
 
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtSql import *
 from PyQt5.QtSql import QSqlDatabase
 
-import sys
-
-sys.path.append("/home/mauro/Documents/projects/qgSurf/")
-
-from pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt
+from .pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt
 
 MAC = "qt_mac_set_native_menubar" in dir()
 
