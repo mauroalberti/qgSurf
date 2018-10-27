@@ -39,7 +39,7 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtSql import *
-#from PyQt5.QtSql import QSqlDatabase
+from PyQt5.QtSql import QSqlDatabase
 from qgis.PyQt.uic import loadUi
 
 from qgis.core import *
@@ -62,6 +62,9 @@ from .pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_q
 from .pygsf.libs_utils.qt.databases import try_execute_query_with_qt
 
 bfp_texts_flnm = "texts.yaml"
+
+ID_SOL, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(6)
+ID_PT, FK_ID_SOL, X, Y, Z = range(5)
 
 
 def get_field_dict(key_val, flds_dicts):
@@ -516,7 +519,7 @@ class BestFitPlaneMainWidget(QWidget):
             QMessageBox.critical(
                 self,
                 self.tool_nm,
-                "Database not defined")
+                "Working database not defined in Configurations tab")
             return
 
         success, msg = try_connect_to_sqlite3_db_with_qt(db_path)
@@ -1004,35 +1007,39 @@ class StoredResultsTableDialog(QDialog):
         self.xprt_shapefile_pth = xprt_shapefile_pth
 
         pars = parse_db_params(db_tables_params)
-        self.sol_tbl_nm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
+        self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
 
-        self.table_model = QSqlTableModel(db=QSqlDatabase.database())
-        self.table_model.setTable(self.sol_tbl_nm)
-        self.table_model.select()
-        self.table_model.setHeaderData(0, Qt.Horizontal, "id")
-        self.table_model.setHeaderData(1, Qt.Horizontal, "dip direction")
-        self.table_model.setHeaderData(2, Qt.Horizontal, "dip angle")
-        self.table_model.setHeaderData(3, Qt.Horizontal, "label")
-        self.table_model.setHeaderData(4, Qt.Horizontal, "comments")
-        self.table_model.setHeaderData(5, Qt.Horizontal, "created")
+        self.solutionsModel = QSqlTableModel(db=QSqlDatabase.database())
+        self.solutionsModel.setTable(self.solutions_tblnm)
 
+        self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
+        self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
+        self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
+        self.solutionsModel.setHeaderData(LABEL, Qt.Horizontal, "label")
+        self.solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, "comments")
+        self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
+
+        self.solutionsModel.select()
+
+        """
         proxy_model = QSortFilterProxyModel()
-        proxy_model.setSourceModel(self.table_model)
+        proxy_model.setSourceModel(self.solutionsModel)
+        """
 
-        self.view = QTableView()
-        self.view.setModel(proxy_model)
+        self.solutionsView = QTableView()
+        self.solutionsView.setModel(self.solutionsModel)
+        self.solutionsView.setSelectionMode(QTableView.MultiSelection)
+        self.solutionsView.setSelectionBehavior(QTableView.SelectRows)
+        self.solutionsView.verticalHeader().hide()
+        self.solutionsView.resizeColumnsToContents()
 
-        self.view.verticalHeader().hide()
-        self.view.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.solutionsView.resizeRowsToContents()
+        self.solutionsView.setSortingEnabled(True)
 
-        self.selection_model = self.view.selectionModel()
-
-        self.view.resizeRowsToContents()
-        self.view.setSortingEnabled(True)
+        self.selection_model = self.solutionsView.selectionModel()
 
         layout = QVBoxLayout()
-
-        layout.addWidget(self.view)
+        layout.addWidget(self.solutionsView)
 
         plot_selected_recs = QPushButton("Plot selected records")
         plot_selected_recs.clicked.connect(self.plot_selected_records)
@@ -1042,7 +1049,7 @@ class StoredResultsTableDialog(QDialog):
         delete_selected_recs.clicked.connect(self.delete_selected_records)
         layout.addWidget(delete_selected_recs)
 
-        xprt_selected_recs = QPushButton("Export selected records to shapefile")
+        xprt_selected_recs = QPushButton("Export selected records")
         xprt_selected_recs.clicked.connect(self.xprt_selected_records_to_shapefile)
         layout.addWidget(xprt_selected_recs)
 
@@ -1068,11 +1075,11 @@ class StoredResultsTableDialog(QDialog):
 
         if not selected_ids:
             qry = "SELECT {}, {} FROM {}".format(
-                dip_dir_alias, dip_ang_alias, self.sol_tbl_nm)
+                dip_dir_alias, dip_ang_alias, self.solutions_tblnm)
         else:
             selected_ids_string = ",".join(map(str, selected_ids))
             qry = "SELECT {}, {} FROM {} WHERE {} IN ({})".format(
-                dip_dir_alias, dip_ang_alias, self.sol_tbl_nm, id_alias, selected_ids_string)
+                dip_dir_alias, dip_ang_alias, self.solutions_tblnm, id_alias, selected_ids_string)
 
         # query the database
 
@@ -1106,79 +1113,42 @@ class StoredResultsTableDialog(QDialog):
 
     def delete_selected_records(self):
 
-        # get relevant fields names
-
-        id_alias = self.sol_tbl_flds[0]["id"]["name"]
-
-        # get selected records attitudes
-
+        indices = self.solutionsView.selectedIndexes()
         selected_ids = get_selected_recs_ids(self.selection_model)
+
+        num_sel_recs = len(selected_ids)
+        if num_sel_recs == 0:
+            QMessageBox.warning(
+                self,
+                "Delete records",
+                "No selected records")
+            return
+        else:
+            msg = "<font color=red>Delete {} record(s)?</font>".format(num_sel_recs)
+            if QMessageBox.question(self, "Delete solution", msg,
+                    QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+                return
+
+        self.solutionsView.setSortingEnabled(False)
+        self.solutionsModel.beginResetModel()
 
         # create query string
 
-        if not selected_ids:
-            QMessageBox.warning(
-                self,
-                self.tool_nm,
-                "No record selected")
-            return
-
         selected_ids_string = ",".join(map(str, selected_ids))
-
-        qry = "DELETE FROM {} WHERE {} IN ({})".format(
-            self.sol_tbl_nm,
-            id_alias,
-            selected_ids_string)
-
-        success, msg = try_execute_query_with_qt(qry)
-
-        if not success:
-            QMessageBox.critical(
-                self,
-                self.tool_nm,
-                "Unable to delete solution records: {}".format(msg))
-            return
-        else:
-            self.table_model.dataChanged.emit(
-                self.table_model.createIndex(0, 0),
-                self.table_model.createIndex(self.table_model.rowCount() - 1, self.table_model.columnCount() - 1),
-                [])
-            QMessageBox.information(
-                self,
-                self.tool_nm,
-                "Emitted")
-
-            """
-            # from: https://stackoverflow.com/questions/12893904/automatically-refreshing-a-qtableview-when-data-changed
-            QModelIndex topLeft = index(0, 0);
-            QModelIndex bottomRight = index(rowCount() - 1, columnCount() - 1);
-
-            emit dataChanged(topLeft, bottomRight);
-            emit layoutChanged();
-
-            self.table_model.rowCount() - 1, self.table_model.columnCount() - 1
-            """
-            """
-            self.dataChanged.emit(QModelIndex, QModelIndex, [])"""
-            """
-            void QAbstractItemModel::dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles = ...)"""
-
-        sol_id_fk_alias = self.pts_tbl_flds[1]["id_sol"]["name"]
-
-        qry = "DELETE FROM {} WHERE {} IN ({})".format(
+        query = QSqlQuery(db=QSqlDatabase.database())
+        query.exec_("DELETE FROM {} WHERE id_sol IN ({})".format(
             self.pts_tbl_nm,
-            sol_id_fk_alias,
-            selected_ids_string)
+            selected_ids_string))
+        for index in indices:
+            self.solutionsModel.removeRow(index.row())
 
-        success, msg = try_execute_query_with_qt(qry)
+        self.solutionsModel.submitAll()
+        QSqlDatabase.database().commit()
 
-        if not success:
-            QMessageBox.critical(
-                self,
-                self.tool_nm,
-                "Unable to delete location records: {}".format(msg))
-            return
+        self.solutionsModel.endResetModel()
 
+        self.solutionsView.setSortingEnabled(True)
+        self.solutionsView.repaint()
 
     def xprt_selected_records_to_shapefile(self):
 
@@ -1213,12 +1183,12 @@ class StoredResultsTableDialog(QDialog):
         sol_id_fk_alias = self.pts_tbl_flds[1]["id_sol"]["name"]
 
         if not selected_ids:
-            qry_solutions = "SELECT * FROM {}".format(self.sol_tbl_nm)
+            qry_solutions = "SELECT * FROM {}".format(self.solutions_tblnm)
             qry_points = "SELECT * FROM {}".format(self.pts_tbl_nm)
         else:
             selected_ids_string = ",".join(map(str, selected_ids))
             qry_solutions = "SELECT * FROM {} WHERE {} IN ({})".format(
-                self.sol_tbl_nm,
+                self.solutions_tblnm,
                 id_alias,
                 selected_ids_string)
             qry_points = "SELECT * FROM {} WHERE {} IN ({})".format(
