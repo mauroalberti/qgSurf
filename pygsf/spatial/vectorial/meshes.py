@@ -565,10 +565,10 @@ def try_geosurface_export_shapefile_pt3d(shapefile_path, geodata, fields_dict_li
     :return:
     """
 
-    point_shapefile, point_shapelayer = shapefile_create(shapefile_path,
-                                                         ogr.wkbPoint25D,
-                                                         fields_dict_list,
-                                                         crs)
+    shapefile_create(shapefile_path,
+         ogr.wkbPoint25D,
+         fields_dict_list,
+         crs)
 
     field_list = [field_dict["name"] for field_dict in fields_dict_list]
 
@@ -579,6 +579,6 @@ def try_geosurface_export_shapefile_pt3d(shapefile_path, geodata, fields_dict_li
     ids = range(len(X))
 
     rec_values_list2 = zip(ids, X, Y, Z)
-    success, msg = try_write_point_results(point_shapelayer, field_list, rec_values_list2)
+    success, msg = try_write_point_results(shapefile_path, field_list, rec_values_list2)
 
     return success, msg
