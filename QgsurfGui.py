@@ -59,9 +59,10 @@ class QgsurfGui(object):
             self.config_fldrpth,
             plugin_params_flnm)
 
-        plugin_params = read_yaml(plugin_config_file)
-        self.version = plugin_params["version"]
-        self.tools = plugin_params["tools"]
+        dPluginParams = read_yaml(plugin_config_file)
+
+        self.version = dPluginParams["version"]
+        self.tools = dPluginParams["tools"]
 
         self.bestfitplane_toolpars = self.tools["bestfitplane_tool_params"]
         self.demplaneinters_toolpars = self.tools["demplaneinters_tool_params"]

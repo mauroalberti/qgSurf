@@ -23,6 +23,21 @@
  ***************************************************************************/
 """
 
+# The "delete_selected_records" method of class "StoredResultsTableDialog"
+# contains code modified from (chp. 15) assetmanager.pyw by Summerfield
+
+#!/usr/bin/env python
+# Copyright (c) 2007-8 Qtrac Ltd. All rights reserved.
+# This program or module is free software: you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published
+# by the Free Software Foundation, either version 2 of the License, or
+# version 3 of the License, or (at your option) any later version. It is
+# provided for educational purposes and is distributed in the hope that
+# it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+# the GNU General Public License for more details.
+
+
 # -*- coding: utf-8 -*-
 
 from __future__ import absolute_import
@@ -46,11 +61,11 @@ from qgis.core import *
 from qgis.gui import *
 
 from .base_params import *
+from .db_queries.queries import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
 from .pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt, get_selected_recs_ids
-from .pygsf.libs_utils.gdal.exceptions import OGRIOException
-from .pygsf.libs_utils.gdal.ogr import shapefile_create
+from .pygsf.libs_utils.gdal.ogr import try_open_shapefile, shapefile_create, try_write_point_results
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
 from .pygsf.libs_utils.qgis.qgs_tools import *
 from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
@@ -65,6 +80,16 @@ bfp_texts_flnm = "texts.yaml"
 
 ID_SOL, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(6)
 ID_PT, FK_ID_SOL, X, Y, Z = range(5)
+
+plugin_folder = os.path.dirname(__file__)
+
+config_fldrpth = os.path.join(
+    plugin_folder,
+    config_fldr)
+
+bfp_text_config_file = os.path.join(
+    config_fldrpth,
+    bfp_texts_flnm)
 
 
 def get_field_dict(key_val, flds_dicts):
@@ -97,23 +122,16 @@ def parse_db_params(sqlite_params):
         src_points_tbl_flds)
 
 
-"""
-def create_inner_table(cursor, tbl_nm, tbl_flds):
+def get_out_shape_params():
 
-    cursor.execute('''DROP TABLE IF EXISTS {tbl_nm}'''.format(tbl_nm=tbl_nm))
+    output_shapefile_params_file = os.path.join(
+        config_fldrpth,
+        output_shapefile_params_flnm)
 
-    flds_parts = []
-    for dct in tbl_flds:
-        fld_ident = list(dct.keys())[0]
-        flds_parts.append("{} {}".format(dct[fld_ident]["name"], dct[fld_ident]["type"]))
-    flds_string = ", ".join(flds_parts)
+    plugin_params = read_yaml(output_shapefile_params_file)
 
-    query_string = '''CREATE TABLE {tbl_nm} ({flds})'''.format(
-        tbl_nm=tbl_nm,
-        flds=flds_string)
+    return plugin_params["pt_shapefile"]
 
-    cursor.execute(query_string)
-"""
 
 def remove_equal_consecutive_xypairs(xy_list):
     out_xy_list = [xy_list[0]]
@@ -139,52 +157,6 @@ def list3_to_list(list3):
     return out_list
 
 
-def open_shapefile(path):
-
-    driver = ogr.GetDriverByName("ESRI Shapefile")
-
-    dataSource = driver.Open(str(path), 1)
-
-    if dataSource is None:
-        raise OGRIOException('Unable to open shapefile in provided path')
-
-    shapelayer = dataSource.GetLayer()
-
-    return shapelayer
-
-
-def write_point_result(point_shapefile, point_shapelayer, recs_list2):
-
-    outshape_featdef = point_shapelayer.GetLayerDefn()
-
-    for curr_Pt in recs_list2:
-
-        # pre-processing for new feature in output layer
-        curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
-        curr_Pt_geom.AddPoint(curr_Pt[1], curr_Pt[2], curr_Pt[3])
-
-        # create a new feature
-        curr_Pt_shape = ogr.Feature(outshape_featdef)
-        curr_Pt_shape.SetGeometry(curr_Pt_geom)
-        curr_Pt_shape.SetField('id', curr_Pt[0])
-
-        curr_Pt_shape.SetField('x', curr_Pt[1])
-        curr_Pt_shape.SetField('y', curr_Pt[2])
-        curr_Pt_shape.SetField('z', curr_Pt[3])
-
-        curr_Pt_shape.SetField('dip_dir', curr_Pt[4])
-        curr_Pt_shape.SetField('dip_ang', curr_Pt[5])
-
-        curr_Pt_shape.SetField('descript', curr_Pt[6])
-
-        # add the feature to the output layer
-        point_shapelayer.CreateFeature(curr_Pt_shape)
-
-        # destroy no longer used objects
-        curr_Pt_geom.Destroy();
-        curr_Pt_shape.Destroy()
-
-
 class BestFitPlaneMainWidget(QWidget):
 
     bfp_calc_update = pyqtSignal()
@@ -195,7 +167,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         self.tool_nm = tool_nm
         self.canvas, self.plugin = canvas, plugin_qaction
-        self.plugin_folder = os.path.dirname(__file__)
+
         self.db_tables_params = db_tables_params
         self.init_params()
 
@@ -206,14 +178,6 @@ class BestFitPlaneMainWidget(QWidget):
         self.db_tables_params = db_tables_params
 
     def init_params(self):
-
-        self.config_fldrpth = os.path.join(
-            self.plugin_folder,
-            config_fldr)
-
-        bfp_text_config_file = os.path.join(
-            self.config_fldrpth,
-            bfp_texts_flnm)
 
         texts_params = read_yaml(bfp_text_config_file)
         self.dem_default_text = texts_params["dem_default_text"]
@@ -370,7 +334,7 @@ class BestFitPlaneMainWidget(QWidget):
 
     def setup_results_tableview(self):
 
-        group_box = QGroupBox(self.tr("Database (sqlite3)"))
+        group_box = QGroupBox(self.tr("Database for result storage (sqlite3)"))
 
         layout = QGridLayout()
 
@@ -432,9 +396,6 @@ class BestFitPlaneMainWidget(QWidget):
         if not db_path:
             return
 
-        # pars = parse_db_params(self.db_tables_params)
-        # sol_tbl_nm, sol_tbl_flds, pts_tbl_nm, pts_tbl_flds = pars
-
         tables = self.db_tables_params["tables"]
 
         solutions_pars = tables["solutions"]
@@ -466,7 +427,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         def check_table_presence(table_nm):
 
-            check_query_str = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{table_name}'".format(
+            check_query_str = check_query_template.format(
                 table_name=table_nm)
 
             curs.execute(check_query_str)
@@ -532,6 +493,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         table_result_dialog = StoredResultsTableDialog(
             tool_nm=self.tool_nm,
+            db_path=db_path,
             db_tables_params=self.db_tables_params,
             xprt_shapefile_pth=self.result_shapefile.text())
 
@@ -868,14 +830,10 @@ class BestFitPlaneMainWidget(QWidget):
                 "No path provided")
             return
 
-        output_shapefile_params_file = os.path.join(
-            self.config_fldrpth,
-            output_shapefile_params_flnm)
+        shape_pars = get_out_shape_params()
 
-        plugin_params = read_yaml(output_shapefile_params_file)
-
-        shape_pars = plugin_params["pt_shapefile"]
         projectCrs = self.canvas.mapSettings().destinationCrs()
+
         shapefile_create(
             path=point_shapefile_path,
             geom_type=ogr.wkbPoint,
@@ -888,7 +846,6 @@ class BestFitPlaneMainWidget(QWidget):
         
         dialog = PrevShapeFilesDialog(self)
 
-        # update_point_shape, update_polygon_shape = False, False
         if dialog.exec_():
             point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
         else:
@@ -961,7 +918,7 @@ class SolutionStereonetDialog(QDialog):
 
             id_fld_alias = get_field_dict('id', sol_tbl_flds)["name"]
             creat_time_alias = get_field_dict('creat_time', sol_tbl_flds)["name"]
-            query_sol_id = "select {id} from {solutions} where {creat_time} = (select MAX({creat_time}) from {solutions})".format(
+            query_sol_id = query_sol_id_template.format(
                 id=id_fld_alias,
                 creat_time=creat_time_alias,
                 solutions=sol_tbl_nm)
@@ -999,11 +956,12 @@ class SolutionNotesDialog(QDialog):
 
 class StoredResultsTableDialog(QDialog):
 
-    def __init__(self, tool_nm, db_tables_params, xprt_shapefile_pth):
+    def __init__(self, tool_nm, db_path, db_tables_params, xprt_shapefile_pth):
 
         super().__init__()
 
         self.tool_nm = tool_nm
+        self.db_path = db_path
         self.xprt_shapefile_pth = xprt_shapefile_pth
 
         pars = parse_db_params(db_tables_params)
@@ -1020,11 +978,6 @@ class StoredResultsTableDialog(QDialog):
         self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
 
         self.solutionsModel.select()
-
-        """
-        proxy_model = QSortFilterProxyModel()
-        proxy_model.setSourceModel(self.solutionsModel)
-        """
 
         self.solutionsView = QTableView()
         self.solutionsView.setModel(self.solutionsModel)
@@ -1074,11 +1027,13 @@ class StoredResultsTableDialog(QDialog):
         # create query string
 
         if not selected_ids:
-            qry = "SELECT {}, {} FROM {}".format(
-                dip_dir_alias, dip_ang_alias, self.solutions_tblnm)
+            qry = query_solutions_all_template.format(
+                dip_dir_alias,
+                dip_ang_alias,
+                self.solutions_tblnm)
         else:
             selected_ids_string = ",".join(map(str, selected_ids))
-            qry = "SELECT {}, {} FROM {} WHERE {} IN ({})".format(
+            qry = query_solutions_selection_template.format(
                 dip_dir_alias, dip_ang_alias, self.solutions_tblnm, id_alias, selected_ids_string)
 
         # query the database
@@ -1113,8 +1068,13 @@ class StoredResultsTableDialog(QDialog):
 
     def delete_selected_records(self):
 
-        indices = self.solutionsView.selectedIndexes()
         selected_ids = get_selected_recs_ids(self.selection_model)
+        if not selected_ids:
+            QMessageBox.warning(
+                self,
+                "Delete records",
+                "No selected records")
+            return
 
         num_sel_recs = len(selected_ids)
         if num_sel_recs == 0:
@@ -1139,7 +1099,7 @@ class StoredResultsTableDialog(QDialog):
         query.exec_("DELETE FROM {} WHERE id_sol IN ({})".format(
             self.pts_tbl_nm,
             selected_ids_string))
-        for index in indices:
+        for index in self.solutionsView.selectedIndexes():
             self.solutionsModel.removeRow(index.row())
 
         self.solutionsModel.submitAll()
@@ -1152,26 +1112,17 @@ class StoredResultsTableDialog(QDialog):
 
     def xprt_selected_records_to_shapefile(self):
 
-        print("start of export")
+        # get the user-defined shapefile
+
         point_shapefile_path = self.xprt_shapefile_pth
         if point_shapefile_path == "":
-            QMessageBox.critical(self,
-                                 "Point shapefile",
-                                 "No shapefile path provided in Configuration")
-            return
-
-        try:
-
-            shapelayer = open_shapefile(
-                point_shapefile_path)
-
-        except OGRIOException:
-
             QMessageBox.critical(
                 self,
                 "Point shapefile",
-                "Shapefile cannot be edited")
+                "No shapefile path provided in Configuration")
             return
+        else:
+            pass
 
         # get selected records attitudes
 
@@ -1180,26 +1131,19 @@ class StoredResultsTableDialog(QDialog):
         # create query string
 
         id_alias = self.sol_tbl_flds[0]["id"]["name"]
-        sol_id_fk_alias = self.pts_tbl_flds[1]["id_sol"]["name"]
 
         if not selected_ids:
-            qry_solutions = "SELECT * FROM {}".format(self.solutions_tblnm)
-            qry_points = "SELECT * FROM {}".format(self.pts_tbl_nm)
+            qry_solutions = select_results_for_shapefile_query
         else:
             selected_ids_string = ",".join(map(str, selected_ids))
-            qry_solutions = "SELECT * FROM {} WHERE {} IN ({})".format(
-                self.solutions_tblnm,
+            qry_solutions = select_results_for_shapefile_query + generic_where_in_template.format(
                 id_alias,
-                selected_ids_string)
-            qry_points = "SELECT * FROM {} WHERE {} IN ({})".format(
-                self.pts_tbl_nm,
-                sol_id_fk_alias,
                 selected_ids_string)
 
         # query the database
 
         success, solutions = try_execute_query_with_sqlite3(
-            db=self.db,
+            db_path=self.db_path,
             query=qry_solutions)
         if not success:
             QMessageBox.critical(
@@ -1207,30 +1151,25 @@ class StoredResultsTableDialog(QDialog):
                 self.tool_nm,
                 solutions)
             return
-        print(solutions)
-        success, points = try_execute_query_with_sqlite3(
-            db=self.db,
-            query=qry_points)
-        if not success:
-            QMessageBox.critical(
-                self,
-                self.tool_nm,
-                points)
-            return
-        print(points)
 
-        #TODO: CONTINUE FROM HERE
-        # if self.update_point_shape:          
-        write_point_result(out_point_shapefile, out_point_shapelayer, solution_list)
+        shape_pars = get_out_shape_params()
+        fld_nms = list(map(lambda par: par["name"], shape_pars))
 
-        try:
-            out_point_shapefile.Destroy()
-            QMessageBox.information(self, 
-                                  self.tr("Results"), 
-                                  self.tr("Results saved in shapefile.<br />Now you can load it"))            
+        success, msg = try_write_point_results(
+            path=point_shapefile_path,
+            field_names=fld_nms,
+            values=solutions)
 
-        except:
-            pass
+        if success:
+            msg_type = QMessageBox.information
+            msg = "Results saved in shapefile.<br />Now you can load it"
+        else:
+            msg_type = QMessageBox.error
+
+        msg_type(
+            self,
+            self.tool_nm,
+            msg)
 
 
 class SelectedSolutionsStereonetDialog(QDialog):
@@ -1268,6 +1207,7 @@ class SelectedSolutionsStereonetDialog(QDialog):
 class NewShapeFilesDialog(QDialog):
 
     def __init__(self, parent=None):
+
         super(NewShapeFilesDialog, self).__init__(parent)
 
         self.output_point_shape_QLineEdit = QLineEdit()

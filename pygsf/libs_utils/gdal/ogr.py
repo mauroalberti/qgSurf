@@ -1,14 +1,26 @@
 # -*- coding: utf-8 -*-
 
-
 import os
+from typing import Dict, Tuple, Union, List
 
 from osgeo import ogr, osr
 
 from .exceptions import *
 
 
-def read_line_shapefile_via_ogr(line_shp_path):
+def try_open_shapefile(path: str) -> Tuple[bool, Union["OGRLayer", str]]:
+
+    dataSource = ogr.Open(path)
+
+    if dataSource is None:
+        return False, "Unable to open shapefile in provided path"
+
+    shapelayer = dataSource.GetLayer()
+
+    return True, shapelayer
+
+
+def read_line_shapefile_via_ogr(line_shp_path: str) -> Dict:
     """
     Read line shapefile using OGR.
 
@@ -166,6 +178,71 @@ def shapefile_create(path, geom_type, fields_dict_list, crs=None):
     return outShapefile, outShapelayer
 
 
+def try_write_point_results(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
+    """
+    Add point records in an existing shapefile, filling attribute values.
+    It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
+
+    :param path: the path of the existing shapefile in which to write.
+    :type path: string.
+    :param field_names: the field names of the attribute table.
+    :type field_names: list of strings.
+    :param values: the values for each record.
+    :type values: list of tuple.
+    :return: success status and related messages.
+    :rtype: tuple of a boolean and a string.
+    """
+
+    success = False
+    msg = ""
+
+    try:
+
+        dataSource = ogr.Open(path, 1)
+
+        if dataSource is None:
+            return False, "Unable to open shapefile in provided path"
+
+        point_layer = dataSource.GetLayer()
+
+        outshape_featdef = point_layer.GetLayerDefn()
+
+        for ndx, pt_vals in enumerate(values):
+
+            # pre-processing for new feature in output layer
+            curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
+            curr_Pt_geom.AddPoint(pt_vals[0], pt_vals[1], pt_vals[2])
+
+            # create a new feature
+            curr_Pt_shape = ogr.Feature(outshape_featdef)
+            curr_Pt_shape.SetGeometry(curr_Pt_geom)
+
+            for ndx, fld_nm in enumerate(field_names):
+
+                curr_Pt_shape.SetField(fld_nm, pt_vals[ndx])
+
+            # add the feature to the output layer
+            point_layer.CreateFeature(curr_Pt_shape)
+
+            # destroy no longer used objects
+            curr_Pt_geom.Destroy()
+            curr_Pt_shape.Destroy()
+
+        del outshape_featdef
+        del point_layer
+        del dataSource
+
+        success = True
+
+    except Exception as e:
+
+        msg = e
+
+    finally:
+
+        return success, msg
+
+
 def ogr_get_solution_shapefile(path, fields_dict_list):
     """
 
@@ -204,41 +281,3 @@ def ogr_get_solution_shapefile(path, fields_dict_list):
 
     outShapefile, outShapelayer = shapefile_create(path, ogr.wkbPoint25D, fields_dict_list, crs=None)
     return outShapefile, outShapelayer, prev_solution_list
-
-
-def ogr_write_point_result(point_shapelayer, field_list, rec_values_list2, geom_type=ogr.wkbPoint25D):
-    """
-
-    :param point_shapelayer:
-    :param field_list:
-    :param rec_values_list2:
-    :param geom_type:
-    :return:
-    """
-
-    outshape_featdef = point_shapelayer.GetLayerDefn()
-
-    for rec_value_list in rec_values_list2:
-
-        # pre-processing for new feature in output layer
-        curr_Pt_geom = ogr.Geometry(geom_type)
-        if geom_type == ogr.wkbPoint25D:
-            curr_Pt_geom.AddPoint(rec_value_list[1], rec_value_list[2], rec_value_list[3])
-        else:
-            curr_Pt_geom.AddPoint(rec_value_list[1], rec_value_list[2])
-
-        # create a new feature
-        curr_Pt_shape = ogr.Feature(outshape_featdef)
-        curr_Pt_shape.SetGeometry(curr_Pt_geom)
-
-        for fld_name, fld_value in zip(field_list, rec_value_list):
-            curr_Pt_shape.SetField(fld_name, fld_value)
-
-        # add the feature to the output layer
-        point_shapelayer.CreateFeature(curr_Pt_shape)
-
-        # destroy no longer used objects
-        curr_Pt_geom.Destroy()
-        curr_Pt_shape.Destroy()
-
-
