@@ -23,3 +23,22 @@ FROM solutions
 INNER JOIN src_points
 ON solutions.id = src_points.id_sol
 """
+
+select_all_solutions_ids = """
+SELECT id
+FROM solutions
+ORDER BY id ASC
+"""
+
+select_solution_pars_template = """
+SELECT dip_dir, dip_ang, label, comments, creat_time
+FROM solutions
+WHERE id = {}
+"""
+
+select_sol_pts_pars_template = """
+SELECT x, y, z
+FROM src_points
+WHERE id_sol = {}
+ORDER BY id
+"""

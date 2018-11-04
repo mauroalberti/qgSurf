@@ -313,29 +313,6 @@ class BestFitPlaneMainWidget(QWidget):
 
         return main_groupbox
 
-    """
-    def setup_results_export(self):
-        
-        group_box = QGroupBox(self.tr("Export shapefile"))
-        
-        layout = QGridLayout()
-
-        self.result_shapefile = QLineEdit()
-        layout.addWidget(self.result_shapefile, 0, 0, 1, 2)
-
-        self.use_shapefile_pButton = QPushButton("Load existing shapefile")
-        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
-        layout.addWidget(self.use_shapefile_pButton, 1, 0, 1, 2)
-
-        self.create_shapefile_pButton = QPushButton("Create result shapefile")
-        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
-        layout.addWidget(self.create_shapefile_pButton, 2, 0, 1, 2)
-
-        group_box.setLayout(layout)
-                 
-        return group_box
-    """
-
     def setup_results_tableview(self):
 
         group_box = QGroupBox(self.tr("Database for result storage (sqlite3)"))
@@ -539,11 +516,9 @@ class BestFitPlaneMainWidget(QWidget):
             self.bestfitplane_PointMapTool.canvasClicked.disconnect(self.set_bfp_input_point)
         except:
             pass
-        
-        #self.update_crs_settings()
-                      
-        self.bestfitplane_PointMapTool = PointMapToolEmitPoint(self.canvas, self.plugin) # mouse listener
-        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
+
+        self.bestfitplane_PointMapTool = PointMapToolEmitPoint(self.canvas, self.plugin)  # mouse listener
+        self.previousTool = self.canvas.mapTool()  # save the standard map tool for restoring it at the end
         self.bestfitplane_PointMapTool.canvasClicked.connect(self.set_bfp_input_point)
         self.bestfitplane_PointMapTool.setCursor(Qt.CrossCursor)        
         self.canvas.setMapTool(self.bestfitplane_PointMapTool)
@@ -751,8 +726,6 @@ class BestFitPlaneMainWidget(QWidget):
 
         self.bestfitplane_calculate_pButton.setEnabled(state)
 
-        #self.update_save_solution_state()
-
     def calculate_bestfitplane(self):        
 
         xyz_list = self.bestfitplane_points        
@@ -773,8 +746,6 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane = normal_direct.normPlane()
         
         self.view_in_stereonet()
-
-        #self.update_save_solution_state()
 
     def disable_points_definition(self):
         
@@ -1102,27 +1073,57 @@ class StoredResultsTableDialog(QDialog):
 
         # create query string
 
-        id_alias = self.sol_tbl_flds[0]["id"]["name"]
+        if export_file_type == "pt_shp":
 
-        if not selected_ids:
-            qry_solutions = select_results_for_shapefile_query
-        else:
-            selected_ids_string = ",".join(map(str, selected_ids))
-            qry_solutions = select_results_for_shapefile_query + generic_where_in_template.format(
-                id_alias,
-                selected_ids_string)
+            id_alias = self.sol_tbl_flds[0]["id"]["name"]
 
-        # query the database
+            if not selected_ids:
+                qry_solutions = select_results_for_shapefile_query
+            else:
+                selected_ids_string = ",".join(map(str, selected_ids))
+                qry_solutions = select_results_for_shapefile_query + generic_where_in_template.format(
+                    id_alias,
+                    selected_ids_string)
 
-        success, solutions = try_execute_query_with_sqlite3(
-            db_path=self.db_path,
-            query=qry_solutions)
-        if not success:
-            QMessageBox.critical(
-                self,
-                self.tool_nm,
-                solutions)
-            return
+            # query the database
+
+            success, solutions = try_execute_query_with_sqlite3(
+                db_path=self.db_path,
+                query=qry_solutions)
+            if not success:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    solutions)
+                return
+
+        elif export_file_type == "ln_shp":
+
+            # create query string
+
+            if selected_ids:
+                ids = selected_ids
+            else:
+                success, cntn = try_execute_query_with_qt(
+                    query=select_all_solutions_ids)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+                else:
+                    query_results = cntn
+
+                # get ids for selected records
+
+                ids = []
+                while query_results.next():
+                    id = int(query_results.value(0))
+                    ids.append(id)
+
+
+        # save results in export dataset
 
         if export_file_type == "pt_shp":
 
@@ -1138,7 +1139,6 @@ class StoredResultsTableDialog(QDialog):
             self,
             self.tool_nm,
             msg)
-        
 
     def try_xprt_selected_records_to_pt_shapefile(self, point_shapefile_path: str, solutions: List[Tuple]):
 

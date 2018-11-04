@@ -243,6 +243,77 @@ def try_write_point_results(path: str, field_names: List[str], values: List[Tupl
         return success, msg
 
 
+def try_writing_line_shapefile(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
+    """
+    Add point records in an existing shapefile, filling attribute values.
+    It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
+
+    :param path: the path of the existing shapefile in which to write.
+    :type path: string.
+    :param field_names: the field names of the attribute table.
+    :type field_names: list of strings.
+    :param values: the values for each record.
+    :type values: list of tuple.
+    :return: success status and related messages.
+    :rtype: tuple of a boolean and a string.
+    """
+
+    success = False
+    msg = ""
+
+    try:
+
+        dataSource = ogr.Open(path, 1)
+
+        if dataSource is None:
+            return False, "Unable to open shapefile in provided path"
+
+        point_layer = dataSource.GetLayer()
+
+        outshape_featdef = point_layer.GetLayerDefn()
+
+        for ndx, pt_vals in enumerate(values):
+
+            # pre-processing for new feature in output layer
+            line = ogr.Geometry(ogr.wkbLineString)
+            curr_Pt_geom.AddPoint(pt_vals[0], pt_vals[1], pt_vals[2])
+
+            line = ogr.Geometry(ogr.wkbLineString)
+            line.AddPoint(1116651.439379124, 637392.6969887456)
+            line.AddPoint(1188804.0108498496, 652655.7409537067)
+            line.AddPoint(1226730.3625203592, 634155.0816022386)
+            line.AddPoint(1281307.30760719, 636467.6640211721)
+
+            # create a new feature
+            curr_Pt_shape = ogr.Feature(outshape_featdef)
+            curr_Pt_shape.SetGeometry(curr_Pt_geom)
+
+            for ndx, fld_nm in enumerate(field_names):
+
+                curr_Pt_shape.SetField(fld_nm, pt_vals[ndx])
+
+            # add the feature to the output layer
+            point_layer.CreateFeature(curr_Pt_shape)
+
+            # destroy no longer used objects
+            curr_Pt_geom.Destroy()
+            curr_Pt_shape.Destroy()
+
+        del outshape_featdef
+        del point_layer
+        del dataSource
+
+        success = True
+
+    except Exception as e:
+
+        msg = e
+
+    finally:
+
+        return success, msg
+
+
 def ogr_get_solution_shapefile(path, fields_dict_list):
     """
 

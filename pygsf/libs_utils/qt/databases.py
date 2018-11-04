@@ -45,26 +45,27 @@ def try_connect_to_sqlite3_db_with_qt(db_path: str, conn_type: str= "readwrite")
         return False, "Exception: {}".format(e)
 
 
-def get_selected_recs_ids(selection_model: QItemSelectionModel) -> Optional[Tuple[int, ...]]:
+def get_selected_recs_ids(selection_model: QItemSelectionModel, ndx_col: int=0) -> Optional[Tuple[int, ...]]:
     """
     Get integer ids from selected records.
+    Unless explicitely defines, it assumes that id is stored in column 0.
 
     :param selection_model: the selection model.
     :type selection_model: QItemSelectionModel.
+    :param ndx_col: the index of the searched columns.
+    :type ndx_col: int.
     :return: the sequence of ids.
     :rtype: tuple of integers.
     """
 
     # get selected records attitudes
 
-    selected_records = selection_model.selectedRows()
+    selected_records_ids = selection_model.selectedRows(column=ndx_col)
 
-    if not selected_records:
+    if selected_records_ids:
+        return tuple(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records_ids))
+    else:
         return None
-
-    selected_ids = tuple(map(lambda qmodel_ndx: qmodel_ndx.data(), selected_records))
-
-    return selected_ids
 
 
 def try_execute_query_with_qt(query: str) -> Tuple[bool, Union[str, QSqlQuery]]:
