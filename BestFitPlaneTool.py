@@ -219,6 +219,7 @@ class BestFitPlaneMainWidget(QWidget):
         widget.setLayout(layout)
         return widget
 
+    """
     def setup_export_tab(self):
 
         widget = QWidget()
@@ -226,6 +227,7 @@ class BestFitPlaneMainWidget(QWidget):
         layout.addWidget(self.setup_results_export())
         widget.setLayout(layout)
         return widget
+    """
 
     def setup_configurations_tab(self):
 
@@ -233,7 +235,7 @@ class BestFitPlaneMainWidget(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.setup_results_tableview())
         #layout.addWidget(self.setup_results_db_params())
-        layout.addWidget(self.setup_results_export())
+        #layout.addWidget(self.setup_results_export())
         widget.setLayout(layout)
         return widget
 
@@ -301,7 +303,7 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_calculate_pButton.setEnabled(False)
         layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
 
-        view_results_button = QPushButton("View saved results")
+        view_results_button = QPushButton("Process saved results")
         view_results_button.clicked.connect(self.view_result_table)
         layout.addWidget(view_results_button, 1, 0, 1, 2)
 
@@ -311,6 +313,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         return main_groupbox
 
+    """
     def setup_results_export(self):
         
         group_box = QGroupBox(self.tr("Export shapefile"))
@@ -331,6 +334,7 @@ class BestFitPlaneMainWidget(QWidget):
         group_box.setLayout(layout)
                  
         return group_box
+    """
 
     def setup_results_tableview(self):
 
@@ -495,7 +499,7 @@ class BestFitPlaneMainWidget(QWidget):
             tool_nm=self.tool_nm,
             db_path=db_path,
             db_tables_params=self.db_tables_params,
-            xprt_shapefile_pth=self.result_shapefile.text())
+            projectCrs=self.canvas.mapSettings().destinationCrs())
 
         table_result_dialog.exec_()
 
@@ -814,45 +818,6 @@ class BestFitPlaneMainWidget(QWidget):
         projectCrs = self.canvas.mapSettings().destinationCrs()
         return self.project_coords(x, y, self.dem.crs(), projectCrs)
 
-    def shapefile_make_new(self):
-
-        dialog = NewShapeFilesDialog(self)
-
-        if dialog.exec_():
-            point_shapefile_path = dialog.output_point_shape_QLineEdit.text()
-        else:
-            return
-
-        if point_shapefile_path == "": 
-            QMessageBox.critical(
-                self,
-                "Point shapefile",
-                "No path provided")
-            return
-
-        shape_pars = get_out_shape_params()
-
-        projectCrs = self.canvas.mapSettings().destinationCrs()
-
-        shapefile_create(
-            path=point_shapefile_path,
-            geom_type=ogr.wkbPoint,
-            fields_dict_list=shape_pars,
-            crs=str(projectCrs))
-
-        self.result_shapefile.setText(point_shapefile_path)
-
-    def shapefile_load_existing(self):
-        
-        dialog = PrevShapeFilesDialog(self)
-
-        if dialog.exec_():
-            point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
-        else:
-            return
-
-        self.result_shapefile.setText(point_shapefile_path)
-
 
 class SolutionStereonetDialog(QDialog):
 
@@ -956,13 +921,13 @@ class SolutionNotesDialog(QDialog):
 
 class StoredResultsTableDialog(QDialog):
 
-    def __init__(self, tool_nm, db_path, db_tables_params, xprt_shapefile_pth):
+    def __init__(self, tool_nm, db_path, db_tables_params, projectCrs):
 
         super().__init__()
 
         self.tool_nm = tool_nm
         self.db_path = db_path
-        self.xprt_shapefile_pth = xprt_shapefile_pth
+        self.projectCrs = projectCrs
 
         pars = parse_db_params(db_tables_params)
         self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
@@ -1003,7 +968,7 @@ class StoredResultsTableDialog(QDialog):
         layout.addWidget(delete_selected_recs)
 
         xprt_selected_recs = QPushButton("Export selected records")
-        xprt_selected_recs.clicked.connect(self.xprt_selected_records_to_shapefile)
+        xprt_selected_recs.clicked.connect(self.xprt_selected_records)
         layout.addWidget(xprt_selected_recs)
 
         self.setLayout(layout)
@@ -1110,19 +1075,26 @@ class StoredResultsTableDialog(QDialog):
         self.solutionsView.setSortingEnabled(True)
         self.solutionsView.repaint()
 
-    def xprt_selected_records_to_shapefile(self):
+    def xprt_selected_records(self):
 
-        # get the user-defined shapefile
+        dialog = ExportDialog(self.projectCrs)
 
-        point_shapefile_path = self.xprt_shapefile_pth
-        if point_shapefile_path == "":
-            QMessageBox.critical(
-                self,
-                "Point shapefile",
-                "No shapefile path provided in Configuration")
-            return
+        if dialog.exec_():
+            if dialog.pt_shape_choice.isChecked():
+                export_file_type = "pt_shp"
+            elif dialog.ln_shape_choice.isChecked():
+                export_file_type = "ln_shp"
+            file_path = dialog.result_shapefile.text()
+            if file_path == "":
+                QMessageBox.critical(
+                    self,
+                    "Point shapefile",
+                    "No shapefile path provided in Configurations")
+                return
+            else:
+                pass
         else:
-            pass
+            return
 
         # get selected records attitudes
 
@@ -1152,24 +1124,42 @@ class StoredResultsTableDialog(QDialog):
                 solutions)
             return
 
-        shape_pars = get_out_shape_params()
-        fld_nms = list(map(lambda par: par["name"], shape_pars))
+        if export_file_type == "pt_shp":
 
-        success, msg = try_write_point_results(
-            path=point_shapefile_path,
-            field_names=fld_nms,
-            values=solutions)
+            success, msg = self.try_xprt_selected_records_to_pt_shapefile(file_path, solutions)
 
-        if success:
-            msg_type = QMessageBox.information
-            msg = "Results saved in shapefile.<br />Now you can load it"
-        else:
-            msg_type = QMessageBox.error
+        elif export_file_type == "ln_shp":
 
-        msg_type(
+            pass
+
+        info = QMessageBox.information if success else QMessageBox.warning
+
+        info(
             self,
             self.tool_nm,
             msg)
+        
+
+    def try_xprt_selected_records_to_pt_shapefile(self, point_shapefile_path: str, solutions: List[Tuple]):
+
+        try:
+
+            shape_pars = get_out_shape_params()
+            fld_nms = list(map(lambda par: par["name"], shape_pars))
+
+            success, msg = try_write_point_results(
+                path=point_shapefile_path,
+                field_names=fld_nms,
+                values=solutions)
+
+            if success:
+                return True, "Results saved in shapefile.<br />Now you can load it"
+            else:
+                 return False, msg
+
+        except Exception as e:
+
+            return False, e
 
 
 class SelectedSolutionsStereonetDialog(QDialog):
@@ -1326,6 +1316,85 @@ class ShapefileSolutionDescriptDialog(QDialog):
         self.setWindowTitle("Best fit plane solution")
 
 
+class ExportDialog(QDialog):
 
+    def __init__(self, projectCrs, parent=None):
 
+        super().__init__(parent)
+
+        self.projectCrs = projectCrs
+
+        layout = QVBoxLayout()
+
+        layout.addWidget(QLabel("Export selected results as:"))
+
+        self.pt_shape_choice = QRadioButton("Point shapefile")
+        self.ln_shape_choice = QRadioButton("Line shapefile")
+
+        layout.addWidget(self.pt_shape_choice)
+        layout.addWidget(self.ln_shape_choice)
+
+        self.result_shapefile = QLineEdit()
+        layout.addWidget(self.result_shapefile)
+
+        self.use_shapefile_pButton = QPushButton("Load existing shapefile")
+        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
+        layout.addWidget(self.use_shapefile_pButton)
+
+        self.create_shapefile_pButton = QPushButton("Create result shapefile")
+        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
+        layout.addWidget(self.create_shapefile_pButton)
+
+        okButton = QPushButton("&OK")
+        cancelButton = QPushButton("Cancel")
+
+        buttonLayout = QHBoxLayout()
+        buttonLayout.addStretch()
+        buttonLayout.addWidget(okButton)
+        buttonLayout.addWidget(cancelButton)
+
+        layout.addLayout(buttonLayout)
+        self.setLayout(layout)
+
+        okButton.clicked.connect(self.accept)
+        cancelButton.clicked.connect(self.reject)
+
+        self.setWindowTitle("Export format")
+
+    def shapefile_make_new(self):
+
+        dialog = NewShapeFilesDialog(self)
+
+        if dialog.exec_():
+            point_shapefile_path = dialog.output_point_shape_QLineEdit.text()
+        else:
+            return
+
+        if point_shapefile_path == "":
+            QMessageBox.critical(
+                self,
+                "Point shapefile",
+                "No path provided")
+            return
+
+        shape_pars = get_out_shape_params()
+
+        shapefile_create(
+            path=point_shapefile_path,
+            geom_type=ogr.wkbPoint,
+            fields_dict_list=shape_pars,
+            crs=str(self.projectCrs))
+
+        self.result_shapefile.setText(point_shapefile_path)
+
+    def shapefile_load_existing(self):
+
+        dialog = PrevShapeFilesDialog(self)
+
+        if dialog.exec_():
+            point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
+        else:
+            return
+
+        self.result_shapefile.setText(point_shapefile_path)
 
