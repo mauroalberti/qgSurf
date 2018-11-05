@@ -178,7 +178,7 @@ def shapefile_create(path, geom_type, fields_dict_list, crs=None):
     return outShapefile, outShapelayer
 
 
-def try_write_point_results(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
+def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
     """
     Add point records in an existing shapefile, filling attribute values.
     It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
@@ -243,7 +243,7 @@ def try_write_point_results(path: str, field_names: List[str], values: List[Tupl
         return success, msg
 
 
-def try_writing_line_shapefile(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
+def try_write_line_shapefile(path: str, field_names: List[str], values: Dict) -> Tuple[bool, str]:
     """
     Add point records in an existing shapefile, filling attribute values.
     It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
@@ -253,7 +253,7 @@ def try_writing_line_shapefile(path: str, field_names: List[str], values: List[T
     :param field_names: the field names of the attribute table.
     :type field_names: list of strings.
     :param values: the values for each record.
-    :type values: list of tuple.
+    :type values: dict with values made up by two dictionaries.
     :return: success status and related messages.
     :rtype: tuple of a boolean and a string.
     """
@@ -268,39 +268,35 @@ def try_writing_line_shapefile(path: str, field_names: List[str], values: List[T
         if dataSource is None:
             return False, "Unable to open shapefile in provided path"
 
-        point_layer = dataSource.GetLayer()
+        line_layer = dataSource.GetLayer()
 
-        outshape_featdef = point_layer.GetLayerDefn()
+        outshape_featdef = line_layer.GetLayerDefn()
 
-        for ndx, pt_vals in enumerate(values):
+        for id in sorted(values.keys()):
 
             # pre-processing for new feature in output layer
-            line = ogr.Geometry(ogr.wkbLineString)
-            curr_Pt_geom.AddPoint(pt_vals[0], pt_vals[1], pt_vals[2])
+            line_geom = ogr.Geometry(ogr.wkbLineString)
 
-            line = ogr.Geometry(ogr.wkbLineString)
-            line.AddPoint(1116651.439379124, 637392.6969887456)
-            line.AddPoint(1188804.0108498496, 652655.7409537067)
-            line.AddPoint(1226730.3625203592, 634155.0816022386)
-            line.AddPoint(1281307.30760719, 636467.6640211721)
+            for xyz in values[id]["pts"]:
+                line_geom.AddPoint(*xyz)
 
             # create a new feature
-            curr_Pt_shape = ogr.Feature(outshape_featdef)
-            curr_Pt_shape.SetGeometry(curr_Pt_geom)
+            line_shape = ogr.Feature(outshape_featdef)
+            line_shape.SetGeometry(line_geom)
 
             for ndx, fld_nm in enumerate(field_names):
 
-                curr_Pt_shape.SetField(fld_nm, pt_vals[ndx])
+                line_shape.SetField(fld_nm, values[id]["vals"][ndx])
 
             # add the feature to the output layer
-            point_layer.CreateFeature(curr_Pt_shape)
+            line_layer.CreateFeature(line_shape)
 
             # destroy no longer used objects
-            curr_Pt_geom.Destroy()
-            curr_Pt_shape.Destroy()
+            line_geom.Destroy()
+            line_shape.Destroy()
 
         del outshape_featdef
-        del point_layer
+        del line_layer
         del dataSource
 
         success = True

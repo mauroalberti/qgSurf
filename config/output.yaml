@@ -10,4 +10,12 @@ pt_shapefile:
   - {name: comments,   ogr_type: ogr.OFTString,  width: 255}
   - {name: creat_time, ogr_type: ogr.OFTDateTime           }
 
+ln_shapefile:
+  - {name: id_sol,     ogr_type: ogr.OFTInteger            }
+  - {name: dip_dir,    ogr_type: ogr.OFTReal               }
+  - {name: dip_ang,    ogr_type: ogr.OFTReal               }
+  - {name: label,      ogr_type: ogr.OFTString,  width: 255}
+  - {name: comments,   ogr_type: ogr.OFTString,  width: 255}
+  - {name: creat_time, ogr_type: ogr.OFTDateTime           }
+
 

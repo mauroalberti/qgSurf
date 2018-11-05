@@ -65,7 +65,7 @@ from .db_queries.queries import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
 from .pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt, get_selected_recs_ids
-from .pygsf.libs_utils.gdal.ogr import try_open_shapefile, shapefile_create, try_write_point_results
+from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_point_shapefile, try_write_line_shapefile
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
 from .pygsf.libs_utils.qgis.qgs_tools import *
 from .pygsf.libs_utils.mpl.mpl_widget import MplWidget
@@ -902,7 +902,6 @@ class StoredResultsTableDialog(QDialog):
 
         pars = parse_db_params(db_tables_params)
         self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
-
         self.solutionsModel = QSqlTableModel(db=QSqlDatabase.database())
         self.solutionsModel.setTable(self.solutions_tblnm)
 
@@ -946,7 +945,7 @@ class StoredResultsTableDialog(QDialog):
 
         self.setMinimumSize(675, 400)
 
-        self.setWindowTitle("Result database")
+        self.setWindowTitle("Saved results")
 
     def plot_selected_records(self):
 
@@ -1122,6 +1121,39 @@ class StoredResultsTableDialog(QDialog):
                     id = int(query_results.value(0))
                     ids.append(id)
 
+            id_pts = {}
+            for id in ids:
+
+                sol_vals_qr = select_solution_pars_template.format(id)
+                success, cntn = try_execute_query_with_qt(
+                    query=sol_vals_qr)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+                else:
+                    cntn.first()
+                    id_pts[id]["vals"] = cntn
+
+                sol_pts_qr = select_sol_pts_pars_template.format(id)
+                success, cntn = try_execute_query_with_qt(
+                    query=sol_pts_qr)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+
+                # get ids for selected records
+
+                xyzs = []
+                while cntn.next():
+                    xyzs.append(cntn)
+
+                id_pts[id]["pts"] = xyzs
 
         # save results in export dataset
 
@@ -1131,7 +1163,7 @@ class StoredResultsTableDialog(QDialog):
 
         elif export_file_type == "ln_shp":
 
-            pass
+            success, msg = self.try_xprt_selected_records_to_ln_shapefile(file_path, id_pts)
 
         info = QMessageBox.information if success else QMessageBox.warning
 
@@ -1147,10 +1179,31 @@ class StoredResultsTableDialog(QDialog):
             shape_pars = get_out_shape_params()
             fld_nms = list(map(lambda par: par["name"], shape_pars))
 
-            success, msg = try_write_point_results(
+            success, msg = try_write_point_shapefile(
                 path=point_shapefile_path,
                 field_names=fld_nms,
                 values=solutions)
+
+            if success:
+                return True, "Results saved in shapefile.<br />Now you can load it"
+            else:
+                 return False, msg
+
+        except Exception as e:
+
+            return False, e
+
+    def try_xprt_selected_records_to_ln_shapefile(self, line_shapefile_path: str, id_vals_xyzs: Dict):
+
+        try:
+
+            shape_pars = get_out_shape_params()
+            fld_nms = list(map(lambda par: par["name"], shape_pars))
+
+            success, msg = try_write_line_shapefile(
+                path=line_shapefile_path,
+                field_names=fld_nms,
+                values=id_vals_xyzs)
 
             if success:
                 return True, "Results saved in shapefile.<br />Now you can load it"
@@ -1329,6 +1382,7 @@ class ExportDialog(QDialog):
         layout.addWidget(QLabel("Export selected results as:"))
 
         self.pt_shape_choice = QRadioButton("Point shapefile")
+        self.pt_shape_choice.setChecked(True)
         self.ln_shape_choice = QRadioButton("Line shapefile")
 
         layout.addWidget(self.pt_shape_choice)

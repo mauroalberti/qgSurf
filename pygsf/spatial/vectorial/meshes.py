@@ -579,6 +579,6 @@ def try_geosurface_export_shapefile_pt3d(shapefile_path, geodata, fields_dict_li
     ids = range(len(X))
 
     rec_values_list2 = zip(ids, X, Y, Z)
-    success, msg = try_write_point_results(shapefile_path, field_list, rec_values_list2)
+    success, msg = try_write_point_shapefile(shapefile_path, field_list, rec_values_list2)
 
     return success, msg

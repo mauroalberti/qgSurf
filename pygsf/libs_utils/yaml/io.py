@@ -6,6 +6,8 @@ import yaml
 
 def read_yaml(file_pth: str) -> Dict:
 
-    return yaml.safe_load(open(file_pth).read())
+    with open(file_pth, 'r') as stream:
+        data = yaml.safe_load(stream)
 
+    return data
 
