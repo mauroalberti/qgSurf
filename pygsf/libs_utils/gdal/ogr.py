@@ -178,10 +178,11 @@ def shapefile_create(path, geom_type, fields_dict_list, crs=None):
     return outShapefile, outShapelayer
 
 
-def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tuple]) -> Tuple[bool, str]:
+def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tuple], ndx_x_val: int) -> Tuple[bool, str]:
     """
     Add point records in an existing shapefile, filling attribute values.
-    It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
+    The point coordinates, i.e. x, y, z start at ndx_x_val index (index is zero-based) and are
+    assumed to be sequential in order (i.e., 0, 1, 2 or 3, 4, 5).
 
     :param path: the path of the existing shapefile in which to write.
     :type path: string.
@@ -189,6 +190,8 @@ def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tu
     :type field_names: list of strings.
     :param values: the values for each record.
     :type values: list of tuple.
+    :param ndx_x_val: the index of the x coordinate. Y and z should follow.
+    :type ndx_x_val: int.
     :return: success status and related messages.
     :rtype: tuple of a boolean and a string.
     """
@@ -211,22 +214,22 @@ def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tu
 
             # pre-processing for new feature in output layer
             curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
-            curr_Pt_geom.AddPoint(pt_vals[0], pt_vals[1], pt_vals[2])
+            curr_Pt_geom.AddPoint(pt_vals[ndx_x_val], pt_vals[ndx_x_val+1], pt_vals[ndx_x_val+2])
 
             # create a new feature
-            curr_Pt_shape = ogr.Feature(outshape_featdef)
-            curr_Pt_shape.SetGeometry(curr_Pt_geom)
+            curr_pt_shape = ogr.Feature(outshape_featdef)
+            curr_pt_shape.SetGeometry(curr_Pt_geom)
 
             for ndx, fld_nm in enumerate(field_names):
 
-                curr_Pt_shape.SetField(fld_nm, pt_vals[ndx])
+                curr_pt_shape.SetField(fld_nm, pt_vals[ndx])
 
             # add the feature to the output layer
-            point_layer.CreateFeature(curr_Pt_shape)
+            point_layer.CreateFeature(curr_pt_shape)
 
             # destroy no longer used objects
             curr_Pt_geom.Destroy()
-            curr_Pt_shape.Destroy()
+            curr_pt_shape.Destroy()
 
         del outshape_featdef
         del point_layer
@@ -246,7 +249,7 @@ def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tu
 def try_write_line_shapefile(path: str, field_names: List[str], values: Dict) -> Tuple[bool, str]:
     """
     Add point records in an existing shapefile, filling attribute values.
-    It assumes that point coordinates, i.e. x, y, z are the first three components of a record (0, 1 and 2 elements in values list).
+
 
     :param path: the path of the existing shapefile in which to write.
     :type path: string.
@@ -277,8 +280,9 @@ def try_write_line_shapefile(path: str, field_names: List[str], values: Dict) ->
             # pre-processing for new feature in output layer
             line_geom = ogr.Geometry(ogr.wkbLineString)
 
-            for xyz in values[id]["pts"]:
-                line_geom.AddPoint(*xyz)
+            for idxyz in values[id]["pts"]:
+                _, x, y, z = idxyz
+                line_geom.AddPoint(x, y, z)
 
             # create a new feature
             line_shape = ogr.Feature(outshape_featdef)
@@ -303,7 +307,7 @@ def try_write_line_shapefile(path: str, field_names: List[str], values: Dict) ->
 
     except Exception as e:
 
-        msg = e
+        msg = str(e)
 
     finally:
 

@@ -14,8 +14,8 @@ sqlite_db:
     src_pts:
       name: src_points
       fields:
-        - id:         {name: id,         type: INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL}
         - id_sol:     {name: id_sol,     type: INTEGER NOT NULL}
+        - id_pt:      {name: id_pt,      type: INTEGER NOT NULL}
         - x:          {name: x,          type: REAL NOT NULL}
         - y:          {name: y,          type: REAL NOT NULL}
         - z:          {name: z,          type: REAL NOT NULL}

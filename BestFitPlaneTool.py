@@ -122,7 +122,7 @@ def parse_db_params(sqlite_params):
         src_points_tbl_flds)
 
 
-def get_out_shape_params():
+def get_out_shape_params(geom_type="point"):
 
     output_shapefile_params_file = os.path.join(
         config_fldrpth,
@@ -130,8 +130,12 @@ def get_out_shape_params():
 
     plugin_params = read_yaml(output_shapefile_params_file)
 
-    return plugin_params["pt_shapefile"]
-
+    if geom_type == "point":
+        return plugin_params["pt_shapefile"]
+    elif geom_type == "line":
+        return plugin_params["ln_shapefile"]
+    else:
+        return None
 
 def remove_equal_consecutive_xypairs(xy_list):
     out_xy_list = [xy_list[0]]
@@ -303,7 +307,7 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_calculate_pButton.setEnabled(False)
         layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
 
-        view_results_button = QPushButton("Process saved results")
+        view_results_button = QPushButton("Saved results")
         view_results_button.clicked.connect(self.view_result_table)
         layout.addWidget(view_results_button, 1, 0, 1, 2)
 
@@ -500,8 +504,9 @@ class BestFitPlaneMainWidget(QWidget):
         if add_marker:
             self.add_marker(prj_crs_x, prj_crs_y)
 
-        self.bestfitplane_points.append([prj_crs_x, prj_crs_y, dem_z_value])        
-        self.bestfitplane_src_points_ListWdgt.addItem("%.3f %.3f %.3f" % (prj_crs_x, prj_crs_y, dem_z_value))
+        curr_ndx = len(self.bestfitplane_points) + 1
+        self.bestfitplane_points.append([curr_ndx, prj_crs_x, prj_crs_y, dem_z_value])
+        self.bestfitplane_src_points_ListWdgt.addItem("%i: %.3f %.3f %.3f" % (curr_ndx, prj_crs_x, prj_crs_y, dem_z_value))
 
         self.bfp_calc_update.emit()
 
@@ -728,7 +733,7 @@ class BestFitPlaneMainWidget(QWidget):
 
     def calculate_bestfitplane(self):        
 
-        xyz_list = self.bestfitplane_points        
+        xyz_list = list(map(lambda idxyz: (idxyz[1], idxyz[2], idxyz[3]), self.bestfitplane_points))
         xyz_array = np.array(xyz_list, dtype=np.float64)
         self.xyz_mean = np.mean(xyz_array, axis = 0)
         svd = xyzSvd(xyz_array - self.xyz_mean)
@@ -841,7 +846,6 @@ class SolutionStereonetDialog(QDialog):
             label = noteDialog.label.toPlainText()
             comments = noteDialog.comments.toPlainText()
 
-
             conn = sqlite3.connect(self.db_path)
             curs = conn.cursor()
 
@@ -863,7 +867,7 @@ class SolutionStereonetDialog(QDialog):
 
             # Create the query strings for updating the points table
 
-            pts_vals = list(map(lambda xyz: [None, last_sol_id, *xyz], self.pts))
+            pts_vals = list(map(lambda idxyz: [last_sol_id, *idxyz], self.pts))
 
             curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
 
@@ -1051,9 +1055,9 @@ class StoredResultsTableDialog(QDialog):
 
         if dialog.exec_():
             if dialog.pt_shape_choice.isChecked():
-                export_file_type = "pt_shp"
+                geom_type = "point"
             elif dialog.ln_shape_choice.isChecked():
-                export_file_type = "ln_shp"
+                geom_type = "line"
             file_path = dialog.result_shapefile.text()
             if file_path == "":
                 QMessageBox.critical(
@@ -1066,13 +1070,40 @@ class StoredResultsTableDialog(QDialog):
         else:
             return
 
+        if not os.path.exists(file_path):
+
+            if geom_type == "point":
+                ogr_geom_type = ogr.wkbPoint
+            elif geom_type == "line":
+                ogr_geom_type = ogr.wkbLineString
+            else:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    "Error: debug <geom_type>: {}".format(geom_type))
+                return
+
+            shape_pars = get_out_shape_params(geom_type)
+            if not shape_pars:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    "Error: debug <shape_pars>: {}".format(shape_pars))
+                return
+
+            shapefile_create(
+                path=file_path,
+                geom_type=ogr_geom_type,
+                fields_dict_list=shape_pars,
+                crs=str(self.projectCrs))
+
         # get selected records attitudes
 
         selected_ids = get_selected_recs_ids(self.selection_model)
 
         # create query string
 
-        if export_file_type == "pt_shp":
+        if geom_type == "point":
 
             id_alias = self.sol_tbl_flds[0]["id"]["name"]
 
@@ -1096,7 +1127,7 @@ class StoredResultsTableDialog(QDialog):
                     solutions)
                 return
 
-        elif export_file_type == "ln_shp":
+        elif geom_type == "line":
 
             # create query string
 
@@ -1135,7 +1166,20 @@ class StoredResultsTableDialog(QDialog):
                     return
                 else:
                     cntn.first()
-                    id_pts[id]["vals"] = cntn
+                    dip_dir = cntn.value(0)
+                    dip_ang = cntn.value(1)
+                    label = cntn.value(2)
+                    comments = cntn.value(3)
+                    creat_time = cntn.value(4)
+                    print(dip_dir, dip_ang, label, comments, creat_time)
+
+                    id_pts[id] = dict(vals=(
+                        id,
+                        dip_dir,
+                        dip_ang,
+                        label,
+                        comments,
+                        creat_time))
 
                 sol_pts_qr = select_sol_pts_pars_template.format(id)
                 success, cntn = try_execute_query_with_qt(
@@ -1149,21 +1193,37 @@ class StoredResultsTableDialog(QDialog):
 
                 # get ids for selected records
 
-                xyzs = []
+                idxyzs = []
                 while cntn.next():
-                    xyzs.append(cntn)
+                    id_pt, x, y, z = cntn.value(0), cntn.value(1), cntn.value(2), cntn.value(3)
+                    #print(x, y, z)
+                    idxyzs.append((id_pt, x, y, z))
 
-                id_pts[id]["pts"] = xyzs
+                id_pts[id]["pts"] = idxyzs
+
+        else:
+
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Error - debug with geom_type: {}".format(geom_type))
 
         # save results in export dataset
 
-        if export_file_type == "pt_shp":
+        if geom_type == "point":
 
             success, msg = self.try_xprt_selected_records_to_pt_shapefile(file_path, solutions)
 
-        elif export_file_type == "ln_shp":
+        elif geom_type == "line":
 
             success, msg = self.try_xprt_selected_records_to_ln_shapefile(file_path, id_pts)
+
+        else:
+
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Error - debug with geom_type = {}".format(geom_type))
 
         info = QMessageBox.information if success else QMessageBox.warning
 
@@ -1176,13 +1236,14 @@ class StoredResultsTableDialog(QDialog):
 
         try:
 
-            shape_pars = get_out_shape_params()
+            shape_pars = get_out_shape_params("point")
             fld_nms = list(map(lambda par: par["name"], shape_pars))
 
             success, msg = try_write_point_shapefile(
                 path=point_shapefile_path,
                 field_names=fld_nms,
-                values=solutions)
+                values=solutions,
+                ndx_x_val=2)
 
             if success:
                 return True, "Results saved in shapefile.<br />Now you can load it"
@@ -1191,13 +1252,13 @@ class StoredResultsTableDialog(QDialog):
 
         except Exception as e:
 
-            return False, e
+            return False, str(e)
 
     def try_xprt_selected_records_to_ln_shapefile(self, line_shapefile_path: str, id_vals_xyzs: Dict):
 
         try:
 
-            shape_pars = get_out_shape_params()
+            shape_pars = get_out_shape_params("line")
             fld_nms = list(map(lambda par: par["name"], shape_pars))
 
             success, msg = try_write_line_shapefile(
@@ -1212,7 +1273,7 @@ class StoredResultsTableDialog(QDialog):
 
         except Exception as e:
 
-            return False, e
+            return False, str(e)
 
 
 class SelectedSolutionsStereonetDialog(QDialog):
@@ -1289,55 +1350,6 @@ class NewShapeFilesDialog(QDialog):
         self.output_point_shape_QLineEdit.setText(out_shapefile_name)
 
 
-class PrevShapeFilesDialog(QDialog):
-
-    def __init__(self, parent=None):
-        super(PrevShapeFilesDialog, self).__init__(parent)
-
-        # self.pointCheckBox = QCheckBox("&Point shapefile:")
-        self.input_point_shape_QLineEdit = QLineEdit()
-        self.input_point_shape_browse_QPushButton = QPushButton(".....")
-        self.input_point_shape_browse_QPushButton.clicked.connect(self.set_in_point_shapefile_name)
-
-        okButton = QPushButton("&OK")
-        cancelButton = QPushButton("Cancel")
-
-        buttonLayout = QHBoxLayout()
-        buttonLayout.addStretch()
-        buttonLayout.addWidget(okButton)
-        buttonLayout.addWidget(cancelButton)
-
-        layout = QGridLayout()
-        layout.addWidget(self.input_point_shape_QLineEdit, 0, 1, 1, 1)
-        layout.addWidget(self.input_point_shape_browse_QPushButton, 0, 2, 1, 1)
-
-        layout.addLayout(buttonLayout, 2, 0, 1, 3)
-        self.setLayout(layout)
-
-        okButton.clicked.connect(self.accept)
-        cancelButton.clicked.connect(self.reject)
-
-        self.setWindowTitle("Get shapefile")
-
-    def set_in_point_shapefile_name(self):
-        in_shapefile_name = old_file_path(
-            self,
-            "Choose shapefile name",
-            "*.shp",
-            "shp (*.shp *.SHP)")
-
-        self.input_point_shape_QLineEdit.setText(in_shapefile_name)
-
-    def set_in_polygon_shapefile_name(self):
-        in_shapefile_name = old_file_path(
-            self,
-            "Choose shapefile name",
-            "*.shp",
-            "shp (*.shp *.SHP)")
-
-        self.input_polygon_shape_QLineEdit.setText(in_shapefile_name)
-
-
 class ShapefileSolutionDescriptDialog(QDialog):
 
     def __init__(self, parent=None):
@@ -1379,25 +1391,27 @@ class ExportDialog(QDialog):
 
         layout = QVBoxLayout()
 
-        layout.addWidget(QLabel("Export selected results as:"))
+        layout.addWidget(QLabel("Export selected results in"))
 
-        self.pt_shape_choice = QRadioButton("Point shapefile")
-        self.pt_shape_choice.setChecked(True)
-        self.ln_shape_choice = QRadioButton("Line shapefile")
+        self.use_shapefile_pButton = QPushButton("existing shapefile")
+        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
+        layout.addWidget(self.use_shapefile_pButton)
 
-        layout.addWidget(self.pt_shape_choice)
-        layout.addWidget(self.ln_shape_choice)
+        self.create_shapefile_pButton = QPushButton("new shapefile")
+        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
+        layout.addWidget(self.create_shapefile_pButton)
 
         self.result_shapefile = QLineEdit()
         layout.addWidget(self.result_shapefile)
 
-        self.use_shapefile_pButton = QPushButton("Load existing shapefile")
-        self.use_shapefile_pButton.clicked.connect(self.shapefile_load_existing)
-        layout.addWidget(self.use_shapefile_pButton)
+        layout.addWidget(QLabel("as"))
 
-        self.create_shapefile_pButton = QPushButton("Create result shapefile")
-        self.create_shapefile_pButton.clicked.connect(self.shapefile_make_new)
-        layout.addWidget(self.create_shapefile_pButton)
+        self.pt_shape_choice = QRadioButton("point data")
+        self.pt_shape_choice.setChecked(True)
+        self.ln_shape_choice = QRadioButton("line data")
+
+        layout.addWidget(self.pt_shape_choice)
+        layout.addWidget(self.ln_shape_choice)
 
         okButton = QPushButton("&OK")
         cancelButton = QPushButton("Cancel")
@@ -1413,10 +1427,19 @@ class ExportDialog(QDialog):
         okButton.clicked.connect(self.accept)
         cancelButton.clicked.connect(self.reject)
 
-        self.setWindowTitle("Export format")
+        self.setWindowTitle("Export")
 
     def shapefile_make_new(self):
 
+        shapefile_path = define_path_new_file(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
+
+        self.result_shapefile.setText(shapefile_path)
+
+        """
         dialog = NewShapeFilesDialog(self)
 
         if dialog.exec_():
@@ -1440,15 +1463,16 @@ class ExportDialog(QDialog):
             crs=str(self.projectCrs))
 
         self.result_shapefile.setText(point_shapefile_path)
+        """
 
     def shapefile_load_existing(self):
 
-        dialog = PrevShapeFilesDialog(self)
+        shapefile_path = old_file_path(
+            self,
+            "Choose shapefile name",
+            "*.shp",
+            "shp (*.shp *.SHP)")
 
-        if dialog.exec_():
-            point_shapefile_path = dialog.input_point_shape_QLineEdit.text()
-        else:
-            return
+        self.result_shapefile.setText(shapefile_path)
 
-        self.result_shapefile.setText(point_shapefile_path)
 

@@ -18,10 +18,11 @@ query_points_fllattr_full_template = select_from_template % source_points_flds_s
 query_points_fllattr_selection_template = query_points_fllattr_full_template + generic_where_in_template
 
 select_results_for_shapefile_query = """
-SELECT src_points.x, src_points.y, src_points.z, solutions.id, solutions.dip_dir, solutions.dip_ang, solutions.label, solutions.comments, solutions.creat_time
-FROM solutions
-INNER JOIN src_points
-ON solutions.id = src_points.id_sol
+SELECT src_points.id_sol, src_points.id_pt, src_points.x, src_points.y, src_points.z, solutions.dip_dir, solutions.dip_ang, solutions.label, solutions.comments, solutions.creat_time
+FROM src_points 
+INNER JOIN solutions
+ON src_points.id_sol = solutions.id 
+ORDER BY src_points.id_sol, src_points.id_pt
 """
 
 select_all_solutions_ids = """
@@ -37,8 +38,8 @@ WHERE id = {}
 """
 
 select_sol_pts_pars_template = """
-SELECT x, y, z
+SELECT id_pt, x, y, z
 FROM src_points
 WHERE id_sol = {}
-ORDER BY id
+ORDER BY id_pt
 """
