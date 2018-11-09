@@ -1,5 +1,8 @@
 
 from builtins import str
+
+from typing import Optional, Tuple
+
 import numpy as np
 
 from qgis.PyQt.QtCore import *
@@ -226,16 +229,67 @@ def raster_qgis_params( raster_layer ):
 def qgs_point( x, y ):
     
     return QgsPointXY(x, y)
-        
 
-def project_qgs_point(qgsPt, srcCrs, destCrs):
+
+def explode_pt(qgs_pt: QgsPointXY) -> Tuple[float, float]:
+    """
+    Returns the x and y coordinates of a QgsPointXY.
+
+    :param qgs_pt: a point.
+    :type qgs_pt: QgsPointXY instance.
+    :return: the x and y pair.
+    :rtype: tuple of two float values.
+    """
+
+    return qgs_pt.x(), qgs_pt.y()
+
+
+def project_qgs_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, destCrs: QgsCoordinateReferenceSystem=None) -> QgsPointXY:
+    """
+    Project a QGIS point to a new CRS.
+    If the destination CRS is not set, EPSG 4326 will be used.
+
+    :param qgsPt: the source point.
+    :type qgsPt: a QgsPointXY instance.
+    :param srcCrs: the source CRS.
+    :type srcCrs: QgsCoordinateReferenceSystem.
+    :param destCrs: the destination CRS.
+    :type destCrs: QgsCoordinateReferenceSystem.
+    :return: the projected point.
+    :rtype: QgsPointXY instance.
+    """
+
+    if not destCrs:
+        destCrs = QgsCoordinateReferenceSystem(
+            id=4326,
+            type=QgsCoordinateReferenceSystem.EpsgCrsId)
+
+    coordinate_transform = QgsCoordinateTransform(
+        source=srcCrs,
+        destination=destCrs,
+        project=QgsProject.instance())
+
+    prj_pt = coordinate_transform.transform(
+        point=qgsPt)
+
+    return prj_pt
+
+
+def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem, destCrs:Optional[QgsCoordinateReferenceSystem]=None) -> Optional[Tuple[float, float]]:
+
+    if not destCrs:
+        destCrs = QgsCoordinateReferenceSystem(4326, QgsCoordinateReferenceSystem.EpsgCrsId)
 
     coordinate_transform = QgsCoordinateTransform(
         srcCrs,
         destCrs,
         QgsProject.instance())
 
-    return coordinate_transform.transform(qgsPt)
+    qgs_pt = coordinate_transform.transform(
+        x=x,
+        y=y)
+
+    return qgs_pt.explode_pt()
 
 
 def project_line_2d( srcLine, srcCrs, destCrs ):

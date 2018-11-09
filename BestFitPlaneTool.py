@@ -205,6 +205,7 @@ class BestFitPlaneMainWidget(QWidget):
         dialog_layout = QVBoxLayout()
         main_widget = QTabWidget()        
         main_widget.addTab(self.setup_processing_tab(), "Processing")
+        main_widget.addTab(self.setup_results_tab(), "Results")
         main_widget.addTab(self.setup_configurations_tab(), "Configurations")
         main_widget.addTab(self.setup_help_tab(), "Help")
                                      
@@ -223,25 +224,95 @@ class BestFitPlaneMainWidget(QWidget):
         widget.setLayout(layout)
         return widget
 
-    """
-    def setup_export_tab(self):
+    def setup_results_tab(self):
 
         widget = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(self.setup_results_export())
+        layout.addWidget(self.setup_results_processings())
         widget.setLayout(layout)
         return widget
-    """
+
+    def setup_results_processings(self):
+
+        #self.tool_nm = tool_nm
+        #self.db_path = db_path
+        #self.projectCrs = projectCrs
+
+        pars = parse_db_params(self.db_tables_params)
+        self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
+        self.solutionsModel = QSqlTableModel(db=QSqlDatabase.database())
+        self.solutionsModel.setTable(self.solutions_tblnm)
+
+        self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
+        self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
+        self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
+        self.solutionsModel.setHeaderData(LABEL, Qt.Horizontal, "label")
+        self.solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, "comments")
+        self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
+
+        self.solutionsModel.select()
+
+        self.solutionsView = QTableView()
+        self.solutionsView.setModel(self.solutionsModel)
+        self.solutionsView.setSelectionMode(QTableView.MultiSelection)
+        self.solutionsView.setSelectionBehavior(QTableView.SelectRows)
+        self.solutionsView.verticalHeader().hide()
+        self.solutionsView.resizeColumnsToContents()
+
+        self.solutionsView.resizeRowsToContents()
+        self.solutionsView.setSortingEnabled(True)
+
+        self.selection_model = self.solutionsView.selectionModel()
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.solutionsView)
+
+        plot_selected_recs = QPushButton("Plot selected records")
+        plot_selected_recs.clicked.connect(self.plot_selected_records)
+        layout.addWidget(plot_selected_recs)
+
+        delete_selected_recs = QPushButton("Delete selected records")
+        delete_selected_recs.clicked.connect(self.delete_selected_records)
+        layout.addWidget(delete_selected_recs)
+
+        xprt_selected_recs = QPushButton("Export selected records")
+        xprt_selected_recs.clicked.connect(self.xprt_selected_records)
+        layout.addWidget(xprt_selected_recs)
+
+        return layout
+
+        #self.setLayout(layout)
+
+        # self.setMinimumSize(675, 400)
+
+        # self.setWindowTitle("Saved results")
 
     def setup_configurations_tab(self):
 
         widget = QWidget()
         layout = QVBoxLayout()
-        layout.addWidget(self.setup_results_tableview())
+        layout.addWidget(self.setup_results_configurations())
         #layout.addWidget(self.setup_results_db_params())
         #layout.addWidget(self.setup_results_export())
         widget.setLayout(layout)
         return widget
+
+    def setup_help_tab(self):
+
+        qwdtHelp = QWidget()
+        qlytHelp = QVBoxLayout()
+
+        # About section
+
+        qtbrHelp = QTextBrowser(qwdtHelp)
+        url_path = "file:///{}/help/help_bfp.html".format(os.path.dirname(__file__))
+        qtbrHelp.setSource(QUrl(url_path))
+        qtbrHelp.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
+        qlytHelp.addWidget(qtbrHelp)
+
+        qwdtHelp.setLayout(qlytHelp)
+
+        return qwdtHelp
 
     def setup_source_dem(self):
 
@@ -317,7 +388,7 @@ class BestFitPlaneMainWidget(QWidget):
 
         return main_groupbox
 
-    def setup_results_tableview(self):
+    def setup_results_configurations(self):
 
         group_box = QGroupBox(self.tr("Database for result storage (sqlite3)"))
 
@@ -337,23 +408,6 @@ class BestFitPlaneMainWidget(QWidget):
         group_box.setLayout(layout)
 
         return group_box
-
-    def setup_help_tab(self):
-
-        qwdtHelp = QWidget()
-        qlytHelp = QVBoxLayout()
-
-        # About section
-
-        qtbrHelp = QTextBrowser(qwdtHelp)
-        url_path = "file:///{}/help/help_bfp.html".format(os.path.dirname(__file__))
-        qtbrHelp.setSource(QUrl(url_path))
-        qtbrHelp.setSearchPaths(['{}/help'.format(os.path.dirname(__file__))])
-        qlytHelp.addWidget(qtbrHelp)
-
-        qwdtHelp.setLayout(qlytHelp)
-
-        return qwdtHelp
 
     def view_in_stereonet(self):
         """
@@ -490,7 +544,7 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_point_markers.append(marker)        
         self.canvas.refresh()        
 
-    def set_bfp_input_point(self, qgs_pt, add_marker = True): 
+    def set_bfp_input_point(self, qgs_pt, add_marker=True):
 
         prj_crs_x, prj_crs_y = qgs_pt.x(), qgs_pt.y()
 
@@ -793,6 +847,330 @@ class BestFitPlaneMainWidget(QWidget):
 
         projectCrs = self.canvas.mapSettings().destinationCrs()
         return self.project_coords(x, y, self.dem.crs(), projectCrs)
+
+    def plot_selected_records(self):
+
+        # get relevant fields names
+
+        id_alias = self.sol_tbl_flds[0]["id"]["name"]
+        dip_dir_alias = self.sol_tbl_flds[1]["dip_dir"]["name"]
+        dip_ang_alias = self.sol_tbl_flds[2]["dip_ang"]["name"]
+
+        # get selected records attitudes
+
+        selected_ids = get_selected_recs_ids(self.selection_model)
+
+        # create query string
+
+        if not selected_ids:
+            qry = query_solutions_all_template.format(
+                dip_dir_alias,
+                dip_ang_alias,
+                self.solutions_tblnm)
+        else:
+            selected_ids_string = ",".join(map(str, selected_ids))
+            qry = query_solutions_selection_template.format(
+                dip_dir_alias, dip_ang_alias, self.solutions_tblnm, id_alias, selected_ids_string)
+
+        # query the database
+
+        success, query_results = try_execute_query_with_qt(
+            query=qry)
+        if not success:
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                query_results)
+            return
+
+        # get vals for selected records
+
+        planes = []
+        while query_results.next():
+            dip_dir = float(query_results.value(0))
+            dip_ang = float(query_results.value(1))
+            planes.append(Plane(dip_dir, dip_ang))
+
+        # plot in stereoplot
+
+        selected_recs_stereonet_dialog = SelectedSolutionsStereonetDialog(
+            tool_nm=self.tool_nm,
+            planes=planes,
+            parent=self)
+
+        selected_recs_stereonet_dialog.show()
+        selected_recs_stereonet_dialog.raise_()
+        selected_recs_stereonet_dialog.activateWindow()
+
+    def delete_selected_records(self):
+
+        selected_ids = get_selected_recs_ids(self.selection_model)
+        if not selected_ids:
+            QMessageBox.warning(
+                self,
+                "Delete records",
+                "No selected records")
+            return
+
+        num_sel_recs = len(selected_ids)
+        if num_sel_recs == 0:
+            QMessageBox.warning(
+                self,
+                "Delete records",
+                "No selected records")
+            return
+        else:
+            msg = "<font color=red>Delete {} record(s)?</font>".format(num_sel_recs)
+            if QMessageBox.question(self, "Delete solution", msg,
+                    QMessageBox.Yes|QMessageBox.No) == QMessageBox.No:
+                return
+
+        self.solutionsView.setSortingEnabled(False)
+        self.solutionsModel.beginResetModel()
+
+        # create query string
+
+        selected_ids_string = ",".join(map(str, selected_ids))
+        query = QSqlQuery(db=QSqlDatabase.database())
+        query.exec_("DELETE FROM {} WHERE id_sol IN ({})".format(
+            self.pts_tbl_nm,
+            selected_ids_string))
+        for index in self.solutionsView.selectedIndexes():
+            self.solutionsModel.removeRow(index.row())
+
+        self.solutionsModel.submitAll()
+        QSqlDatabase.database().commit()
+
+        self.solutionsModel.endResetModel()
+
+        self.solutionsView.setSortingEnabled(True)
+        self.solutionsView.repaint()
+
+    def xprt_selected_records(self):
+
+        dialog = ExportDialog(self.projectCrs)
+
+        if dialog.exec_():
+            if dialog.pt_shape_choice.isChecked():
+                geom_type = "point"
+            elif dialog.ln_shape_choice.isChecked():
+                geom_type = "line"
+            file_path = dialog.result_shapefile.text()
+            if file_path == "":
+                QMessageBox.critical(
+                    self,
+                    "Point shapefile",
+                    "No shapefile path provided in Configurations")
+                return
+            else:
+                pass
+        else:
+            return
+
+        if not os.path.exists(file_path):
+
+            if geom_type == "point":
+                ogr_geom_type = ogr.wkbPoint
+            elif geom_type == "line":
+                ogr_geom_type = ogr.wkbLineString
+            else:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    "Error: debug <geom_type>: {}".format(geom_type))
+                return
+
+            shape_pars = get_out_shape_params(geom_type)
+            if not shape_pars:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    "Error: debug <shape_pars>: {}".format(shape_pars))
+                return
+
+            shapefile_create(
+                path=file_path,
+                geom_type=ogr_geom_type,
+                fields_dict_list=shape_pars,
+                crs=str(self.projectCrs))
+
+        # get selected records attitudes
+
+        selected_ids = get_selected_recs_ids(self.selection_model)
+
+        # create query string
+
+        if geom_type == "point":
+
+            id_alias = self.sol_tbl_flds[0]["id"]["name"]
+
+            if not selected_ids:
+                qry_solutions = select_results_for_shapefile_query
+            else:
+                selected_ids_string = ",".join(map(str, selected_ids))
+                qry_solutions = select_results_for_shapefile_query + generic_where_in_template.format(
+                    id_alias,
+                    selected_ids_string)
+
+            # query the database
+
+            success, solutions = try_execute_query_with_sqlite3(
+                db_path=self.db_path,
+                query=qry_solutions)
+            if not success:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    solutions)
+                return
+
+        elif geom_type == "line":
+
+            # create query string
+
+            if selected_ids:
+                ids = selected_ids
+            else:
+                success, cntn = try_execute_query_with_qt(
+                    query=select_all_solutions_ids)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+                else:
+                    query_results = cntn
+
+                # get ids for selected records
+
+                ids = []
+                while query_results.next():
+                    id = int(query_results.value(0))
+                    ids.append(id)
+
+            id_pts = {}
+            for id in ids:
+
+                sol_vals_qr = select_solution_pars_template.format(id)
+                success, cntn = try_execute_query_with_qt(
+                    query=sol_vals_qr)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+                else:
+                    cntn.first()
+                    dip_dir = cntn.value(0)
+                    dip_ang = cntn.value(1)
+                    label = cntn.value(2)
+                    comments = cntn.value(3)
+                    creat_time = cntn.value(4)
+                    print(dip_dir, dip_ang, label, comments, creat_time)
+
+                    id_pts[id] = dict(vals=(
+                        id,
+                        dip_dir,
+                        dip_ang,
+                        label,
+                        comments,
+                        creat_time))
+
+                sol_pts_qr = select_sol_pts_pars_template.format(id)
+                success, cntn = try_execute_query_with_qt(
+                    query=sol_pts_qr)
+                if not success:
+                    QMessageBox.critical(
+                        self,
+                        self.tool_nm,
+                        cntn)
+                    return
+
+                # get ids for selected records
+
+                idxyzs = []
+                while cntn.next():
+                    id_pt, x, y, z = cntn.value(0), cntn.value(1), cntn.value(2), cntn.value(3)
+                    #print(x, y, z)
+                    idxyzs.append((id_pt, x, y, z))
+
+                id_pts[id]["pts"] = idxyzs
+
+        else:
+
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Error - debug with geom_type: {}".format(geom_type))
+
+        # save results in export dataset
+
+        if geom_type == "point":
+
+            success, msg = self.try_xprt_selected_records_to_pt_shapefile(file_path, solutions)
+
+        elif geom_type == "line":
+
+            success, msg = self.try_xprt_selected_records_to_ln_shapefile(file_path, id_pts)
+
+        else:
+
+            QMessageBox.critical(
+                self,
+                self.tool_nm,
+                "Error - debug with geom_type = {}".format(geom_type))
+
+        info = QMessageBox.information if success else QMessageBox.warning
+
+        info(
+            self,
+            self.tool_nm,
+            msg)
+
+    def try_xprt_selected_records_to_pt_shapefile(self, point_shapefile_path: str, solutions: List[Tuple]):
+
+        try:
+
+            shape_pars = get_out_shape_params("point")
+            fld_nms = list(map(lambda par: par["name"], shape_pars))
+
+            success, msg = try_write_point_shapefile(
+                path=point_shapefile_path,
+                field_names=fld_nms,
+                values=solutions,
+                ndx_x_val=2)
+
+            if success:
+                return True, "Results saved in shapefile.<br />Now you can load it"
+            else:
+                 return False, msg
+
+        except Exception as e:
+
+            return False, str(e)
+
+    def try_xprt_selected_records_to_ln_shapefile(self, line_shapefile_path: str, id_vals_xyzs: Dict):
+
+        try:
+
+            shape_pars = get_out_shape_params("line")
+            fld_nms = list(map(lambda par: par["name"], shape_pars))
+
+            success, msg = try_write_line_shapefile(
+                path=line_shapefile_path,
+                field_names=fld_nms,
+                values=id_vals_xyzs)
+
+            if success:
+                return True, "Results saved in shapefile.<br />Now you can load it"
+            else:
+                 return False, msg
+
+        except Exception as e:
+
+            return False, str(e)
 
 
 class SolutionStereonetDialog(QDialog):
@@ -1406,12 +1784,16 @@ class ExportDialog(QDialog):
 
         layout.addWidget(QLabel("as"))
 
+        choiceLayout = QHBoxLayout()
+
         self.pt_shape_choice = QRadioButton("point data")
         self.pt_shape_choice.setChecked(True)
         self.ln_shape_choice = QRadioButton("line data")
 
-        layout.addWidget(self.pt_shape_choice)
-        layout.addWidget(self.ln_shape_choice)
+        choiceLayout.addWidget(self.pt_shape_choice)
+        choiceLayout.addWidget(self.ln_shape_choice)
+
+        layout.addLayout(choiceLayout)
 
         okButton = QPushButton("&OK")
         cancelButton = QPushButton("Cancel")

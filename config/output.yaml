@@ -2,21 +2,21 @@
 pt_shapefile:
   - {name: id_sol,     ogr_type: ogr.OFTInteger            }
   - {name: id_pt,      ogr_type: ogr.OFTInteger            }
-  - {name: x,          ogr_type: ogr.OFTReal               }
-  - {name: y,          ogr_type: ogr.OFTReal               }
+  - {name: longitude,  ogr_type: ogr.OFTReal               }
+  - {name: latitude,   ogr_type: ogr.OFTReal               }
   - {name: z,          ogr_type: ogr.OFTReal               }
   - {name: dip_dir,    ogr_type: ogr.OFTReal               }
   - {name: dip_ang,    ogr_type: ogr.OFTReal               }
-  - {name: label,      ogr_type: ogr.OFTString,  width: 255}
-  - {name: comments,   ogr_type: ogr.OFTString,  width: 255}
+  - {name: data_set,   ogr_type: ogr.OFTString,  width: 255}
+  - {name: notes,      ogr_type: ogr.OFTString,  width: 255}
   - {name: creat_time, ogr_type: ogr.OFTDateTime           }
 
 ln_shapefile:
   - {name: id_sol,     ogr_type: ogr.OFTInteger            }
   - {name: dip_dir,    ogr_type: ogr.OFTReal               }
   - {name: dip_ang,    ogr_type: ogr.OFTReal               }
-  - {name: label,      ogr_type: ogr.OFTString,  width: 255}
-  - {name: comments,   ogr_type: ogr.OFTString,  width: 255}
+  - {name: data_set,   ogr_type: ogr.OFTString,  width: 255}
+  - {name: notes,      ogr_type: ogr.OFTString,  width: 255}
   - {name: creat_time, ogr_type: ogr.OFTDateTime           }
 
 
