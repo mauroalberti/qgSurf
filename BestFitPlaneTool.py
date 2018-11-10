@@ -62,6 +62,7 @@ from qgis.gui import *
 
 from .base_params import *
 from .db_queries.queries import *
+from .messages.msgs import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
 from .pygsf.libs_utils.qt.databases import try_connect_to_sqlite3_db_with_qt, get_selected_recs_ids
@@ -134,7 +135,9 @@ def get_out_shape_params(geom_type="point"):
     else:
         return None
 
+
 def remove_equal_consecutive_xypairs(xy_list):
+
     out_xy_list = [xy_list[0]]
 
     for n in range(1, len(xy_list)):
@@ -193,6 +196,9 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_points = []
         self.bestfitplane = None
 
+        self.sol_tbl_flds = None
+        self.selection_model = None
+
     def reset_dem_input_states(self):
         
         self.dem, self.grid = None, None
@@ -200,16 +206,23 @@ class BestFitPlaneMainWidget(QWidget):
     def setup_gui(self):
 
         dialog_layout = QVBoxLayout()
-        main_widget = QTabWidget()        
-        main_widget.addTab(self.setup_processing_tab(), "Processing")
-        main_widget.addTab(self.setup_results_tab(), "Results")
-        main_widget.addTab(self.setup_configurations_tab(), "Configurations")
-        main_widget.addTab(self.setup_help_tab(), "Help")
-                                     
-        dialog_layout.addWidget(main_widget)                                     
+        self.main_widget = QTabWidget()
+        self.main_widget.addTab(self.setup_processing_tab(), "Processing")
+        self.main_widget.addTab(self.setup_configurations_tab(), "Configurations")
+        self.main_widget.addTab(self.setup_results_tab(), "Results")
+        self.main_widget.addTab(self.setup_help_tab(), "Help")
+
+        self.main_widget.currentChanged.connect(self.onTabChange)
+
+        dialog_layout.addWidget(self.main_widget)
         self.setLayout(dialog_layout)                    
         self.adjustSize()                       
         self.setWindowTitle('{} - {}'.format(plugin_nm, self.tool_nm))
+
+    @pyqtSlot()
+    def onTabChange(self):
+
+        self.solutionsView.update()
 
     def setup_processing_tab(self):
         
@@ -228,64 +241,6 @@ class BestFitPlaneMainWidget(QWidget):
         layout.addWidget(self.setup_results_processings())
         widget.setLayout(layout)
         return widget
-
-    def setup_results_processings(self):
-
-        widget = QWidget()
-
-        #self.tool_nm = tool_nm
-        #self.db_path = db_path
-        #self.projectCrs = projectCrs
-
-        pars = parse_db_params(self.db_tables_params)
-        self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
-        self.solutionsModel = QSqlTableModel(db=QSqlDatabase.database())
-        self.solutionsModel.setTable(self.solutions_tblnm)
-
-        self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
-        self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
-        self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
-        self.solutionsModel.setHeaderData(DATASET, Qt.Horizontal, "label")
-        self.solutionsModel.setHeaderData(NOTES, Qt.Horizontal, "comments")
-        self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
-
-        self.solutionsModel.select()
-
-        self.solutionsView = QTableView()
-        self.solutionsView.setModel(self.solutionsModel)
-        self.solutionsView.setSelectionMode(QTableView.MultiSelection)
-        self.solutionsView.setSelectionBehavior(QTableView.SelectRows)
-        self.solutionsView.verticalHeader().hide()
-        self.solutionsView.resizeColumnsToContents()
-
-        self.solutionsView.resizeRowsToContents()
-        self.solutionsView.setSortingEnabled(True)
-
-        self.selection_model = self.solutionsView.selectionModel()
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.solutionsView)
-
-        plot_selected_recs = QPushButton("Plot selected records")
-        plot_selected_recs.clicked.connect(self.plot_selected_records)
-        layout.addWidget(plot_selected_recs)
-
-        delete_selected_recs = QPushButton("Delete selected records")
-        delete_selected_recs.clicked.connect(self.delete_selected_records)
-        layout.addWidget(delete_selected_recs)
-
-        xprt_selected_recs = QPushButton("Export selected records")
-        xprt_selected_recs.clicked.connect(self.xprt_selected_records)
-        layout.addWidget(xprt_selected_recs)
-
-        widget.setLayout(layout)
-        return widget
-
-        #self.setLayout(layout)
-
-        # self.setMinimumSize(675, 400)
-
-        # self.setWindowTitle("Saved results")
 
     def setup_configurations_tab(self):
 
@@ -313,6 +268,97 @@ class BestFitPlaneMainWidget(QWidget):
         qwdtHelp.setLayout(qlytHelp)
 
         return qwdtHelp
+
+    def setup_results_tableview(self):
+
+        db_path = self.result_db_path_qle.text()
+
+        if db_path:
+
+            success, msg = try_connect_to_sqlite3_db_with_qt(db_path)
+            if not success:
+                QMessageBox.critical(
+                    self,
+                    self.tool_nm,
+                    msg)
+                return
+
+            """
+            table_result_dialog = StoredResultsTableDialog(
+                tool_nm=self.tool_nm,
+                db_path=db_path,
+                db_tables_params=self.db_tables_params,
+                projectCrs=self.get_project_crs_long_descr())
+
+            table_result_dialog.exec_()
+            """
+
+            pars = parse_db_params(self.db_tables_params)
+
+            self.solutions_tblnm, self.sol_tbl_flds, self.pts_tbl_nm, self.pts_tbl_flds = pars
+            self.solutionsModel = QSqlTableModel(db=QSqlDatabase.database())
+            self.solutionsModel.setTable(self.solutions_tblnm)
+
+            self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
+            self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
+            self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
+            self.solutionsModel.setHeaderData(DATASET, Qt.Horizontal, "dataset")
+            self.solutionsModel.setHeaderData(NOTES, Qt.Horizontal, "notes")
+            self.solutionsModel.setHeaderData(SRC_CRS, Qt.Horizontal, "source crs")
+            self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
+
+            self.solutionsModel.select()
+
+            self.solutionsView.setModel(self.solutionsModel)
+            self.solutionsView.setSelectionMode(QTableView.MultiSelection)
+            self.solutionsView.setSelectionBehavior(QTableView.SelectRows)
+            self.solutionsView.verticalHeader().hide()
+            self.solutionsView.resizeColumnsToContents()
+
+            self.solutionsView.resizeRowsToContents()
+            self.solutionsView.setSortingEnabled(True)
+
+            self.selection_model = self.solutionsView.selectionModel()
+
+    def setup_results_processings(self):
+
+        self.results_widget = QWidget()
+
+        self.results_layout = QVBoxLayout()
+
+        plot_selected_recs = QPushButton("Plot selected records")
+        plot_selected_recs.clicked.connect(self.plot_selected_records)
+        self.results_layout.addWidget(plot_selected_recs)
+
+        delete_selected_recs = QPushButton("Delete selected records")
+        delete_selected_recs.clicked.connect(self.delete_selected_records)
+        self.results_layout.addWidget(delete_selected_recs)
+
+        xprt_selected_recs = QPushButton("Export selected records")
+        xprt_selected_recs.clicked.connect(self.xprt_selected_records)
+        self.results_layout.addWidget(xprt_selected_recs)
+
+        #self.tool_nm = tool_nm
+        #self.db_path = db_path
+        #self.projectCrs = projectCrs
+
+        self.solutionsView = QTableView()
+
+        #self.setup_results_tableview()
+
+        self.solutionsView.show()
+
+        self.results_layout.addWidget(self.solutionsView)
+
+        self.results_widget.setLayout(self.results_layout)
+
+        return self.results_widget
+
+        #self.setLayout(self.results_layout)
+
+        # self.setMinimumSize(675, 400)
+
+        # self.setWindowTitle("Saved results")
 
     def setup_source_dem(self):
 
@@ -378,9 +424,11 @@ class BestFitPlaneMainWidget(QWidget):
         self.bestfitplane_calculate_pButton.setEnabled(False)
         layout.addWidget(self.bestfitplane_calculate_pButton, 0, 0, 1, 2)
 
+        """
         view_results_button = QPushButton("Saved results")
         view_results_button.clicked.connect(self.view_result_table)
         layout.addWidget(view_results_button, 1, 0, 1, 2)
+        """
 
         self.enable_point_input_buttons(False)
 
@@ -422,7 +470,7 @@ class BestFitPlaneMainWidget(QWidget):
             points=self.bestfitplane_points,
             result_db_path=self.result_db_path_qle.text(),
             db_tables_params=self.db_tables_params,
-            prj_crs=self.get_project_crs())
+            prj_crs=self.get_project_crs_long_descr())
         stereonet_dialog.exec_()
 
     def create_result_db(self):
@@ -450,6 +498,8 @@ class BestFitPlaneMainWidget(QWidget):
         if success:
 
             self.result_db_path_qle.setText(db_path)
+
+            self.setup_results_tableview()
 
             QMessageBox.information(
                 self,
@@ -507,11 +557,15 @@ class BestFitPlaneMainWidget(QWidget):
         if tables_found:
 
             self.result_db_path_qle.setText(db_path)
+
+            self.setup_results_tableview()
+
             QMessageBox.information(
                 self,
                 self.tool_nm,
                 "Result db set")
 
+    """
     def view_result_table(self):
 
         db_path = self.result_db_path_qle.text()
@@ -535,9 +589,10 @@ class BestFitPlaneMainWidget(QWidget):
             tool_nm=self.tool_nm,
             db_path=db_path,
             db_tables_params=self.db_tables_params,
-            projectCrs=self.get_project_crs())
+            projectCrs=self.get_project_crs_long_descr())
 
         table_result_dialog.exec_()
+    """
 
     def add_marker(self, prj_crs_x, prj_crs_y):
 
@@ -836,9 +891,24 @@ class BestFitPlaneMainWidget(QWidget):
         
         self.disable_MapTool(self.bestfitplane_PointMapTool)
 
-    def get_project_crs(self):
+    def get_project_crs(self) -> QgsCoordinateReferenceSystem:
 
         return self.canvas.mapSettings().destinationCrs()
+
+    def get_project_crs_authid(self) -> str:
+
+        return self.get_project_crs().authid()
+
+    def get_project_crs_descr(self) -> str:
+
+        return self.get_project_crs().description()
+
+    def get_project_crs_long_descr(self) -> str:
+
+        return "{} - {}".format(
+            self.get_project_crs_authid(),
+            self.get_project_crs_descr()
+        )
 
     def project_coords(self, x, y, source_crs, dest_crs):
         
@@ -861,6 +931,14 @@ class BestFitPlaneMainWidget(QWidget):
         return self.project_coords(x, y, self.dem.crs(), projectCrs)
 
     def plot_selected_records(self):
+
+        if not self.sol_tbl_flds:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                msg_database_missing
+            )
+            return
 
         # get relevant fields names
 
@@ -916,6 +994,14 @@ class BestFitPlaneMainWidget(QWidget):
 
     def delete_selected_records(self):
 
+        if not self.selection_model:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                msg_database_missing
+            )
+            return
+
         selected_ids = get_selected_recs_ids(self.selection_model)
         if not selected_ids:
             QMessageBox.warning(
@@ -956,11 +1042,20 @@ class BestFitPlaneMainWidget(QWidget):
         self.solutionsModel.endResetModel()
 
         self.solutionsView.setSortingEnabled(True)
-        self.solutionsView.repaint()
+        self.solutionsView.update()
 
     def xprt_selected_records(self):
 
-        dialog = ExportDialog(self.projectCrs)
+        if not self.selection_model:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                msg_database_missing
+            )
+            return
+
+        dialog = ExportDialog(
+            self.get_project_crs())
 
         if dialog.exec_():
             if dialog.pt_shape_choice.isChecked():
@@ -1077,17 +1172,19 @@ class BestFitPlaneMainWidget(QWidget):
                     cntn.first()
                     dip_dir = cntn.value(0)
                     dip_ang = cntn.value(1)
-                    label = cntn.value(2)
-                    comments = cntn.value(3)
-                    creat_time = cntn.value(4)
-                    print(dip_dir, dip_ang, label, comments, creat_time)
+                    dataset = cntn.value(2)
+                    notes = cntn.value(3)
+                    src_crs = cntn.value(4)
+                    creat_time = cntn.value(5)
+                    #print(dip_dir, dip_ang, dataset, notes, creat_time)
 
                     id_pts[id] = dict(vals=(
                         id,
                         dip_dir,
                         dip_ang,
-                        label,
-                        comments,
+                        dataset,
+                        notes,
+                        src_crs,
                         creat_time))
 
                 sol_pts_qr = select_sol_pts_pars_template.format(id)
@@ -1234,6 +1331,7 @@ class SolutionStereonetDialog(QDialog):
         noteDialog = SolutionNotesDialog(self.plugin_fldrpth, parent=self)
 
         if noteDialog.exec_():
+
             dataset = noteDialog.label.toPlainText()
             notes = noteDialog.comments.toPlainText()
 
@@ -1241,8 +1339,8 @@ class SolutionStereonetDialog(QDialog):
             curs = conn.cursor()
 
             # Insert a row of data
-
-            values = [None, self.plane.dd, self.plane.da, dataset, notes, self.prj_crs, dt.now()]
+            print(self.prj_crs)
+            values = [None, self.plane.dd, self.plane.da, dataset, notes, str(self.prj_crs), dt.now()]
             curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
 
             # Get the max id of the saved solution
@@ -1258,9 +1356,9 @@ class SolutionStereonetDialog(QDialog):
 
             # Create the query strings for updating the points table
 
-            pts_vals = list(map(lambda idxyzlonlat: [last_sol_id, *idxyzlonlat], self.pts))
+            pts_vals = list(map(lambda idxyzlonlat: [None, last_sol_id, *idxyzlonlat], self.pts))
 
-            curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
+            curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
 
             # Save (commit) the changes
 
@@ -1285,6 +1383,7 @@ class SolutionNotesDialog(QDialog):
         self.show()
 
 
+"""
 class StoredResultsTableDialog(QDialog):
 
     def __init__(self, tool_nm, db_path, db_tables_params, projectCrs):
@@ -1559,17 +1658,17 @@ class StoredResultsTableDialog(QDialog):
                     cntn.first()
                     dip_dir = cntn.value(0)
                     dip_ang = cntn.value(1)
-                    label = cntn.value(2)
-                    comments = cntn.value(3)
+                    dataset = cntn.value(2)
+                    notes = cntn.value(3)
                     creat_time = cntn.value(4)
-                    print(dip_dir, dip_ang, label, comments, creat_time)
+                    #print(dip_dir, dip_ang, dataset, notes, creat_time)
 
                     id_pts[id] = dict(vals=(
                         id,
                         dip_dir,
                         dip_ang,
-                        label,
-                        comments,
+                        dataset,
+                        notes,
                         creat_time))
 
                 sol_pts_qr = select_sol_pts_pars_template.format(id)
@@ -1665,7 +1764,7 @@ class StoredResultsTableDialog(QDialog):
         except Exception as e:
 
             return False, str(e)
-
+"""
 
 class SelectedSolutionsStereonetDialog(QDialog):
 
@@ -1698,7 +1797,7 @@ class SelectedSolutionsStereonetDialog(QDialog):
 
         self.setWindowTitle("Selected solutions")
 
-
+"""
 class NewShapeFilesDialog(QDialog):
 
     def __init__(self, parent=None):
@@ -1739,8 +1838,9 @@ class NewShapeFilesDialog(QDialog):
             "shp (*.shp *.SHP)")
 
         self.output_point_shape_QLineEdit.setText(out_shapefile_name)
+"""
 
-
+"""
 class ShapefileSolutionDescriptDialog(QDialog):
 
     def __init__(self, parent=None):
@@ -1770,7 +1870,7 @@ class ShapefileSolutionDescriptDialog(QDialog):
         cancelButton.clicked.connect(self.reject)
 
         self.setWindowTitle("Best fit plane solution")
-
+"""
 
 class ExportDialog(QDialog):
 

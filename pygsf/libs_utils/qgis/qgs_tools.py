@@ -62,17 +62,20 @@ def loaded_point_layers():
     return [layer for layer in loaded_vector_layers() if layer.geometryType() == QgsWkbTypes.PointGeometry]
     
  
-def loaded_raster_layers():        
+def loaded_raster_layers():
           
     return [layer for layer in loaded_layers() if layer.type() == QgsMapLayer.RasterLayer]
 
 
-def loaded_monoband_raster_layers():        
+def loaded_monoband_raster_layers():
           
     return [layer for layer in loaded_raster_layers() if layer.bandCount() == 1]
        
            
-def pt_geoms_attrs(pt_layer, field_list = []):
+def pt_geoms_attrs(pt_layer, field_list=None):
+
+    if not field_list:
+        field_list = []
     
     if pt_layer.selectedFeatureCount() > 0:
         features = pt_layer.selectedFeatures()
@@ -102,8 +105,11 @@ def pt_geoms_attrs(pt_layer, field_list = []):
     return rec_list
 
 
-def line_geoms_attrs(line_layer, field_list = []):
-    
+def line_geoms_attrs(line_layer, field_list=None):
+
+    if not field_list:
+        field_list = []
+
     lines = []
     
     if line_layer.selectedFeatureCount() > 0:
@@ -129,7 +135,7 @@ def line_geoms_attrs(line_layer, field_list = []):
     return lines
            
        
-def line_geoms_with_id(line_layer, curr_field_ndx):    
+def line_geoms_with_id(line_layer, curr_field_ndx):
         
     lines = []
     progress_ids = [] 
@@ -156,22 +162,22 @@ def line_geoms_with_id(line_layer, curr_field_ndx):
                    
 def polyline_to_xytuple_list(qgsline):
     
-    assert len(qgsline) > 0    
+    assert len(qgsline) > 0
     return [(qgspoint.x(), qgspoint.y()) for qgspoint in qgsline]
 
 
 def multipolyline_to_xytuple_list2(qgspolyline):
     
-    return [polyline_to_xytuple_list(qgsline) for qgsline in qgspolyline] 
+    return [polyline_to_xytuple_list(qgsline) for qgsline in qgspolyline]
 
 
-def field_values(layer, curr_field_ndx): 
+def field_values(layer, curr_field_ndx):
     
     values = []
     iterator = layer.getFeatures()
     
     for feature in iterator:
-        values.append(feature.attributes()[curr_field_ndx]) 
+        values.append(feature.attributes()[curr_field_ndx])
             
     return values
     
@@ -229,7 +235,7 @@ def raster_qgis_params(raster_layer):
 def qgs_point(x: float, y: float) -> QgsPointXY:
     """
     Creates a QgsPointXY instance from x-y coordinates.
-    
+
     :param x: the x coordinate.
     :type x: float.
     :param y: the y coordinate.
@@ -289,7 +295,7 @@ def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem, des
     """
     Project a pair of x-y coordinates to a new projection.
     If the destination CRS is not provided, the new projection will be EPSG 4236 (WGS-84).
-    
+
     :param x: the x coordinate.
     :type x: float.
     :param y: the y coordinate.
@@ -328,7 +334,7 @@ def project_line_2d(srcLine, srcCrs, destCrs):
         destLine = destLine.add_pt(Point(destPt.x(), destPt.y()))
         
     return destLine
-        
+
 
 """
 Modified from: profiletool, script: tools/ptmaptool.py
