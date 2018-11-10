@@ -43,7 +43,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Comments</string>
+    <string>Notes</string>
    </property>
   </widget>
   <widget class="QPlainTextEdit" name="comments">
@@ -82,7 +82,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Label</string>
+    <string>Dataset</string>
    </property>
   </widget>
  </widget>

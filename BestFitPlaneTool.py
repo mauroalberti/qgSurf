@@ -78,9 +78,6 @@ from .pygsf.libs_utils.qt.databases import try_execute_query_with_qt
 
 bfp_texts_flnm = "texts.yaml"
 
-ID_SOL, DIP_DIR, DIP_ANG, LABEL, COMMENTS, CREAT_TIME = range(6)
-ID_PT, FK_ID_SOL, X, Y, Z = range(5)
-
 plugin_folder = os.path.dirname(__file__)
 
 config_fldrpth = os.path.join(
@@ -234,6 +231,8 @@ class BestFitPlaneMainWidget(QWidget):
 
     def setup_results_processings(self):
 
+        widget = QWidget()
+
         #self.tool_nm = tool_nm
         #self.db_path = db_path
         #self.projectCrs = projectCrs
@@ -246,8 +245,8 @@ class BestFitPlaneMainWidget(QWidget):
         self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
         self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
         self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
-        self.solutionsModel.setHeaderData(LABEL, Qt.Horizontal, "label")
-        self.solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, "comments")
+        self.solutionsModel.setHeaderData(DATASET, Qt.Horizontal, "label")
+        self.solutionsModel.setHeaderData(NOTES, Qt.Horizontal, "comments")
         self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
 
         self.solutionsModel.select()
@@ -279,7 +278,8 @@ class BestFitPlaneMainWidget(QWidget):
         xprt_selected_recs.clicked.connect(self.xprt_selected_records)
         layout.addWidget(xprt_selected_recs)
 
-        return layout
+        widget.setLayout(layout)
+        return widget
 
         #self.setLayout(layout)
 
@@ -421,7 +421,8 @@ class BestFitPlaneMainWidget(QWidget):
             plane=self.bestfitplane,
             points=self.bestfitplane_points,
             result_db_path=self.result_db_path_qle.text(),
-            db_tables_params=self.db_tables_params)
+            db_tables_params=self.db_tables_params,
+            prj_crs=self.get_project_crs())
         stereonet_dialog.exec_()
 
     def create_result_db(self):
@@ -534,7 +535,7 @@ class BestFitPlaneMainWidget(QWidget):
             tool_nm=self.tool_nm,
             db_path=db_path,
             db_tables_params=self.db_tables_params,
-            projectCrs=self.canvas.mapSettings().destinationCrs())
+            projectCrs=self.get_project_crs())
 
         table_result_dialog.exec_()
 
@@ -558,9 +559,13 @@ class BestFitPlaneMainWidget(QWidget):
         if add_marker:
             self.add_marker(prj_crs_x, prj_crs_y)
 
+        lon, lat = qgs_project_xy(
+            x=prj_crs_x,
+            y=prj_crs_y,
+            srcCrs=self.get_project_crs())
         curr_ndx = len(self.bestfitplane_points) + 1
-        self.bestfitplane_points.append([curr_ndx, prj_crs_x, prj_crs_y, dem_z_value])
-        self.bestfitplane_src_points_ListWdgt.addItem("%i: %.3f %.3f %.3f" % (curr_ndx, prj_crs_x, prj_crs_y, dem_z_value))
+        self.bestfitplane_points.append([curr_ndx, prj_crs_x, prj_crs_y, dem_z_value, lon, lat])
+        self.bestfitplane_src_points_ListWdgt.addItem("%i: %.3f %.3f %.3f %.6f %.6f" % (curr_ndx, prj_crs_x, prj_crs_y, dem_z_value, lon, lat))
 
         self.bfp_calc_update.emit()
 
@@ -629,7 +634,7 @@ class BestFitPlaneMainWidget(QWidget):
             return
 
         # for all xy tuples, project to project CRS as a qgis point
-        projectCrs = self.canvas.mapSettings().destinationCrs()
+        projectCrs = self.get_project_crs()
         proj_crs_qgispoint_list = [project_qgs_point(qgs_point(x,y), inpts_lyr.crs(), projectCrs) for (x,y) in xypair_list ]
 
         # for all qgs points, process them for the input point processing queue
@@ -787,10 +792,11 @@ class BestFitPlaneMainWidget(QWidget):
 
     def calculate_bestfitplane(self):        
 
-        xyz_list = list(map(lambda idxyz: (idxyz[1], idxyz[2], idxyz[3]), self.bestfitplane_points))
-        xyz_array = np.array(xyz_list, dtype=np.float64)
-        self.xyz_mean = np.mean(xyz_array, axis = 0)
-        svd = xyzSvd(xyz_array - self.xyz_mean)
+        x_ndx, y_ndx, z_ndx = 1, 2, 3
+        lfXyz = list(map(lambda idxyz: (idxyz[x_ndx], idxyz[y_ndx], idxyz[z_ndx]), self.bestfitplane_points))
+        npaXyz = np.array(lfXyz, dtype=np.float64)
+        self.xyz_mean = np.mean(npaXyz, axis=0)
+        svd = xyzSvd(npaXyz - self.xyz_mean)
         if svd['result'] == None:
             QMessageBox.critical(
                 self,
@@ -830,6 +836,10 @@ class BestFitPlaneMainWidget(QWidget):
         
         self.disable_MapTool(self.bestfitplane_PointMapTool)
 
+    def get_project_crs(self):
+
+        return self.canvas.mapSettings().destinationCrs()
+
     def project_coords(self, x, y, source_crs, dest_crs):
         
         if source_crs != dest_crs:
@@ -840,12 +850,14 @@ class BestFitPlaneMainWidget(QWidget):
 
     def get_dem_crs_coords(self, x, y):
 
-        projectCrs = self.canvas.mapSettings().destinationCrs()
+        projectCrs = self.get_project_crs()
+
         return self.project_coords(x, y, projectCrs, self.dem.crs())
 
     def get_prj_crs_coords(self, x, y):
 
-        projectCrs = self.canvas.mapSettings().destinationCrs()
+        projectCrs = self.get_project_crs()
+
         return self.project_coords(x, y, self.dem.crs(), projectCrs)
 
     def plot_selected_records(self):
@@ -1175,7 +1187,7 @@ class BestFitPlaneMainWidget(QWidget):
 
 class SolutionStereonetDialog(QDialog):
 
-    def __init__(self, tool_nm, plane, points, result_db_path, db_tables_params, parent=None):
+    def __init__(self, tool_nm, plane, points, result_db_path, db_tables_params, prj_crs, parent=None):
 
         super().__init__(parent)
 
@@ -1184,6 +1196,7 @@ class SolutionStereonetDialog(QDialog):
         self.pts = points
         self.db_path = result_db_path
         self.db_tables_params = db_tables_params
+        self.prj_crs = prj_crs
         self.plugin_fldrpth = os.path.dirname(__file__)
 
         layout = QVBoxLayout()
@@ -1221,16 +1234,16 @@ class SolutionStereonetDialog(QDialog):
         noteDialog = SolutionNotesDialog(self.plugin_fldrpth, parent=self)
 
         if noteDialog.exec_():
-            label = noteDialog.label.toPlainText()
-            comments = noteDialog.comments.toPlainText()
+            dataset = noteDialog.label.toPlainText()
+            notes = noteDialog.comments.toPlainText()
 
             conn = sqlite3.connect(self.db_path)
             curs = conn.cursor()
 
             # Insert a row of data
 
-            values = [None, self.plane.dd, self.plane.da, label, comments, dt.now()]
-            curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
+            values = [None, self.plane.dd, self.plane.da, dataset, notes, self.prj_crs, dt.now()]
+            curs.execute("INSERT INTO {} VALUES (?, ?, ?, ?, ?, ?, ?)".format(sol_tbl_nm), values)
 
             # Get the max id of the saved solution
 
@@ -1245,7 +1258,7 @@ class SolutionStereonetDialog(QDialog):
 
             # Create the query strings for updating the points table
 
-            pts_vals = list(map(lambda idxyz: [last_sol_id, *idxyz], self.pts))
+            pts_vals = list(map(lambda idxyzlonlat: [last_sol_id, *idxyzlonlat], self.pts))
 
             curs.executemany("INSERT INTO {} VALUES (?, ?, ?, ?, ?)".format(pts_tbl_nm), pts_vals)
 
@@ -1290,8 +1303,8 @@ class StoredResultsTableDialog(QDialog):
         self.solutionsModel.setHeaderData(ID_SOL, Qt.Horizontal, "id")
         self.solutionsModel.setHeaderData(DIP_DIR, Qt.Horizontal, "dip direction")
         self.solutionsModel.setHeaderData(DIP_ANG, Qt.Horizontal, "dip angle")
-        self.solutionsModel.setHeaderData(LABEL, Qt.Horizontal, "label")
-        self.solutionsModel.setHeaderData(COMMENTS, Qt.Horizontal, "comments")
+        self.solutionsModel.setHeaderData(DATASET, Qt.Horizontal, "label")
+        self.solutionsModel.setHeaderData(NOTES, Qt.Horizontal, "comments")
         self.solutionsModel.setHeaderData(CREAT_TIME, Qt.Horizontal, "created")
 
         self.solutionsModel.select()

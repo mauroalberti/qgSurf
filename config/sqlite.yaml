@@ -4,18 +4,23 @@ sqlite_db:
     solutions:
       name: solutions
       fields:
-        - id:         {name: id,         type: INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL}
-        - dip_dir:    {name: dip_dir,    type: REAL NOT NULL}
-        - dip_ang:    {name: dip_ang,    type: REAL NOT NULL}
-        - data_set:   {name: data_set,   type: TEXT}
-        - comments:   {name: notes,      type: TEXT}
-        - creat_time: {name: creat_time, type: DATE NOT NULL}
+        - id:          {name: id,           type: INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL}
+        - dip_dir:     {name: dip_dir,      type: REAL NOT NULL}
+        - dip_ang:     {name: dip_ang,      type: REAL NOT NULL}
+        - data_set:    {name: data_set,     type: TEXT}
+        - comments:    {name: notes,        type: TEXT}
+        - src_crs:     {name: src_crs,      type: TEXT}
+        - creat_time:  {name: creat_time,   type: DATE NOT NULL}
 
     src_pts:
       name: src_points
       fields:
-        - id_sol:     {name: id_sol,     type: INTEGER NOT NULL}
-        - id_pt:      {name: id_pt,      type: INTEGER NOT NULL}
-        - longitude:  {name: longitude,  type: REAL NOT NULL}
-        - latitude:   {name: latitude,   type: REAL NOT NULL}
-        - z:          {name: z,          type: REAL NOT NULL}
+        - id:          {name: id,           type: INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL}
+        - id_sol:      {name: id_sol,       type: INTEGER NOT NULL}
+        - pt_int_id:   {name: pt_int_id,    type: INTEGER NOT NULL}
+        - x:           {name: x,            type: REAL NOT NULL}
+        - y:           {name: y,            type: REAL NOT NULL}
+        - z:           {name: z,            type: REAL NOT NULL}
+        - longitude:   {name: longitude,    type: REAL NOT NULL}
+        - latitude:    {name: latitude,     type: REAL NOT NULL}
+

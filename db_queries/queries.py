@@ -1,6 +1,9 @@
 
-solutions_flds_str = "id, dip_dir, dip_ang, data_set, notes, creat_time"
-source_points_flds_str = "id, id_sol, longitude, latitude, z"
+ID_SOL, DIP_DIR, DIP_ANG, DATASET, NOTES, SRC_CRS, CREAT_TIME = range(7)
+ID_PT, FK_ID_SOL, PT_INT_ID, X, Y, Z, LON, LAT = range(8)
+
+solutions_flds_str = "id, dip_dir, dip_ang, data_set, notes, src_crs, creat_time"
+source_points_flds_str = "id, id_sol, pt_int_id, x, y, z, longitude, latitude"
 
 select_from_template = "SELECT %s FROM {}"
 generic_where_in_template = " WHERE {} IN ({})"
@@ -11,18 +14,21 @@ query_sol_id_template = "select {id} from {solutions} where {creat_time} = (sele
 query_solutions_all_template = "SELECT {}, {} FROM {}"
 query_solutions_selection_template = query_solutions_all_template + generic_where_in_template
 
-query_solutions_fllattr_full_template = select_from_template % solutions_flds_str
-query_solutions_fllattr_selection_template = query_solutions_fllattr_full_template + generic_where_in_template
+#query_solutions_fllattr_full_template = select_from_template % solutions_flds_str
+#query_solutions_fllattr_selection_template = query_solutions_fllattr_full_template + generic_where_in_template
 
-query_points_fllattr_full_template = select_from_template % source_points_flds_str
-query_points_fllattr_selection_template = query_points_fllattr_full_template + generic_where_in_template
+#query_points_fllattr_full_template = select_from_template % source_points_flds_str
+#query_points_fllattr_selection_template = query_points_fllattr_full_template + generic_where_in_template
 
 select_results_for_shapefile_query = """
-SELECT src_points.id_sol, src_points.id_pt, src_points.longitude, src_points.latitude, src_points.z, solutions.dip_dir, solutions.dip_ang, solutions.data_set, solutions.notes, solutions.creat_time
+SELECT src_points.id, src_points.id_sol, src_points.pt_int_id, 
+       src_points.x, src_points.y, src_points.z, src_points.longitude, src_points.latitude, 
+       solutions.dip_dir, solutions.dip_ang, solutions.data_set, solutions.notes, 
+       solutions.src_crs, solutions.creat_time
 FROM src_points 
 INNER JOIN solutions
 ON src_points.id_sol = solutions.id 
-ORDER BY src_points.id_sol, src_points.id_pt
+ORDER BY src_points.id
 """
 
 select_all_solutions_ids = """
@@ -32,15 +38,15 @@ ORDER BY id ASC
 """
 
 select_solution_pars_template = """
-SELECT dip_dir, dip_ang, data_set, notes, creat_time
+SELECT dip_dir, dip_ang, data_set, notes, src_crs, creat_time
 FROM solutions
 WHERE id = {}
 """
 
 select_sol_pts_pars_template = """
-SELECT id_pt, longitude, latitude, z
+SELECT id, pt_int_id, x, y, z, longitude, latitude
 FROM src_points
 WHERE id_sol = {}
-ORDER BY id_pt
+ORDER BY id
 """
 
