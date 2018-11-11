@@ -280,8 +280,8 @@ def try_write_line_shapefile(path: str, field_names: List[str], values: Dict) ->
             # pre-processing for new feature in output layer
             line_geom = ogr.Geometry(ogr.wkbLineString)
 
-            for idxyz in values[id]["pts"]:
-                _, x, y, z = idxyz
+            for id_xyz in values[id]["pts"]:
+                x, y, z = id_xyz
                 line_geom.AddPoint(x, y, z)
 
             # create a new feature

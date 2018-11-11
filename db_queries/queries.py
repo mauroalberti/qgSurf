@@ -14,20 +14,28 @@ query_sol_id_template = "select {id} from {solutions} where {creat_time} = (sele
 query_solutions_all_template = "SELECT {}, {} FROM {}"
 query_solutions_selection_template = query_solutions_all_template + generic_where_in_template
 
-#query_solutions_fllattr_full_template = select_from_template % solutions_flds_str
-#query_solutions_fllattr_selection_template = query_solutions_fllattr_full_template + generic_where_in_template
-
-#query_points_fllattr_full_template = select_from_template % source_points_flds_str
-#query_points_fllattr_selection_template = query_points_fllattr_full_template + generic_where_in_template
-
-select_results_for_shapefile_query = """
+xprt_shppt_select_all_results = """
 SELECT src_points.id, src_points.id_sol, src_points.pt_int_id, 
-       src_points.x, src_points.y, src_points.z, src_points.longitude, src_points.latitude, 
+       src_points.x, src_points.y, src_points.z, 
+       src_points.longitude, src_points.latitude, 
        solutions.dip_dir, solutions.dip_ang, solutions.data_set, solutions.notes, 
        solutions.src_crs, solutions.creat_time
 FROM src_points 
 INNER JOIN solutions
 ON src_points.id_sol = solutions.id 
+ORDER BY src_points.id
+"""
+
+xprt_shppt_select_part_results = """
+SELECT src_points.id, src_points.id_sol, src_points.pt_int_id, 
+       src_points.x, src_points.y, src_points.z, 
+       src_points.longitude, src_points.latitude, 
+       solutions.dip_dir, solutions.dip_ang, solutions.data_set, solutions.notes, 
+       solutions.src_crs, solutions.creat_time
+FROM src_points 
+INNER JOIN solutions
+ON src_points.id_sol = solutions.id 
+WHERE src_points.id_sol IN ({})
 ORDER BY src_points.id
 """
 
@@ -43,10 +51,10 @@ FROM solutions
 WHERE id = {}
 """
 
-select_sol_pts_pars_template = """
-SELECT id, pt_int_id, x, y, z, longitude, latitude
+xprt_shpln_select_sol_pts_pars_template = """
+SELECT x, y, z
 FROM src_points
 WHERE id_sol = {}
-ORDER BY id
+ORDER BY pt_int_id
 """
 
