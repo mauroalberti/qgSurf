@@ -57,10 +57,9 @@ class GeoArray(object):
     """
     GeoArray class.
     Stores and process georeferenced raster data.
-
     """
 
-    def __init__(self, inGeotransform: GeoTransform, inProjection: str, inLevels: Optional[List['np.array']]=None) -> None:
+    def __init__(self, inGeotransform: GeoTransform, inProjection: str, inLevels: Optional[List[np.ndarray]]=None) -> None:
         """
         GeoArray class constructor.
 
@@ -266,6 +265,26 @@ class GeoArray(object):
 
         return self.gt.has_rotation
 
+    def xy(self, level_ndx: int=0) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """
+        Returns the two arrays storing respectively the x and the y coordinates
+        of the grid cell centers for the chosen level (default is first level).
+
+        :param level_ndx: the index of the
+        :return: two arrays storing the geographical coordinates of the grid centers.
+        :rtype: tuple made up by two float arrays.
+
+        Examples:
+        """
+
+        res = self.level_shape(level_ndx)
+
+        if not res:
+            return None
+        else:
+            num_rows, num_cols = res
+            return gtToxyCellCenters(self.gt, num_rows, num_cols)
+
     def interpolate_bilinear(self, x: Number, y: Number, level_ndx=0) -> Optional[float]:
         """
         Interpolate the z value at a point, given its geographic coordinates.
@@ -465,7 +484,7 @@ def levelCreateParams(gt: GeoTransform, prj: str, data: array) -> Dict:
     :param data: the level data.
     :type data: Numpy array.
     :return: the dictionary of the relevant parameters.
-    :rtype: dictinary.
+    :rtype: dictionary.
 
     Examples:
     """
@@ -475,6 +494,7 @@ def levelCreateParams(gt: GeoTransform, prj: str, data: array) -> Dict:
         projection=prj,
         data_shape=data.shape
     )
+
 
 def levelsEquival(level_params_1: Dict, level_params_2: dict) -> bool:
     """

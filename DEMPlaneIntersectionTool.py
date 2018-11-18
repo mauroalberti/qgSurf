@@ -859,7 +859,7 @@ class DemPlaneIntersectionWidget(QWidget):
         # set analysis parameters
         sourcePoint = self.inters.parameters._srcPt
         self.srcPlaneAttitude = self.inters.parameters._srcPlaneAttitude
-        self.plane_z = self.srcPlaneAttitude.plane_from_geo(sourcePoint)  
+        self.plane_z = self.srcPlaneAttitude.plane_from_geo_closure(sourcePoint)
               
         # add fields to the output shapefile  
         id_fieldDef = ogr.FieldDefn('id', ogr.OFTInteger)

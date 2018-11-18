@@ -1584,10 +1584,10 @@ class Grid(object):
             x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
             # closure for the planar surface that, given (x,y), will be used to derive z  
-            plane_z_closure = srcPlaneAttitude.plane_from_geo( srcPt  )
+            plane_z_closure = srcPlaneAttitude.plane_from_geo_closure(srcPt)
             
             # 2D array of plane segment parameters
-            x_plane_m = srcPlaneAttitude.plane_x_coeff(  )            
+            x_plane_m = srcPlaneAttitude.slope_x_dir()
             x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, grid_coord_to_geogr_coord_y_closure, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
@@ -1607,7 +1607,7 @@ class Grid(object):
             y_dem_q = self.data - cell_center_y_array * y_dem_m
  
             # 2D array of plane segment parameters
-            y_plane_m = srcPlaneAttitude.plane_y_coeff(  )            
+            y_plane_m = srcPlaneAttitude.slope_y_dir()
             y_plane_q = array_from_function( 1, self.col_num(), grid_coord_to_geogr_coord_x_closure , lambda i: 0, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
@@ -1650,10 +1650,10 @@ class Grid(object):
             x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
             # equation for the planar surface that, given (x,y), will be used to derive z  
-            plane_z_closure = srcPlaneAttitude.plane_from_geo( srcPt )
+            plane_z_closure = srcPlaneAttitude.plane_from_geo_closure( srcPt )
             
             # 2D array of plane segment parameters
-            x_plane_m = srcPlaneAttitude.plane_x_coeff(  )            
+            x_plane_m = srcPlaneAttitude.slope_x_dir(  )            
             x_plane_q = array_from_function( self.row_num(), 1, lambda j: 0, grid_coord_to_geogr_coord_y_closure, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
@@ -1672,7 +1672,7 @@ class Grid(object):
             y_dem_q = self.data - cell_center_y_array * y_dem_m
  
             # 2D array of plane segment parameters
-            y_plane_m = srcPlaneAttitude.plane_y_coeff(  )            
+            y_plane_m = srcPlaneAttitude.slope_y_dir(  )            
             y_plane_q = array_from_function( 1, self.col_num(), grid_coord_ to_geogr_coord_x , lambda i: 0, plane_z_closure )
 
             # 2D array that defines denominator for intersections between local segments
