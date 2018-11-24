@@ -6,92 +6,105 @@ from ..defaults.typing import Tuple
 from ..mathematics.defaults import *
 
 from ..spatial.rasters.geoarray import GeoArray
+from ..spatial.rasters.fields import *
 from ..spatial.vectorial.vectorial import Point
 
 from ..orientations.orientations import Plane
 
 
-def topo_plane_intersection(grid: GeoArray, level_ndx: int=0, srcPt: Point, srcPlaneAttitude: Plane) -> Tuple['array', 'array', 'array', 'array']:
+def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: GeoArray, level_ndx: int=0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Calculates the intersections (as points) between the grid and a planar analytical surface.
 
-    :param surf_type: type of considered surface (i.e., plane, the only case implemented at present).
-    :type surf_type: String.
-    :param level_ndx: the grid level to use from the provided geoarray. Default is first (index equal to zero).
-    :type level_ndx: integer.
-    :param srcPt: point, expressed in geographical coordinates, that the plane must contain.
-    :type srcPt: Point.
     :param srcPlaneAttitude: orientation of the surface (currently only planes).
     :type srcPlaneAttitude: class Plane.
+    :param srcPt: point, expressed in geographical coordinates, that the plane must contain.
+    :type srcPt: Point.
+    :param geo_array: the input GeoArray storing the used grid.
+    :type geo_array: GeoArray.
+    :param level_ndx: the grid level to use from the provided geoarray. Default is first (index equal to zero).
+    :type level_ndx: integer.
 
-    :return: tuple of four arrays
+    :return: tuple of four Numpy arrays
 
     Examples:
     """
 
-    # closures to compute the geographic coordinates (in x- and y-) of a cell center
-    # the grid coordinates of the cell center are expressed by i and j
+    # the numeric values of the grid stored in a Numpy array
 
-    closure_grid_coord_to_geogr_coord_x = lambda j: grid.domain.llcorner.x + grid.cellsize_x * (0.5 + j)
-    closure_grid_coord_to_geogr_coord_y = lambda i: grid.domain.trcorner.y - grid.cellsize_y * (0.5 + i)
+    grid_z = geo_array.level(
+        level_ndx=level_ndx)
+
+    # row and column numbers of the grid
+
+    row_num, col_num = grid_z.shape
+
+    # grid cell sizes along x- and y-directions
+
+    cell_size_x = geo_array.cellsize_x
+    cell_size_y = geo_array.cellsize_y
 
     # arrays storing the geographical coordinates of the cell centers along the x- and y- axes
 
-    ycoords_x, xcoords_y = grid.xy(level_ndx)
-
-    #### x-axis direction intersections
-
-    # 2D array of DEM segment parameters
-
-    x_dem_m = grid.grad_forward_x()
-    x_dem_q = grid.data - cell_center_x_array * x_dem_m
+    grid_x, grid_y = geo_array.xy(level_ndx)
 
     # closure for the planar surface that, given (x,y), will be used to derive z
 
-    closure_plane_z = srcPlaneAttitude.plane_from_geo_closure(srcPt)
-
-    # 2D array of plane segment parameters
-
-    x_plane_m = srcPlaneAttitude.slope_x_dir()
-    x_plane_q = np.fromfunction(
-        lambda i, j: closure_plane_z(0, closure_grid_coord_to_geogr_coord_y(i)),
-        (grid.row_num(), 1))
-
-    # 2D array that defines denominator for intersections between local segments
-
-    x_inters_denomin = np.where(x_dem_m != x_plane_m, x_dem_m - x_plane_m, np.NaN)
-
-    coincident_x = np.where(x_dem_q != x_plane_q, np.NaN, ycoords_x)
-
-    xcoords_x = np.where(x_dem_m != x_plane_m, (x_plane_q - x_dem_q) / x_inters_denomin, coincident_x)
-    xcoords_x = np.where(xcoords_x < ycoords_x, np.NaN, xcoords_x)
-    xcoords_x = np.where(xcoords_x >= ycoords_x + grid.cellsize_x, np.NaN, xcoords_x)
-
-    #### y-axis direction intersections
+    plane_z_closure = srcPlaneAttitude.closure_plane_from_geo(srcPt)
 
     # 2D array of DEM segment parameters
 
-    y_dem_m = grid.grad_forward_y()
-    y_dem_q = grid.data - cell_center_y_array * y_dem_m
+    grid_m_along_x = grad_x(
+        fld=grid_z,
+        cell_size_x=cell_size_x)
+
+    grid_q_along_x = grid_z - grid_m_along_x * grid_x
+
+    grid_m_along_y = grad_y(
+        fld=grid_z,
+        cell_size_y=cell_size_y)
+
+    grid_q_along_y = grid_z - grid_m_along_y * grid_y
+
+    # closures to compute the geographic coordinates (in x- and y-) of a cell center
+    # the grid coordinates of the cell center are expressed by i and j
+
+    #closure_grid_coord_to_geogr_coord_x = lambda j: geo_array.domain.llcorner.x + cell_size_x * (0.5 + j)
+    #closure_grid_coord_to_geogr_coord_y = lambda i: geo_array.domain.trcorner.y - cell_size_y * (0.5 + i)
+
+    # 2D arrays of plane segment parameters
+
+    plane_m_along_x = srcPlaneAttitude.slope_x_dir()
+    plane_q_along_x = np.fromfunction(
+        lambda i, j: plane_z_closure(0, closure_grid_coord_to_geogr_coord_y(i)),
+        (row_num, 1))
 
     # 2D array of plane segment parameters
 
-    y_plane_m = srcPlaneAttitude.slope_y_dir()
-    y_plane_q = np.fromfunction(
-        lambda i, j: closure_plane_z(closure_grid_coord_to_geogr_coord_x(j), 0),
-        (1, grid.col_num()))
+    m_plane_along_y = srcPlaneAttitude.slope_y_dir()
+    q_plane_along_y = np.fromfunction(
+        lambda i, j: plane_z_closure(closure_grid_coord_to_geogr_coord_x(j), 0),
+        (1, col_num))
 
-    # 2D array that defines denominator for intersections between local segments
+    # 2D arrays that define denominators for intersections between local segments
 
-    y_inters_denomin = np.where(y_dem_m != y_plane_m, y_dem_m - y_plane_m, np.NaN)
-    coincident_y = np.where(y_dem_q != y_plane_q, np.NaN, xcoords_y)
+    x_inters_denomin = np.where(grid_m_along_x != plane_m_along_x, grid_m_along_x - plane_m_along_x, np.NaN)
 
-    ycoords_y = np.where(y_dem_m != y_plane_m, (y_plane_q - y_dem_q) / y_inters_denomin, coincident_y)
+    coincident_x = np.where(grid_q_along_x != plane_q_along_x, np.NaN, ycoords_x)
 
-    # filter out cases where intersection is outside cell range
+    xcoords_x = np.where(grid_m_along_x != plane_m_along_x, (plane_q_along_x - grid_q_along_x) / x_inters_denomin, coincident_x)
+    xcoords_x = np.where(xcoords_x < ycoords_x, np.NaN, xcoords_x)
+    xcoords_x = np.where(xcoords_x >= ycoords_x + cell_size_x, np.NaN, xcoords_x)
+
+    y_inters_denomin = np.where(grid_m_along_y != m_plane_along_y, grid_m_along_y - m_plane_along_y, np.NaN)
+    coincident_y = np.where(grid_q_along_y != q_plane_along_y, np.NaN, xcoords_y)
+
+    ycoords_y = np.where(grid_m_along_y != m_plane_along_y, (q_plane_along_y - grid_q_along_y) / y_inters_denomin, coincident_y)
+
+    # filtering out intersections outside of cell range
 
     ycoords_y = np.where(ycoords_y < xcoords_y, np.NaN, ycoords_y)
-    ycoords_y = np.where(ycoords_y >= xcoords_y + grid.cellsize_y, np.NaN, ycoords_y)
+    ycoords_y = np.where(ycoords_y >= xcoords_y + cell_size_y, np.NaN, ycoords_y)
 
     for i in range(xcoords_x.shape[0]):
         for j in range(xcoords_x.shape[1]):

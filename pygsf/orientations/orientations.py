@@ -1686,20 +1686,20 @@ class Plane(object):
         """
         return - cos(radians(self.dd)) * tan(radians(self.da))
 
-    def plane_from_geo_closure(self, or_Pt):
+    def closure_plane_from_geo(self, src_pt: Point) -> Callable:
         """
         Closure that embodies the analytical formula for a given, non-vertical plane.
         This closure is used to calculate the z value from given horizontal coordinates (x, y).
 
-        @param  or_Pt:  Point_3D instance expressing a location point contained by the plane.
-        @type  or_Pt:  Point_3D.
+        :param src_pt: Point_3D instance expressing a location point contained by the plane.
+        :type src_pt: Point_3D.
 
-        @return:  lambda (closure) expressing an analytical formula for deriving z given x and y values.
+        :return: lambda (closure) expressing an analytical formula for deriving z given x and y values.
         """
 
-        x0 = or_Pt._x
-        y0 = or_Pt._y
-        z0 = or_Pt._z
+        x0 = src_pt.x
+        y0 = src_pt.y
+        z0 = src_pt.z
 
         # slope of the line parallel to the x axis and contained by the plane
         a = self.slope_x_dir()

@@ -1584,7 +1584,7 @@ class Grid(object):
             x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
             # closure for the planar surface that, given (x,y), will be used to derive z  
-            plane_z_closure = srcPlaneAttitude.plane_from_geo_closure(srcPt)
+            plane_z_closure = srcPlaneAttitude.closure_plane_from_geo(srcPt)
             
             # 2D array of plane segment parameters
             x_plane_m = srcPlaneAttitude.slope_x_dir()
@@ -1650,7 +1650,7 @@ class Grid(object):
             x_dem_q = self.data - cell_center_x_array * x_dem_m            
             
             # equation for the planar surface that, given (x,y), will be used to derive z  
-            plane_z_closure = srcPlaneAttitude.plane_from_geo_closure( srcPt )
+            plane_z_closure = srcPlaneAttitude.closure_plane_from_geo( srcPt )
             
             # 2D array of plane segment parameters
             x_plane_m = srcPlaneAttitude.slope_x_dir(  )            
