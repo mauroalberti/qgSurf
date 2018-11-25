@@ -32,12 +32,12 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     # the numeric values of the grid stored in a Numpy array
 
-    grid_z = geo_array.level(
+    q_d = geo_array.level(
         level_ndx=level_ndx)
 
     # row and column numbers of the grid
 
-    row_num, col_num = grid_z.shape
+    row_num, col_num = q_d.shape
 
     # grid cell sizes along x- and y-directions
 
@@ -46,25 +46,27 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     # arrays storing the geographical coordinates of the cell centers along the x- and y- axes
 
-    grid_x, grid_y = geo_array.xy(level_ndx)
+    x, y = geo_array.xy(level_ndx)
 
-    # closure for the planar surface that, given (x,y), will be used to derive z
+    # closure for the planar surface that, given (x, y), will be used to derive z
 
     plane_z_closure = srcPlaneAttitude.closure_plane_from_geo(srcPt)
 
+    """
     # 2D array of DEM segment parameters
 
     grid_m_along_x = grad_x(
-        fld=grid_z,
+        fld=q_d,
         cell_size_x=cell_size_x)
 
-    grid_q_along_x = grid_z - grid_m_along_x * grid_x
+    grid_q_along_x = q_d - grid_m_along_x * x
 
     grid_m_along_y = grad_y(
-        fld=grid_z,
+        fld=q_d,
         cell_size_y=cell_size_y)
 
-    grid_q_along_y = grid_z - grid_m_along_y * grid_y
+    grid_q_along_y = q_d - grid_m_along_y * y
+    """
 
     # closures to compute the geographic coordinates (in x- and y-) of a cell center
     # the grid coordinates of the cell center are expressed by i and j
@@ -72,6 +74,7 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
     #closure_grid_coord_to_geogr_coord_x = lambda j: geo_array.domain.llcorner.x + cell_size_x * (0.5 + j)
     #closure_grid_coord_to_geogr_coord_y = lambda i: geo_array.domain.trcorner.y - cell_size_y * (0.5 + i)
 
+    """
     # 2D arrays of plane segment parameters
 
     plane_m_along_x = srcPlaneAttitude.slope_x_dir()
@@ -81,10 +84,11 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     # 2D array of plane segment parameters
 
-    m_plane_along_y = srcPlaneAttitude.slope_y_dir()
-    q_plane_along_y = np.fromfunction(
+    plane_m_along_y = srcPlaneAttitude.slope_y_dir()
+    plane_q_along_y = np.fromfunction(
         lambda i, j: plane_z_closure(closure_grid_coord_to_geogr_coord_x(j), 0),
         (1, col_num))
+    """
 
     # 2D arrays that define denominators for intersections between local segments
 
@@ -96,10 +100,10 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
     xcoords_x = np.where(xcoords_x < ycoords_x, np.NaN, xcoords_x)
     xcoords_x = np.where(xcoords_x >= ycoords_x + cell_size_x, np.NaN, xcoords_x)
 
-    y_inters_denomin = np.where(grid_m_along_y != m_plane_along_y, grid_m_along_y - m_plane_along_y, np.NaN)
-    coincident_y = np.where(grid_q_along_y != q_plane_along_y, np.NaN, xcoords_y)
+    y_inters_denomin = np.where(grid_m_along_y != plane_m_along_y, grid_m_along_y - plane_m_along_y, np.NaN)
+    coincident_y = np.where(grid_q_along_y != plane_q_along_y, np.NaN, xcoords_y)
 
-    ycoords_y = np.where(grid_m_along_y != m_plane_along_y, (q_plane_along_y - grid_q_along_y) / y_inters_denomin, coincident_y)
+    ycoords_y = np.where(grid_m_along_y != plane_m_along_y, (plane_q_along_y - grid_q_along_y) / y_inters_denomin, coincident_y)
 
     # filtering out intersections outside of cell range
 
