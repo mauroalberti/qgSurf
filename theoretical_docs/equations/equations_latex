@@ -1,0 +1,60 @@
+augmented matrix
+
+\begin{bmatrix}
+\vec{y}
+\\ 
+1
+\end{bmatrix}
+
+=
+
+\begin{bmatrix}
+A & | & \vec{b} \\ 
+0 .. 0 & | & 1
+\end{bmatrix}
+
+\begin{bmatrix}
+\vec{x} \\
+1
+\end{bmatrix}
+
+
+
+
+y' = A \vec{x} + \vec{b}
+
+
+
+
+
+\begin{bmatrix}
+x'
+\\ 
+y'
+\\ 
+z'
+\end{bmatrix}
+
+=
+
+\begin{bmatrix}
+gt_{1} & gt_{2} & gt_{0} \\ 
+gt_{4} & gt_{5} & gt_{3} \\ 
+0 & 0 & 1
+\end{bmatrix}
+
+\begin{bmatrix}
+x \\ 
+y \\ 
+1
+\end{bmatrix}
+
+
+
+\\
+x' = gt_{1} x + gt_{2} y + gt_{0} \\
+y' = gt_{4} x + gt_{5} y + gt_{3} \\
+1 = 0 + 0 + 1
+
+
+
