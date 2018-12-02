@@ -58,3 +58,18 @@ y' = gt_{4} x + gt_{5} y + gt_{3} \\
 
 
 
+linear solution of intesection
+
+\\
+z_{d} = m_{d} x' + q_{d} \\
+z_{p} = m_{p} x' + q_{p} \\
+
+\\
+m_{d} x' + q_{d} = m_{p} x' + q_{p} \Rightarrow \\
+(m_{d} - m_{p}) x' = q_{p} - q_{d} \Rightarrow \\
+x' = \frac{q_{p} - q_{d}}{m_{d} - m_{p}}
+
+\frac{x'}{cell size'} = i'  [0 \to 1 ]
+
+
+
