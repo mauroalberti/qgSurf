@@ -689,13 +689,33 @@ class Segment(object):
 
     @property
     def delta_z(self):
+        """
+        Z delta between segment end point and start point.
+
+        :return: float.
+        """
 
         return self.end_pt.z - self.start_pt.z
 
     @property
     def length_2d(self):
+        """
+        2D length of a segment.
+
+        :return: float.
+        """
 
         return self.start_pt.dist_2d(self.end_pt)
+
+    @property
+    def slope(self):
+        """
+        Calculates the slope of a segment.
+
+        :return: float
+        """
+
+        return self.delta_z / self.length_2d
 
     @property
     def length_3d(self):
