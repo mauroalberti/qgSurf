@@ -52,6 +52,14 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     plane_z_closure = srcPlaneAttitude.closure_plane_from_geo(srcPt)
 
+    # plane elevations at grid cell centers
+
+    q_p = array_from_function(
+        row_num=row_num,
+        col_num=col_num,
+        geotransform=geo_array.gt,
+        z_transfer_func=plane_z_closure)
+
     """
     # 2D array of DEM segment parameters
 
