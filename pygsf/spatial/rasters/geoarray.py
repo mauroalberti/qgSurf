@@ -83,7 +83,7 @@ class GeoArray(object):
             self._levels = inLevels
 
     @property
-    def cellsize_x(self) -> float:
+    def src_cellsize_j(self) -> float:
         """
         Get the cell size of the grid in the x direction.
 
@@ -96,7 +96,7 @@ class GeoArray(object):
         return abs(self.gt.pixWidth)
 
     @property
-    def cellsize_y(self) -> float:
+    def src_cellsize_i(self) -> float:
         """
         Get the cell size of the grid in the y direction.
 
@@ -265,6 +265,21 @@ class GeoArray(object):
 
         return self.gt.has_rotation
 
+    def geotransf_cell_sizes(self) -> Tuple[float, float]:
+        """
+        Calculates the geotransformed cell sizes.
+
+        :return: a pair of float values, representing the cell sizes in the j and i directions.
+        """
+
+        factor = 100
+
+        start_pt = Point(*self.ijArrToxy(0, 0))
+        end_pt_j = Point(*self.ijArrToxy(0, factor))
+        end_pt_i = Point(*self.ijArrToxy(factor, 0))
+
+        return end_pt_j.dist2DWith(start_pt)/factor, end_pt_i.dist2DWith(start_pt)/factor
+
     def xy(self, level_ndx: int=0) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """
         Returns the two arrays storing respectively the x and the y coordinates
@@ -378,8 +393,8 @@ class GeoArray(object):
         div = divergence(
             fld_x=self._levels[ndx_fx],
             fld_y=self._levels[ndx_fy],
-            cell_size_x=self.cellsize_x,
-            cell_size_y=self.cellsize_y)
+            cell_size_x=self.src_cellsize_j,
+            cell_size_y=self.src_cellsize_i)
 
         return GeoArray(
             inGeotransform=self.gt,
@@ -404,8 +419,8 @@ class GeoArray(object):
         curl_m = curl_module(
             fld_x=self._levels[ndx_fx],
             fld_y=self._levels[ndx_fy],
-            cell_size_x=self.cellsize_x,
-            cell_size_y=self.cellsize_y)
+            cell_size_x=self.src_cellsize_j,
+            cell_size_y=self.src_cellsize_i)
 
         return GeoArray(
             inGeotransform=self.gt,
@@ -430,11 +445,11 @@ class GeoArray(object):
         """
 
         if axis == 'x':
-            cell_sizes = [self.cellsize_x]
+            cell_sizes = [self.src_cellsize_j]
         elif axis == 'y':
-            cell_sizes = [self.cellsize_y]
+            cell_sizes = [self.src_cellsize_i]
         elif axis == '':
-            cell_sizes = [self.cellsize_x, self.cellsize_y]
+            cell_sizes = [self.src_cellsize_j, self.src_cellsize_i]
         else:
             raise GeoArrayIOException("Axis must be 'x' or 'y. '{}' given".format(axis))
 
@@ -464,8 +479,8 @@ class GeoArray(object):
         flowln_grad = magn_grad_along_flowlines(
             fld_x=self._levels[ndx_fx],
             fld_y=self._levels[ndx_fy],
-            cell_size_x=self.cellsize_x,
-            cell_size_y=self.cellsize_y)
+            cell_size_x=self.src_cellsize_j,
+            cell_size_y=self.src_cellsize_i)
 
         return GeoArray(
             inGeotransform=self.gt,

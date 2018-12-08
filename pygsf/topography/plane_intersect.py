@@ -8,9 +8,10 @@ from ..spatial.vectorial.vectorial import Point, Segment
 from ..orientations.orientations import Plane
 
 
+
 def ij2pt(plane_clos: Callable, ij2xy: Callable, i: int, j: int) -> Point:
     """
-    Return a point located onto a plane.
+    Return a point located onto a plane, starting by array indices.
 
     :param plane_clos: a closure representing the plane.
     :param ij2xy: a function converting from array coordinates to geographic coordinates.
@@ -70,11 +71,6 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     row_num, col_num = q_d.shape
 
-    # grid cell sizes along x- and y-directions
-
-    cell_size_x = geo_array.cellsize_x
-    cell_size_y = geo_array.cellsize_y
-
     # arrays storing the geographical coordinates of the cell centers along the x- and y- axes
 
     x, y = geo_array.xy(level_ndx)
@@ -105,70 +101,43 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
         i=0, 
         j=index_multiplier)
 
-    """
-    # 2D arrays of plane segment parameters
-
-    mj_p = srcPlaneAttitude.slope_x_dir()
-    plane_q_along_x = np.fromfunction(
-        lambda i, j: plane_z_closure(0, closure_grid_coord_to_geogr_coord_y(i)),
-        (row_num, 1))
-
-    # 2D array of plane segment parameters
-
-    mi_p = srcPlaneAttitude.slope_y_dir()
-    plane_q_along_y = np.fromfunction(
-        lambda i, j: plane_z_closure(closure_grid_coord_to_geogr_coord_x(j), 0),
-        (1, col_num))
-    """
-    
-    """
     # 2D array of DEM segment parameters
 
-    grid_m_along_x = grad_x(
+    cell_size_j, cell_size_i = geo_array.geotransf_cell_sizes()
+
+    mj_g = grad_j(
         fld=q_d,
-        cell_size_x=cell_size_x)
+        cell_size_j=cell_size_j)
 
-    grid_q_along_x = q_d - grid_m_along_x * x
-
-    grid_m_along_y = grad_y(
+    mi_g = grad_iminus(
         fld=q_d,
-        cell_size_y=cell_size_y)
-
-    grid_q_along_y = q_d - grid_m_along_y * y
-    """
-
-    # closures to compute the geographic coordinates (in x- and y-) of a cell center
-    # the grid coordinates of the cell center are expressed by i and j
-
-    #closure_grid_coord_to_geogr_coord_x = lambda j: geo_array.domain.llcorner.x + cell_size_x * (0.5 + j)
-    #closure_grid_coord_to_geogr_coord_y = lambda i: geo_array.domain.trcorner.y - cell_size_y * (0.5 + i)
-
+        cell_size_i=cell_size_i)
 
     # 2D arrays that define denominators for intersections between local segments
 
-    x_inters_denomin = np.where(grid_m_along_x != mj_p, grid_m_along_x - mj_p, np.NaN)
+    j_inters_denomin = np.where(mj_g != mj_p, mj_g - mj_p, np.NaN)
 
-    coincident_x = np.where(grid_q_along_x != plane_q_along_x, np.NaN, ycoords_x)
+    coincident_x = np.where(q_d != q_p, np.NaN, i_coords_x)
 
-    xcoords_x = np.where(grid_m_along_x != mj_p, (plane_q_along_x - grid_q_along_x) / x_inters_denomin, coincident_x)
-    xcoords_x = np.where(xcoords_x < ycoords_x, np.NaN, xcoords_x)
-    xcoords_x = np.where(xcoords_x >= ycoords_x + cell_size_x, np.NaN, xcoords_x)
+    j_coords_x = np.where(mj_g != mj_p, (q_p - q_d) / j_inters_denomin, coincident_x)
+    j_coords_x = np.where(j_coords_x < i_coords_x, np.NaN, j_coords_x)
+    j_coords_x = np.where(j_coords_x >= i_coords_x + cell_size_j, np.NaN, j_coords_x)
 
-    y_inters_denomin = np.where(grid_m_along_y != mi_p, grid_m_along_y - mi_p, np.NaN)
-    coincident_y = np.where(grid_q_along_y != plane_q_along_y, np.NaN, xcoords_y)
+    y_inters_denomin = np.where(mi_g != mi_p, mi_g - mi_p, np.NaN)
+    coincident_y = np.where(q_d != q_p, np.NaN, j_coords_y)
 
-    ycoords_y = np.where(grid_m_along_y != mi_p, (plane_q_along_y - grid_q_along_y) / y_inters_denomin, coincident_y)
+    i_coords_y = np.where(mi_g != mi_p, (q_p - q_d) / y_inters_denomin, coincident_y)
 
     # filtering out intersections outside of cell range
 
-    ycoords_y = np.where(ycoords_y < xcoords_y, np.NaN, ycoords_y)
-    ycoords_y = np.where(ycoords_y >= xcoords_y + cell_size_y, np.NaN, ycoords_y)
+    i_coords_y = np.where(i_coords_y < j_coords_y, np.NaN, i_coords_y)
+    i_coords_y = np.where(i_coords_y >= j_coords_y + cell_size_i,   np.NaN, i_coords_y)
 
-    for i in range(xcoords_x.shape[0]):
-        for j in range(xcoords_x.shape[1]):
-            if abs(xcoords_x[i, j] - ycoords_x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
-                    ycoords_y[i, j] - xcoords_y[i, j]) < MIN_SEPARATION_THRESHOLD:
-                ycoords_y[i, j] = np.NaN
+    for i in range(j_coords_x.shape[0]):
+        for j in range(j_coords_x.shape[1]):
+            if abs(j_coords_x[i, j] - i_coords_x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
+                    i_coords_y[i, j] - j_coords_y[i, j]) < MIN_SEPARATION_THRESHOLD:
+                i_coords_y[i, j] = np.NaN
 
-    return xcoords_x, xcoords_y, ycoords_x, ycoords_y
+    return j_coords_x, j_coords_y, i_coords_x, i_coords_y
 

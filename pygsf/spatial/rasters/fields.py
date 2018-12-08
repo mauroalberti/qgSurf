@@ -69,17 +69,17 @@ def array_from_function(
         z_transfer_func=z_transfer_func)
 
 
-def grad_x(
+def grad_j(
         fld: np.ndarray,
-        cell_size_x: Number,
+        cell_size_j: Number,
         edge_order: int=2) -> np.ndarray:
     """
-    Calculates the array gradient along the x axis.
+    Calculates the array gradient along the j axis.
 
     :param fld: array.
     :type fld: np.array.
-    :param cell_size_x: the cell spacing in the x direction.
-    :type cell_size_x: Number.
+    :param cell_size_j: the cell spacing in the x direction.
+    :type cell_size_j: Number.
     :param edge_order: the type of edge order used in the Numpy gradient method.
     :type edge_order: int.
     :return: gradient field.
@@ -88,20 +88,20 @@ def grad_x(
     Examples:
     """
 
-    return np.gradient(fld, edge_order=edge_order, axis=1) / cell_size_x
+    return np.gradient(fld, edge_order=edge_order, axis=1) / cell_size_j
 
 
-def grad_y(
+def grad_i(
         fld: np.ndarray,
-        cell_size_y: Number,
+        cell_size_i: Number,
         edge_order: int=2) -> np.ndarray:
     """
-    Calculates the array gradient along the y axis.
+    Calculates the array gradient along the i axis.
 
     :param fld: array.
     :type fld: np.array.
-    :param cell_size_y: the cell spacing in the y direction.
-    :type cell_size_y: Number.
+    :param cell_size_i: the cell spacing in the y direction.
+    :type cell_size_i: Number.
     :param edge_order: the type of edge order used in the Numpy gradient method.
     :type edge_order: int.
     :return: gradient field.
@@ -110,7 +110,29 @@ def grad_y(
     Examples:
     """
 
-    return - np.gradient(fld, edge_order=edge_order, axis=0) / cell_size_y
+    return np.gradient(fld, edge_order=edge_order, axis=0) / cell_size_i
+
+
+def grad_iminus(
+        fld: np.ndarray,
+        cell_size_i: Number,
+        edge_order: int=2) -> np.ndarray:
+    """
+    Calculates the array gradient along the -i axis.
+
+    :param fld: array.
+    :type fld: np.array.
+    :param cell_size_i: the cell spacing in the y direction.
+    :type cell_size_i: Number.
+    :param edge_order: the type of edge order used in the Numpy gradient method.
+    :type edge_order: int.
+    :return: gradient field.
+    :rtype: np.array.
+
+    Examples:
+    """
+
+    return - np.gradient(fld, edge_order=edge_order, axis=0) / cell_size_i
 
 
 def dir_deriv(
@@ -138,14 +160,14 @@ def dir_deriv(
     :rtype: Numpy array.
     """
 
-    df_dx = grad_x(
+    df_dx = grad_j(
         fld=fld,
-        cell_size_x=cell_size_x,
+        cell_size_j=cell_size_x,
         edge_order=dx_edge_order)
 
-    df_dy = grad_y(
+    df_dy = grad_iminus(
         fld=fld,
-        cell_size_y=cell_size_y,
+        cell_size_i=cell_size_y,
         edge_order=dy_edge_order)
 
     return df_dx * sin(direct_rad) + df_dy * cos(direct_rad)
@@ -237,8 +259,8 @@ def divergence(
     Examples:
     """
 
-    dfx_dx = grad_x(fld_x, cell_size_x)
-    dfy_dy = grad_y(fld_y, cell_size_y)
+    dfx_dx = grad_j(fld_x, cell_size_x)
+    dfy_dy = grad_iminus(fld_y, cell_size_y)
 
     return dfx_dx + dfy_dy
 
@@ -266,8 +288,8 @@ def curl_module(
     Examples:
     """
 
-    dfx_dy = grad_y(fld_x, cell_size_y, edge_order=2)
-    dfy_dx = grad_x(fld_y, cell_size_x, edge_order=1)
+    dfx_dy = grad_iminus(fld_x, cell_size_y, edge_order=2)
+    dfy_dx = grad_j(fld_y, cell_size_x, edge_order=1)
 
     return dfy_dx - dfx_dy
 
@@ -298,11 +320,11 @@ def magn_grads(
 
     magn = magnitude(fld_x, fld_y)
     if axis == 'x':
-        return [grad_x(magn, dir_cell_sizes[0])]
+        return [grad_j(magn, dir_cell_sizes[0])]
     elif axis == 'y':
-        return [grad_y(magn, dir_cell_sizes[0])]
+        return [grad_iminus(magn, dir_cell_sizes[0])]
     elif axis == '':
-        return [grad_x(magn, dir_cell_sizes[0]), grad_y(magn, dir_cell_sizes[1])]
+        return [grad_j(magn, dir_cell_sizes[0]), grad_iminus(magn, dir_cell_sizes[1])]
     else:
         raise InputValuesException("Axis must be 'x' or 'y' or '' (for both x and y). '{}' given".format(axis))
 

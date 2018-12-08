@@ -1158,8 +1158,8 @@ class ArrCoord(object):
     
     def grid2geogcoord( self, currGeoGrid ):
         
-        currPt_geogr_y = currGeoGrid.domain.g_trcorner()._y - self.i * currGeoGrid.cellsize_y()
-        currPt_geogr_x = currGeoGrid.domain.g_llcorner()._x + self.j * currGeoGrid.cellsize_x()
+        currPt_geogr_y = currGeoGrid.domain.g_trcorner()._y - self.i * currGeoGrid.src_cellsize_i()
+        currPt_geogr_x = currGeoGrid.domain.g_llcorner()._x + self.j * currGeoGrid.src_cellsize_j()
         return Point_3D( currPt_geogr_x, currPt_geogr_y )
 
 
@@ -1634,8 +1634,8 @@ class Grid(object):
         if surf_type == 'plane': 
                         
             # lambdas to compute the geographic coordinates (in x- and y-) of a cell center 
-            grid_coord_ to_geogr_coord_x = lambda j : self.domain.g_llcorner()._x + self.cellsize_x() * ( 0.5 + j )
-            grid_coord_to_geogr_coord_y_closure = lambda i : self.domain.g_trcorner()._y - self.cellsize_y() * ( 0.5 + i )
+            grid_coord_ to_geogr_coord_x = lambda j : self.domain.g_llcorner()._x + self.src_cellsize_j() * ( 0.5 + j )
+            grid_coord_to_geogr_coord_y_closure = lambda i : self.domain.g_trcorner()._y - self.src_cellsize_i() * ( 0.5 + i )
              
             # arrays storing the geographical coordinates of the cell centers along the x- and y- axes    
             cell_center_x_array = self._x()
@@ -1662,7 +1662,7 @@ class Grid(object):
             xcoords_x = np.where( x_dem_m != x_plane_m , (x_plane_q - x_dem_q ) / x_inters_denomin, coincident_x )
             
             xcoords_x = np.where( xcoords_x < ycoords_x , np.NaN, xcoords_x )           
-            xcoords_x = np.where( xcoords_x >= ycoords_x + self.cellsize_x() , np.NaN, xcoords_x )  
+            xcoords_x = np.where( xcoords_x >= ycoords_x + self.src_cellsize_j() , np.NaN, xcoords_x )  
                         
             
             #### y-axis direction intersections
@@ -1683,7 +1683,7 @@ class Grid(object):
 
             # filter out cases where intersection is outside cell range
             ycoords_y = np.where( ycoords_y < xcoords_y , np.NaN, ycoords_y )           
-            ycoords_y = np.where( ycoords_y >= xcoords_y + self.cellsize_y() , np.NaN, ycoords_y )            
+            ycoords_y = np.where( ycoords_y >= xcoords_y + self.src_cellsize_i() , np.NaN, ycoords_y )            
 
             for i in xrange(xcoords_x.shape[0]):
                 for j in xrange(xcoords_x.shape[1]):
