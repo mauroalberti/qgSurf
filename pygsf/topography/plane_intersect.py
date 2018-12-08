@@ -105,7 +105,7 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     cell_size_j, cell_size_i = geo_array.geotransf_cell_sizes()
 
-    mj_g = grad_j(
+    mj_d = grad_j(
         fld=q_d,
         cell_size_j=cell_size_j)
 
@@ -115,7 +115,14 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     # 2D arrays that define denominators for intersections between local segments
 
-    j_inters_denomin = np.where(mj_g != mj_p, mj_g - mj_p, np.NaN)
+    j_coords_inters = np.where(abs(mj_d - mj_p) < 1e-6, np.NaN, (q_p - q_d) / (cell_size_j*(mj_d - mj_p)))
+    j_coords_inters = np.where(abs(q_d - q_p) < 1e-6, 0.0, j_coords_inters)
+    j_coords_inters = np.where(0.0 <= j_coords_inters < 1.0, j_coords_inters, np.NaN)
+
+
+
+
+
 
 
 
@@ -124,11 +131,11 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     i_inters_denomin = np.where(mi_g != mi_p, mi_g - mi_p, np.NaN)
 
-    coincident_x = np.where(q_d != q_p, np.NaN, x)
 
-    j_coords_x = np.where(mj_g != mj_p, (q_p - q_d) / j_inters_denomin, coincident_x)
-    j_coords_x = np.where(j_coords_x < x, np.NaN, j_coords_x)
-    j_coords_x = np.where(j_coords_x >= x + cell_size_j, np.NaN, j_coords_x)
+
+
+    j_coords_inters = np.where(j_coords_inters < x, np.NaN, j_coords_inters)
+    j_coords_inters = np.where(j_coords_inters >= x + cell_size_j, np.NaN, j_coords_inters)
 
     coincident_y = np.where(q_d != q_p, np.NaN, y)
 
@@ -139,11 +146,11 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
     i_coords_y = np.where(i_coords_y < y, np.NaN, i_coords_y)
     i_coords_y = np.where(i_coords_y >= y + cell_size_i, np.NaN, i_coords_y)
 
-    for i in range(j_coords_x.shape[0]):
-        for j in range(j_coords_x.shape[1]):
-            if abs(j_coords_x[i, j] - x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
+    for i in range(j_coords_inters.shape[0]):
+        for j in range(j_coords_inters.shape[1]):
+            if abs(j_coords_inters[i, j] - x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
                     i_coords_y[i, j] - y[i, j]) < MIN_SEPARATION_THRESHOLD:
                 i_coords_y[i, j] = np.NaN
 
-    return j_coords_x, y, x, i_coords_y
+    return j_coords_inters, y, x, i_coords_y
 
