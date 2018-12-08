@@ -117,27 +117,33 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
 
     j_inters_denomin = np.where(mj_g != mj_p, mj_g - mj_p, np.NaN)
 
-    coincident_x = np.where(q_d != q_p, np.NaN, i_coords_x)
+
+
+
+
+
+    i_inters_denomin = np.where(mi_g != mi_p, mi_g - mi_p, np.NaN)
+
+    coincident_x = np.where(q_d != q_p, np.NaN, x)
 
     j_coords_x = np.where(mj_g != mj_p, (q_p - q_d) / j_inters_denomin, coincident_x)
-    j_coords_x = np.where(j_coords_x < i_coords_x, np.NaN, j_coords_x)
-    j_coords_x = np.where(j_coords_x >= i_coords_x + cell_size_j, np.NaN, j_coords_x)
+    j_coords_x = np.where(j_coords_x < x, np.NaN, j_coords_x)
+    j_coords_x = np.where(j_coords_x >= x + cell_size_j, np.NaN, j_coords_x)
 
-    y_inters_denomin = np.where(mi_g != mi_p, mi_g - mi_p, np.NaN)
-    coincident_y = np.where(q_d != q_p, np.NaN, j_coords_y)
+    coincident_y = np.where(q_d != q_p, np.NaN, y)
 
-    i_coords_y = np.where(mi_g != mi_p, (q_p - q_d) / y_inters_denomin, coincident_y)
+    i_coords_y = np.where(mi_g != mi_p, (q_p - q_d) / i_inters_denomin, coincident_y)
 
     # filtering out intersections outside of cell range
 
-    i_coords_y = np.where(i_coords_y < j_coords_y, np.NaN, i_coords_y)
-    i_coords_y = np.where(i_coords_y >= j_coords_y + cell_size_i,   np.NaN, i_coords_y)
+    i_coords_y = np.where(i_coords_y < y, np.NaN, i_coords_y)
+    i_coords_y = np.where(i_coords_y >= y + cell_size_i, np.NaN, i_coords_y)
 
     for i in range(j_coords_x.shape[0]):
         for j in range(j_coords_x.shape[1]):
-            if abs(j_coords_x[i, j] - i_coords_x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
-                    i_coords_y[i, j] - j_coords_y[i, j]) < MIN_SEPARATION_THRESHOLD:
+            if abs(j_coords_x[i, j] - x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
+                    i_coords_y[i, j] - y[i, j]) < MIN_SEPARATION_THRESHOLD:
                 i_coords_y[i, j] = np.NaN
 
-    return j_coords_x, j_coords_y, i_coords_x, i_coords_y
+    return j_coords_x, y, x, i_coords_y
 
