@@ -8,43 +8,131 @@ from ..spatial.vectorial.vectorial import Point, Segment
 from ..orientations.orientations import Plane
 
 
-
-def ij2pt(plane_clos: Callable, ij2xy: Callable, i: int, j: int) -> Point:
+def ijarr2xyz(ijarr2xy_func: Callable, xy2z_func: Callable, i: float, j: float) -> Tuple[float, float, float]:
     """
-    Return a point located onto a plane, starting by array indices.
+    Return a tuple of (x, y, z) values, starting by array indices.
 
-    :param plane_clos: a closure representing the plane.
-    :param ij2xy: a function converting from array coordinates to geographic coordinates.
-    :param i: i index of point.
-    :param j: j index of point.
+    :param ijarr2xy_func: a function converting from array to geographic coordinates.
+    :param xy2z_func: a callable converting from x, y geographic coordinates to a z value.
+    :param i: i index.
+    :param j: j index.
     :return: Point
     """
 
-    x, y = ij2xy(i, j)
-    z = plane_clos(x, y)
-    return Point(x, y, z)
+    x, y = ijarr2xy_func(i, j)
+    z = xy2z_func(x, y)
+    return x, y, z
 
 
-def plane_slope(plane_closure: Callable, arrij2xy: Callable, i: int, j: int) -> float:
+def xyarr2segmentslope(
+        xy2z_func: Callable,
+        arrij2xy_func: Callable,
+        i: float,
+        j: float,
+        i_start=0.0,
+        j_start=0.0) -> float:
     """
-    Calculates the plane slope along a gridded direction defined by its end point i, j array coordinates.
-    Start point is array coordinates 0, 0.
+    Calculates the segment slope along a gridded direction defined by its end point i, j array coordinates.
+    Assumed start point is array coordinates 0, 0.
 
-    :param plane_closure: a closure representing the plane.
-    :param arrij2xy: a function converting from array coordinates to geographic coordinates.
+    :param xy2z_func: a callable deriving a z value from geographic x-y coordinates..
+    :param arrij2xy_func: a function converting from array coordinates to geographic coordinates.
     :param i: i index of end point.
     :param j: j index of end point.
-    :return: slope along the plane.
+    :param i_start: i index of start point. Default is 0.0.
+    :param j_start:j index of start point. Default is 0.0.
+    :return: segment slope.
     :rtype: float.
     """
 
-    start_point = ij2pt(plane_closure, arrij2xy, 0, 0)
-    end_point = ij2pt(plane_closure, arrij2xy, i, j)
+    start_point = Point(*ijarr2xyz(
+        ijarr2xy_func=arrij2xy_func,
+        xy2z_func=xy2z_func,
+        i=i_start,
+        j=j_start))
+
+    end_point = Point(*ijarr2xyz(
+        ijarr2xy_func=arrij2xy_func,
+        xy2z_func=xy2z_func,
+        i=i,
+        j=j))
 
     return Segment(start_point, end_point).slope
 
 
-def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: GeoArray, level_ndx: int=0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def segment_intersections_array(
+        m_arr1: np.ndarray,
+        m_arr2: np.ndarray,
+        q_arr1: np.ndarray,
+        q_arr2: np.ndarray,
+        cell_size: float,
+        m_delta_tol: Optional[float]=1e-6,
+        q_delta_tol: Optional[float]=1e-6) -> np.ndarray:
+    """
+    Creates array that gives the residual index [0-1[ of the intersection between segments along the considered
+    array axis (i or j) whose m (slope) and q (y-axis intersection) values along the considered array axis (i or j)
+    are defined in the two pairs of input arrays.
+
+    :param m_arr1: array storing values of grid 1 segment slopes.
+    :param m_arr2: array storing values of grid 2 segment slopes.
+    :param q_arr1: array storing values of grid 1 segment y-axis intersections.
+    :param q_arr2: array storing values of grid 2 segment y-axis intersections.
+    :param cell_size: cell size of the two grids along the considered direction. Required the same in the two grids.
+    :param m_delta_tol: optional tolerance for delta between grid 1 and grid 2 segment slopes.
+    :param q_delta_tol: optional tolerance for delta between grid 1 and grid 2 segment y-axis intersections.
+    :return: array with values of intersection residual indices [0 - 1[
+    """
+
+    # if segments slope are not sub-equal, we calculate the intersection residual slope using the required formula
+
+    inters_residual_indices = np.where(abs(m_arr1 - m_arr2) < m_delta_tol, np.NaN, (q_arr2 - q_arr1) / (cell_size * (m_arr1 - m_arr2)))
+
+    # if the elevations at the left cell center are sub-equal,
+    # the residual index is set to 0.0, i.e. there is an intersection at the left cell
+
+    inters_with_coincident_starts = np.where(abs(q_arr1 - q_arr2) < q_delta_tol, 0.0, inters_residual_indices)
+
+    # we filter out residual indices that are not within cell span, i.e., not between 0.0 (included) and 1.0 (excluded)
+
+    inters_intracells_residuals = np.where(0.0 <= inters_with_coincident_starts < 1.0, inters_with_coincident_starts, np.NaN)
+
+    return inters_intracells_residuals
+
+
+def array2points(direction: str, arr: np.ndarray, ij2xy_func: Callable) -> List[Point]:
+    """
+    Converts an array of along-direction (i- or j-) intra-cell segments [0 -> 1[ into
+    a list of 2D points.
+
+    :param direction: considered intersection direction: 'i' (for i axis) or 'j' (for j axis).
+    :param arr: array of along-direction (i- or j-) intra-cell segments [0 -> 1[.
+    :param ij2xy_func: function to convert from array indices to x-y geographic coordinates.
+    :return: list of Points.:
+    :raise: Exception when direction is not 'i' or 'j'
+    """
+
+    pts = []
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
+            val = arr[i, j]
+            if np.isfinite(val):
+                if direction == 'i':
+                    i_int, j_int = i + val, j
+                elif direction == 'j':
+                    i_int, j_int = i, j + val
+                else:
+                    raise Exception('Unexpected array direction value: {}'.format(direction))
+                x, y = ij2xy_func(i_int, j_int)
+                pts.append(Point(x, y))
+
+    return pts
+
+
+def plane_dem_intersection(
+        srcPlaneAttitude: Plane,
+        srcPt: Point,
+        geo_array: GeoArray,
+        level_ndx: int=0) -> Tuple[List[Point], List[Point]]:
     """
     Calculates the intersections (as points) between the grid and a planar analytical surface.
 
@@ -56,26 +144,21 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
     :type geo_array: GeoArray.
     :param level_ndx: the grid level to use from the provided geoarray. Default is first (index equal to zero).
     :type level_ndx: integer.
-
-    :return: tuple of four Numpy arrays
+    :return: tuple of two intersection points lists, the first along the j directions, the second along the i directions.
 
     Examples:
     """
 
-    # the numeric values of the grid stored in a Numpy array
+    # dem values as a Numpy array
 
     q_d = geo_array.level(
         level_ndx=level_ndx)
 
-    # row and column numbers of the grid
+    # row and column numbers of the dem
 
     row_num, col_num = q_d.shape
 
-    # arrays storing the geographical coordinates of the cell centers along the x- and y- axes
-
-    x, y = geo_array.xy(level_ndx)
-
-    # closure for the planar surface that, given (x, y), will be used to derive z
+    # plane closure that, given (x, y), derive z
 
     plane_z_closure = srcPlaneAttitude.closure_plane_from_geo(srcPt)
 
@@ -87,19 +170,19 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
         geotransform=geo_array.gt,
         z_transfer_func=plane_z_closure)
 
-    index_multiplier = 100  # large value to ensure correct slope values 
+    index_multiplier = 100  # large value to ensure a precise slope values
     
-    mi_p = plane_slope(
-        plane_closure=plane_z_closure, 
-        arrij2xy=geo_array.ijArrToxy, 
+    mi_p = xyarr2segmentslope(
+        xy2z_func=plane_z_closure,
+        arrij2xy_func=geo_array.ijArrToxy,
         i=index_multiplier, 
-        j=0)
+        j=0) * np.ones((row_num, col_num))
     
-    mj_p = plane_slope(
-        plane_closure=plane_z_closure, 
-        arrij2xy=geo_array.ijArrToxy, 
+    mj_p = xyarr2segmentslope(
+        xy2z_func=plane_z_closure,
+        arrij2xy_func=geo_array.ijArrToxy,
         i=0, 
-        j=index_multiplier)
+        j=index_multiplier) * np.ones((row_num, col_num))
 
     # 2D array of DEM segment parameters
 
@@ -109,48 +192,35 @@ def topo_plane_intersection(srcPlaneAttitude: Plane, srcPt: Point, geo_array: Ge
         fld=q_d,
         cell_size_j=cell_size_j)
 
-    mi_g = grad_iminus(
+    mi_d = grad_iminus(
         fld=q_d,
         cell_size_i=cell_size_i)
 
-    # 2D arrays that define denominators for intersections between local segments
+    # intersection points
 
-    j_coords_inters = np.where(abs(mj_d - mj_p) < 1e-6, np.NaN, (q_p - q_d) / (cell_size_j*(mj_d - mj_p)))
-    j_coords_inters = np.where(abs(q_d - q_p) < 1e-6, 0.0, j_coords_inters)
-    j_coords_inters = np.where(0.0 <= j_coords_inters < 1.0, j_coords_inters, np.NaN)
+    intersection_pts_j = segment_intersections_array(
+        m_arr1=mj_d,
+        m_arr2=mj_p,
+        q_arr1=q_d,
+        q_arr2=q_p,
+        cell_size=cell_size_j)
 
+    intersection_pts_j = array2points(
+        direction='j',
+        arr=intersection_pts_j,
+        ij2xy_func=geo_array.ijArrToxy)
 
+    intersection_pts_i = segment_intersections_array(
+        m_arr1=mi_d,
+        m_arr2=mi_p,
+        q_arr1=q_d,
+        q_arr2=q_p,
+        cell_size=cell_size_i)
 
+    intersection_pts_i = array2points(
+        direction='i',
+        arr=intersection_pts_i,
+        ij2xy_func=geo_array.ijArrToxy)
 
-
-
-
-
-
-
-
-    i_inters_denomin = np.where(mi_g != mi_p, mi_g - mi_p, np.NaN)
-
-
-
-
-    j_coords_inters = np.where(j_coords_inters < x, np.NaN, j_coords_inters)
-    j_coords_inters = np.where(j_coords_inters >= x + cell_size_j, np.NaN, j_coords_inters)
-
-    coincident_y = np.where(q_d != q_p, np.NaN, y)
-
-    i_coords_y = np.where(mi_g != mi_p, (q_p - q_d) / i_inters_denomin, coincident_y)
-
-    # filtering out intersections outside of cell range
-
-    i_coords_y = np.where(i_coords_y < y, np.NaN, i_coords_y)
-    i_coords_y = np.where(i_coords_y >= y + cell_size_i, np.NaN, i_coords_y)
-
-    for i in range(j_coords_inters.shape[0]):
-        for j in range(j_coords_inters.shape[1]):
-            if abs(j_coords_inters[i, j] - x[i, j]) < MIN_SEPARATION_THRESHOLD and abs(
-                    i_coords_y[i, j] - y[i, j]) < MIN_SEPARATION_THRESHOLD:
-                i_coords_y[i, j] = np.NaN
-
-    return j_coords_inters, y, x, i_coords_y
+    return intersection_pts_j, intersection_pts_i
 
