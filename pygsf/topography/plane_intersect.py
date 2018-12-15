@@ -94,7 +94,7 @@ def segment_intersections_array(
 
     # we filter out residual indices that are not within cell span, i.e., not between 0.0 (included) and 1.0 (excluded)
 
-    inters_intracells_residuals = np.where(0.0 <= inters_with_coincident_starts < 1.0, inters_with_coincident_starts, np.NaN)
+    inters_intracells_residuals = np.where(np.logical_and(inters_with_coincident_starts >= 0.0, inters_with_coincident_starts < 1.0), inters_with_coincident_starts, np.NaN)
 
     return inters_intracells_residuals
 
@@ -171,17 +171,17 @@ def plane_dem_intersection(
         z_transfer_func=plane_z_closure)
 
     index_multiplier = 100  # large value to ensure a precise slope values
-    
+
     mi_p = xyarr2segmentslope(
         xy2z_func=plane_z_closure,
         arrij2xy_func=geo_array.ijArrToxy,
-        i=index_multiplier, 
+        i=index_multiplier,
         j=0) * np.ones((row_num, col_num))
-    
+
     mj_p = xyarr2segmentslope(
         xy2z_func=plane_z_closure,
         arrij2xy_func=geo_array.ijArrToxy,
-        i=0, 
+        i=0,
         j=index_multiplier) * np.ones((row_num, col_num))
 
     # 2D array of DEM segment parameters

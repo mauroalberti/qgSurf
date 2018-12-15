@@ -705,7 +705,7 @@ class Segment(object):
         :return: float.
         """
 
-        return self.start_pt.dist_2d(self.end_pt)
+        return self.start_pt.dist2DWith(self.end_pt)
 
     @property
     def slope(self):
