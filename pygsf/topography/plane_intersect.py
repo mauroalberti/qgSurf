@@ -132,7 +132,7 @@ def plane_dem_intersection(
         srcPlaneAttitude: Plane,
         srcPt: Point,
         geo_array: GeoArray,
-        level_ndx: int=0) -> Tuple[List[Point], List[Point]]:
+        level_ndx: int=0) -> List[Point]:
     """
     Calculates the intersections (as points) between the grid and a planar analytical surface.
 
@@ -144,7 +144,7 @@ def plane_dem_intersection(
     :type geo_array: GeoArray.
     :param level_ndx: the grid level to use from the provided geoarray. Default is first (index equal to zero).
     :type level_ndx: integer.
-    :return: tuple of two intersection points lists, the first along the j directions, the second along the i directions.
+    :return: list of unique intersecting points.
 
     Examples:
     """
@@ -217,10 +217,16 @@ def plane_dem_intersection(
         q_arr2=q_p,
         cell_size=cell_size_i)
 
+    # filter out i-direction points coincident with those of j-direction
+
+    intersection_pts_i = intersection_pts_i[np.where( intersection_pts_i > 1e10-6 )]
+
     intersection_pts_i = array2points(
         direction='i',
         arr=intersection_pts_i,
         ij2xy_func=geo_array.ijArrToxy)
 
-    return intersection_pts_j, intersection_pts_i
+    unique_pts = intersection_pts_j + intersection_pts_i
+
+    return unique_pts
 

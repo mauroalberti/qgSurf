@@ -351,6 +351,23 @@ class Point(object):
                 else:
                     return True
 
+    def already_present(self, pt_list: List['Point'], tolerance: [int, float] = MIN_SEPARATION_THRESHOLD) -> bool:
+        """
+        Determines if a point is already in a given point list, using an optional distance separation,
+
+        :param pt_list: list of points. May be empty.
+        :type pt_list: List of Points.
+        :param tolerance: optional maximum distance between near-coincident point pair.
+        :type tolerance: numeric (int, float).
+        :return: True if already present, False otherwise.
+        :rtype: boolean.
+        """
+
+        for pt in pt_list:
+            if self.isCoinc(pt, tolerance=tolerance):
+                return True
+        return False
+
     def shift(self, sx: float, sy: float, sz: float) -> Optional['Point']:
         """
         Create a new object shifted by given amount from the self instance.

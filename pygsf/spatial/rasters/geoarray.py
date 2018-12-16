@@ -85,7 +85,7 @@ class GeoArray(object):
     @property
     def src_cellsize_j(self) -> float:
         """
-        Get the cell size of the grid in the x direction.
+        Get the cell size of the geoarray in the x direction.
 
         :return: cell size in the x (j) direction.
         :rtype: float.
@@ -98,7 +98,7 @@ class GeoArray(object):
     @property
     def src_cellsize_i(self) -> float:
         """
-        Get the cell size of the grid in the y direction.
+        Get the cell size of the geoarray in the y direction.
 
         :return: cell size in the y (-i) direction.
         :rtype: float.
@@ -111,7 +111,7 @@ class GeoArray(object):
     @property
     def levels_num(self) -> int:
         """
-        Returns the number of levels (dimensions) of the grid.
+        Returns the number of levels (dimensions) of the geoarray.
 
         :return: number of levels.
         :rtype: int.

@@ -44,12 +44,17 @@ from qgis.gui import *
     
 from osgeo import ogr
 
-from .geosurf.geoio import read_dem
-from .geosurf.spatial import Point_2D, Segment_2D, Vector_2D, Point_3D, GeolPlane
-from .geosurf.intersections import Intersection_Parameters, Intersections
+#from .geosurf.geoio import read_dem
+#from .geosurf.spatial import Point_2D, Segment_2D, Vector_2D, GeolPlane
+#from .geosurf.intersections import Intersection_Parameters, Intersections
 
+from .pygsf.topography.plane_intersect import plane_dem_intersection
+from .pygsf.orientations.orientations import Plane
+from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
+from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, project_qgs_point, qgs_point
 from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
+from .pygsf.spatial.vectorial.vectorial import Point
 
 
 class DemPlaneIntersectionWidget(QWidget):
@@ -75,7 +80,7 @@ class DemPlaneIntersectionWidget(QWidget):
 
         self.reset_values() 
         self.previousTool = None        
-        self.grid = None
+        self.geoarray = None
         self.input_points = None
         self.intersection_PointMapTool = None         
         self.intersection_markers_list = []
@@ -371,8 +376,8 @@ class DemPlaneIntersectionWidget(QWidget):
          
         self.update_crs_settings()
                        
-        self.intersection_PointMapTool = PointMapToolEmitPoint(self.canvas, self.plugin) # mouse listener
-        self.previousTool = self.canvas.mapTool() # save the standard map tool for restoring it at the end
+        self.intersection_PointMapTool = PointMapToolEmitPoint(self.canvas, self.plugin)  # mouse listener
+        self.previousTool = self.canvas.mapTool()  # save the standard map tool for restoring it at the end
         self.intersection_PointMapTool.canvasClicked.connect(self.update_intersection_point_pos)
         self.intersection_PointMapTool.setCursor(Qt.CrossCursor)                
         self.canvas.setMapTool(self.intersection_PointMapTool)
@@ -454,7 +459,7 @@ class DemPlaneIntersectionWidget(QWidget):
 
     def reset_dem_input_states(self):
 
-        self.dem, self.grid = None, None
+        self.dem, self.geoarray = None, None
 
     def get_working_dem(self, ndx_DEM_file = 0):
 
@@ -467,27 +472,24 @@ class DemPlaneIntersectionWidget(QWidget):
         if ndx_DEM_file == 0: 
             return             
 
-        self.dem = self.rasterLayers[ndx_DEM_file-1]        
-        try:
-            self.grid = read_dem(self.dem.source())               
-        except IOError as e:
-            QMessageBox.critical(self, "DEM", str(e))
+        self.dem = self.rasterLayers[ndx_DEM_file-1]
+
+        dem_src = self.dem.source()
+        success, cntnt = try_read_raster_band(raster_source=dem_src)
+        if not success:
+            QMessageBox.critical(self, "DEM", "{} was not read".format(dem_src))
             return
 
-        if self.grid.domain.g_xrange() <= 360.0 and self.grid.domain.g_yrange() <= 180.0:
-            QMessageBox.warning(self, "DEM", "The used DEM appears to be in polar coordinates (i.e., lat-lon), not supported by the plugin.\nPlease choose a DEM in planar coordinates.")
+        geotransform, projection, band_params, data = cntnt
+        self.geoarray = GeoArray(inGeotransform=geotransform, inProjection=projection, inLevels=[data])
 
-        if self.grid is None: 
-            QMessageBox.critical(self, "DEM", "DEM was not read")
-            return
-    
         self.intersection_definepoint_pButton.setEnabled(True)
         self.intersection_resetsrcpt_pButton.setEnabled(True)
 
     def coords_within_dem_bndr(self, dem_crs_coord_x, dem_crs_coord_y):
         
-        if dem_crs_coord_x <= self.grid.xmin or dem_crs_coord_x >= self.grid.xmax or \
-           dem_crs_coord_y <= self.grid.ymin or dem_crs_coord_y >= self.grid.ymax:
+        if dem_crs_coord_x <= self.geoarray.xmin or dem_crs_coord_x >= self.geoarray.xmax or \
+           dem_crs_coord_y <= self.geoarray.ymin or dem_crs_coord_y >= self.geoarray.ymax:
             return False        
         return True        
 
@@ -503,7 +505,7 @@ class DemPlaneIntersectionWidget(QWidget):
 
     def update_intersection_point_pos(self, qgs_point = None, button = None): # Add point to analyze
 
-        if self.grid is None:
+        if self.geoarray is None:
             QMessageBox.critical(self, "Intersection source point", "Source DEM is not defined") 
             return
 
@@ -561,7 +563,7 @@ class DemPlaneIntersectionWidget(QWidget):
         """         
         
         # to prevent action when the DEM is not set              
-        if self.grid is None: 
+        if self.geoarray is None:
             return None 
                
         if not self.fixz2dem_checkBox.isChecked(): 
@@ -571,14 +573,15 @@ class DemPlaneIntersectionWidget(QWidget):
             dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords(self.intersection_srcpt_x, self.intersection_srcpt_y)        
         else:
             dem_crs_source_pt_x, dem_crs_source_pt_y = self.intersection_srcpt_x, self.intersection_srcpt_y      
-         
+
+        """
         if not self.coords_within_dem_bndr(dem_crs_source_pt_x, dem_crs_source_pt_y): 
             QMessageBox.critical(self, "Intersection source point", 
                                  "Defined point is outside source DEM extent")                 
             return None
-        
-        currArrCoord = self.grid.geog2array_coord(Point_2D(dem_crs_source_pt_x, dem_crs_source_pt_y))        
-        z = self.grid.interpolate_bilinear(currArrCoord)         
+        """
+
+        z = self.geoarray.interpolate_bilinear(dem_crs_source_pt_x, dem_crs_source_pt_y)
         if z is None: 
             return None
         
@@ -653,7 +656,7 @@ class DemPlaneIntersectionWidget(QWidget):
         """
 
         # check if all input data are correct
-        if self.grid is None:
+        if self.geoarray is None:
             QMessageBox.information(self, "qgSurf", "Please first define a source DEM")
             return
                 
@@ -673,7 +676,7 @@ class DemPlaneIntersectionWidget(QWidget):
             dem_crs_source_pt_x, dem_crs_source_pt_y = self.get_dem_crs_coords(prj_crs_source_pt_x, prj_crs_source_pt_y) 
         else:
             dem_crs_source_pt_x, dem_crs_source_pt_y = prj_crs_source_pt_x, prj_crs_source_pt_y
-        dem_crs_source_point = Point_3D(dem_crs_source_pt_x, dem_crs_source_pt_y, z)
+        dem_crs_source_point = Point(dem_crs_source_pt_x, dem_crs_source_pt_y, z)
 
         # geoplane attitude in DEM CRS
         src_dip_direction, src_dip_angle = self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value()
@@ -682,22 +685,14 @@ class DemPlaneIntersectionWidget(QWidget):
         else:
             corr_dip_direction, corr_dip_angle = src_dip_direction, src_dip_angle      
         
-        self.srcPlaneAttitude = GeolPlane(corr_dip_direction, corr_dip_angle)
+        self.srcPlaneAttitude = Plane(corr_dip_direction, corr_dip_angle)
 
-        # intersection arrays       
+        # intersection points
 
-        self.inters = Intersections() 
-        self.inters.xcoords_x, self.inters.xcoords_y, \
-        self.inters.ycoords_x, self.inters.ycoords_y = self.grid.intersection_with_surface('plane', dem_crs_source_point, self.srcPlaneAttitude)            
-        self.inters.parameters = Intersection_Parameters(self.grid._sourcename, dem_crs_source_point, self.srcPlaneAttitude)
-        self.intersections_x = list(self.inters.xcoords_x[ np.logical_not(np.isnan(self.inters.xcoords_x)) ]) + \
-                               list(self.inters.ycoords_x[ np.logical_not(np.isnan(self.inters.ycoords_y)) ])    
-        self.intersections_y = list(self.inters.xcoords_y[ np.logical_not(np.isnan(self.inters.xcoords_x)) ]) + \
-                               list(self.inters.ycoords_y[ np.logical_not(np.isnan(self.inters.ycoords_y)) ])                          
-        intersection_data = dict(x = self.intersections_x, y = self.intersections_y)          
-        intersection_plane = dict(dipdir = self.inters.parameters._srcPlaneAttitude._dipdir, dipangle = self.inters.parameters._srcPlaneAttitude._dipangle)        
-        intersection_point = dict(x = self.inters.parameters._srcPt._x, y = self.inters.parameters._srcPt._y, z = self.inters.parameters._srcPt._z)
-        self.intersections_xprt = dict(data = intersection_data, plane = intersection_plane, point = intersection_point)
+        self.intersection_pts = plane_dem_intersection(
+            srcPlaneAttitude=self.srcPlaneAttitude,
+            srcPt=dem_crs_source_point,
+            geo_array=self.geoarray)
 
         self.plot_intersections()
 
@@ -748,7 +743,7 @@ class DemPlaneIntersectionWidget(QWidget):
         pt2d_prj_crs = Point_2D(prj_crs_pt2d_x, prj_crs_pt2d_y)
         
         # dummy distance displacement in DEM CRS
-        dem_crs_displacement_distance = self.grid.domain.g_min_size() / dummy_factor       
+        dem_crs_displacement_distance = self.geoarray.domain.g_min_size() / dummy_factor
         
         # create list of displacement ratios and azimuths in project CRS for 0-359 DEM CRS orientations
         projection_deformation_list = []
@@ -761,18 +756,16 @@ class DemPlaneIntersectionWidget(QWidget):
     def corrected_plane_attitude(self, dip_direction_prj_crs, dip_angle_prj_crs, dummy_factor = 100.0):
         
         # dummy distance displacement in DEM CRS
-        dem_crs_displacement_distance = self.grid.domain.g_min_size() / dummy_factor   
+        dem_crs_displacement_distance = 100  # self.geoarray.domain.g_min_size() / dummy_factor
         
         # DEM center in DEM and prj CRSes
-        dem_center_pt2d_dem_crs = self.grid.domain.g_horiz_center()
+        dem_center_pt2d_dem_crs = self.geoarray.domain.g_horiz_center()
         dem_center_pt2d_prj_crs_x, dem_center_pt2d_prj_crs_y = self.get_prj_crs_coords(dem_center_pt2d_dem_crs._x, dem_center_pt2d_dem_crs._y)
-        dem_center_pt2d_prj_crs = Point_2D(dem_center_pt2d_prj_crs_x, dem_center_pt2d_prj_crs_y)
-        
-        """
+        dem_center_pt2d_prj_crs = Point(dem_center_pt2d_prj_crs_x, dem_center_pt2d_prj_crs_y)
+
         # ANALYSIS - projection deformation list
         projection_deformation_ellipse_dict = self.projection_deformations_list(dem_center_pt2d_dem_crs)
-        """
-        
+
         # analysed direction in prj CRS    
         rhr_strike_prj_crs = dip_direction_prj_crs - 90.0
         if rhr_strike_prj_crs < 0.0:
@@ -791,15 +784,14 @@ class DemPlaneIntersectionWidget(QWidget):
 
     def plot_intersections(self):
         
-        try:
-            if self.intersections_x is None or len(self.intersections_x) == 0 or \
-               self.intersections_y is None or len(self.intersections_y) == 0:
-                return
-        except:
+        if not self.intersections:
             return
-        
+
+        intersections_x = list(map(lambda pt: pt.x, self.intersections))
+        intersections_y = list(map(lambda pt: pt.y, self.intersections))
+
         current_markers_list = []
-        for dem_crs_x, dem_crs_y in zip(self.intersections_x, self.intersections_y):
+        for dem_crs_x, dem_crs_y in zip(intersections_x, intersections_y):
             if self.on_the_fly_projection:
                 prj_crs_x, prj_crs_y = self.get_prj_crs_coords(dem_crs_x, dem_crs_y)
             else:
