@@ -677,7 +677,7 @@ class BestFitPlaneMainWidget(QWidget):
         # for all xy tuples, project to project CRS as a qgis point
 
         projectCrs = self.get_project_crs()
-        proj_crs_qgispoint_list = [project_qgs_point(qgs_point(x,y), inpts_lyr.crs(), projectCrs) for (x,y) in xypair_list ]
+        proj_crs_qgispoint_list = [qgs_project_point(qgs_point(x, y), inpts_lyr.crs(), projectCrs) for (x, y) in xypair_list]
 
         # for all qgs points, process them for the input point processing queue
 
@@ -895,7 +895,7 @@ class BestFitPlaneMainWidget(QWidget):
     def project_coords(self, x, y, source_crs, dest_crs):
         
         if source_crs != dest_crs:
-            dest_crs_qgs_pt = project_qgs_point(qgs_point(x, y), source_crs, dest_crs)
+            dest_crs_qgs_pt = qgs_project_point(qgs_point(x, y), source_crs, dest_crs)
             return dest_crs_qgs_pt.x(), dest_crs_qgs_pt.y()
         else:
             return x, y

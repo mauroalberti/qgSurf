@@ -260,7 +260,7 @@ def explode_pt(qgs_pt: QgsPointXY) -> Tuple[float, float]:
     return qgs_pt.x(), qgs_pt.y()
 
 
-def project_qgs_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, destCrs: QgsCoordinateReferenceSystem=None) -> QgsPointXY:
+def qgs_project_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, destCrs: QgsCoordinateReferenceSystem=None) -> QgsPointXY:
     """
     Project a QGIS point to a new CRS.
     If the destination CRS is not set, EPSG 4326 will be used.
@@ -330,7 +330,7 @@ def project_line_2d(srcLine, srcCrs, destCrs):
     destLine = Line()
     for pt in srcLine._pts:        
         srcPt = QgsPointXY(pt._x, pt._y)
-        destPt = project_qgs_point(srcPt, srcCrs, destCrs)
+        destPt = qgs_project_point(srcPt, srcCrs, destCrs)
         destLine = destLine.add_pt(Point(destPt.x(), destPt.y()))
         
     return destLine
