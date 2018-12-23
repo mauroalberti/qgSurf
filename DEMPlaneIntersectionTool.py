@@ -679,10 +679,28 @@ class DemPlaneIntersectionWidget(QWidget):
         except:
             QMessageBox.information(self, "qgSurf", "z value is not correctly defined")
             return
-        
-        # source point position in DEM CRS
+
+        # source point
 
         srcpt_prjcrs_x, srcpt_prjcrs_y = self.srcpt_x, self.srcpt_y
+
+        srcpt_epsg4326_lon, srcpt_epsg4326_lat = qgs_project_xy(
+            x=srcpt_prjcrs_x,
+            y=srcpt_prjcrs_y,
+            srcCrs=self.projectCrs)
+
+        north_dummpy_pt_lon = srcpt_epsg4326_lon  # no change
+        north_dummpy_pt_lat = srcpt_epsg4326_lat + (1.0/1200.0)  # add 3 minute-seconds (approximately 90 meters)
+
+        dummypt_prjcrs_x, dummypt_prjcrs_y = qgs_project_xy(
+            x=north_dummpy_pt_lon,
+            y=north_dummpy_pt_lat,
+            destCrs=self.projectCrs)
+
+        azimuth_correction = 0
+
+        # source point position in DEM CRS
+
         if self.on_the_fly_projection:       
             srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(srcpt_prjcrs_x, srcpt_prjcrs_y)
         else:

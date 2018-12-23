@@ -260,10 +260,10 @@ def explode_pt(qgs_pt: QgsPointXY) -> Tuple[float, float]:
     return qgs_pt.x(), qgs_pt.y()
 
 
-def qgs_project_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, destCrs: QgsCoordinateReferenceSystem=None) -> QgsPointXY:
+def qgs_project_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem = None, destCrs: QgsCoordinateReferenceSystem = None) -> QgsPointXY:
     """
     Project a QGIS point to a new CRS.
-    If the destination CRS is not set, EPSG 4326 will be used.
+    If the source/destination CRS is not provided, it will be set to EPSG 4236 (WGS-84).
 
     :param qgsPt: the source point.
     :type qgsPt: a QgsPointXY instance.
@@ -274,6 +274,11 @@ def qgs_project_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, d
     :return: the projected point.
     :rtype: QgsPointXY instance.
     """
+
+    if not srcCrs:
+        srcCrs = QgsCoordinateReferenceSystem(
+            4326,
+            QgsCoordinateReferenceSystem.EpsgCrsId)
 
     if not destCrs:
         destCrs = QgsCoordinateReferenceSystem(
@@ -291,10 +296,10 @@ def qgs_project_point(qgsPt: QgsPointXY, srcCrs: QgsCoordinateReferenceSystem, d
     return prj_pt
 
 
-def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem, destCrs:Optional[QgsCoordinateReferenceSystem]=None) -> Optional[Tuple[float, float]]:
+def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem = None, destCrs:Optional[QgsCoordinateReferenceSystem] = None) -> Tuple[float, float]:
     """
     Project a pair of x-y coordinates to a new projection.
-    If the destination CRS is not provided, the new projection will be EPSG 4236 (WGS-84).
+    If the source/destination CRS is not provided, it will be set to EPSG 4236 (WGS-84).
 
     :param x: the x coordinate.
     :type x: float.
@@ -307,6 +312,11 @@ def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem, des
     :return: the projected x-y coordinates.
     :rtype: tuple of two float values.
     """
++
+    if not srcCrs:
+        srcCrs = QgsCoordinateReferenceSystem(
+            4326,
+            QgsCoordinateReferenceSystem.EpsgCrsId)
 
     if not destCrs:
         destCrs = QgsCoordinateReferenceSystem(
