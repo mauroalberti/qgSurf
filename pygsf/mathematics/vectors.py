@@ -579,8 +579,8 @@ class Vect(object):
 
     def angle(self, another: 'Vect', unit='d') -> Optional[float]:
         """
-        Calculate angle between two vectors, as degrees
-        in 0° - 180° range.
+        Calculate angle between two vectors,
+        in 0° - 180° range (as degrees).
 
         Example:
           >>> Vect(1, 0, 0).angle(Vect(0, 0, 1))
@@ -632,6 +632,52 @@ class Vect(object):
 
         x, y, z = arrToTuple(array3x3.dot(self.a))
         return Vect(x, y, z)
+
+    @property
+    def azimuth(self) -> Optional[float]:
+        """
+        The azimuth between the Y axis and the vector, calculated clockwise.
+
+        :return: angle in degrees.
+        :rtype: optional float.
+
+        Examples:
+          >>> Vect(0, 1, 0).azimuth
+          0.0
+          >>> Vect(1, 1, 0).azimuth
+          45.0
+          >>> Vect(1, 0, 0).azimuth
+          90.0
+          >>> Vect(1, -1, 0).azimuth
+          135.0
+          >>> Vect(0, -1, 0).azimuth
+          180.0
+          >>> Vect(-1, -1, 0).azimuth
+          225.0
+          >>> Vect(-1, 0, 0).azimuth
+          270.0
+          >>> Vect(-1, 1, 0).azimuth
+          315.0
+          >>> Vect(0, 0, 1).azimuth is None
+          True
+          >>> Vect(0, 0, -1).azimuth is None
+          True
+        """
+
+        y_axis = Vect(0, 1, 0)
+        vector_2d = self.versor2D()
+
+        if not vector_2d:
+            return None
+
+        angle = vector_2d.angle(y_axis)
+
+        z_comp = y_axis.vCross(vector_2d).z
+
+        if z_comp <= 0.0:
+            return angle
+        else:
+            return 360.0 - angle
 
 
 if __name__ == "__main__":
