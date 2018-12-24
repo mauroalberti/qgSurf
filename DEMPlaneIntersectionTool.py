@@ -56,7 +56,7 @@ from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
 from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, qgs_project_xy
 from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
-from .pygsf.spatial.vectorial.vectorial import Point
+from .pygsf.spatial.vectorial.vectorial import Point, Segment
 
 
 class DemPlaneIntersectionWidget(QWidget):
@@ -567,10 +567,7 @@ class DemPlaneIntersectionWidget(QWidget):
         if not self.fixz2dem_checkBox.isChecked(): 
             return None
 
-        if self.on_the_fly_projection:         
-            dem_crs_source_pt_x, dem_crs_source_pt_y = self.project_from_prj_to_dem_crs(self.srcpt_x, self.srcpt_y)
-        else:
-            dem_crs_source_pt_x, dem_crs_source_pt_y = self.srcpt_x, self.srcpt_y
+        dem_crs_source_pt_x, dem_crs_source_pt_y = self.project_from_prj_to_dem_crs(self.srcpt_x, self.srcpt_y)
 
         """
         if not self.coords_within_dem_bndr(dem_crs_source_pt_x, dem_crs_source_pt_y): 
@@ -684,6 +681,8 @@ class DemPlaneIntersectionWidget(QWidget):
 
         srcpt_prjcrs_x, srcpt_prjcrs_y = self.srcpt_x, self.srcpt_y
 
+        # Calculates dip direction correction with respect to project CRS Y orientation
+
         srcpt_epsg4326_lon, srcpt_epsg4326_lat = qgs_project_xy(
             x=srcpt_prjcrs_x,
             y=srcpt_prjcrs_y,
@@ -697,23 +696,42 @@ class DemPlaneIntersectionWidget(QWidget):
             y=north_dummpy_pt_lat,
             destCrs=self.projectCrs)
 
-        azimuth_correction = 0
+        start_pt = Point(
+            srcpt_prjcrs_x,
+            srcpt_prjcrs_y)
+
+        end_pt = Point(
+            dummypt_prjcrs_x,
+            dummypt_prjcrs_y)
+
+        north_vector = Segment(
+            start_pt=start_pt,
+            end_pt=end_pt).vector()
+
+        azimuth_correction = north_vector.azimuth
+
+        print("Azimuth correction: {}".format(azimuth_correction))
+
+        src_dip_direction, src_dip_angle = self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value()
+
+        prjcrs_dipdir = (src_dip_direction + azimuth_correction) % 360.0
+        prjcrs_dipang = src_dip_angle
+
+        print("Project CRS corrected plane orientation: dip dir. = {}, dip ang. = {}".format(prjcrs_dipdir, prjcrs_dipang))
+
+        return
 
         # source point position in DEM CRS
 
-        if self.on_the_fly_projection:       
-            srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(srcpt_prjcrs_x, srcpt_prjcrs_y)
-        else:
-            srcpt_demcrs_x, srcpt_demcrs_y = srcpt_prjcrs_x, srcpt_prjcrs_y
+        srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(srcpt_prjcrs_x, srcpt_prjcrs_y)
+
         dem_crs_source_point = Point(srcpt_demcrs_x, srcpt_demcrs_y, z)
 
         # geoplane attitude in DEM CRS
-        src_dip_direction, src_dip_angle = self.DDirection_spinBox.value(), self.DAngle_verticalSlider.value()
-        if self.on_the_fly_projection:       
-            corr_dip_direction, corr_dip_angle = self.corrected_plane_attitude(src_dip_direction, src_dip_angle) 
-        else:
-            corr_dip_direction, corr_dip_angle = src_dip_direction, src_dip_angle      
-        
+
+
+        corr_dip_direction, corr_dip_angle = self.corrected_plane_attitude(src_dip_direction, src_dip_angle)
+
         self.srcPlaneAttitude = Plane(corr_dip_direction, corr_dip_angle)
 
         # intersection points
@@ -735,10 +753,9 @@ class DemPlaneIntersectionWidget(QWidget):
 
         current_markers_list = []
         for dem_crs_x, dem_crs_y in zip(intersections_x, intersections_y):
-            if self.on_the_fly_projection:
-                prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(dem_crs_x, dem_crs_y)
-            else:
-                prj_crs_x, prj_crs_y = dem_crs_x, dem_crs_y           
+
+            prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(dem_crs_x, dem_crs_y)
+
             marker = self.create_marker(self.canvas, prj_crs_x, prj_crs_y, pen_width= 1, icon_type = 1, icon_size = 8, 
                                          icon_color = QColor(str(self.Intersection_color_comboBox.currentText())))
             current_markers_list.append(marker)        
@@ -858,11 +875,9 @@ class DemPlaneIntersectionWidget(QWidget):
         curr_Pt_id = 0   
         for curr_Pt in zip(intersections_x, intersections_y, intersections_z):            
             curr_Pt_id += 1
-            if self.on_the_fly_projection:            
-                prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(float(curr_Pt[0]), float(curr_Pt[1]))
-            else:
-                prj_crs_x, prj_crs_y = float(curr_Pt[0]), float(curr_Pt[1])
-            
+
+            prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(float(curr_Pt[0]), float(curr_Pt[1]))
+
             # pre-processing for new feature in output layer
             curr_Pt_geom = ogr.Geometry(ogr.wkbPoint)
             curr_Pt_geom.AddPoint(prj_crs_x, prj_crs_y, float(curr_Pt[2]))
@@ -876,11 +891,8 @@ class DemPlaneIntersectionWidget(QWidget):
             curr_Pt_shape.SetField('y', prj_crs_y) 
             curr_Pt_shape.SetField('z', curr_Pt[2]) 
 
-            if self.on_the_fly_projection:
-                prj_crs_src_pt_x, prj_crs_src_pt_y = self.project_from_dem_to_prj_crs(self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'])
-            else:
-                prj_crs_src_pt_x, prj_crs_src_pt_y = self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y']
-                
+            prj_crs_src_pt_x, prj_crs_src_pt_y = self.project_from_dem_to_prj_crs(self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'])
+
             curr_Pt_shape.SetField('srcPt_x', prj_crs_src_pt_x)
             curr_Pt_shape.SetField('srcPt_y', prj_crs_src_pt_y) 
             curr_Pt_shape.SetField('srcPt_z', self.intersections_xprt['point']['z'])
@@ -919,10 +931,9 @@ class DemPlaneIntersectionWidget(QWidget):
                 if direct == 'x': dem_crs_x, dem_crs_y = self.inters.xcoords_x[ i, j ], self.inters.xcoords_y[ i, j ]
                 if direct == 'y': dem_crs_x, dem_crs_y = self.inters.ycoords_x[ i, j ], self.inters.ycoords_y[ i, j ]                                        
                 z = self.plane_z(dem_crs_x, dem_crs_y)
-                if self.on_the_fly_projection: 
-                    prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(dem_crs_x, dem_crs_y)
-                else:
-                    prj_crs_x, prj_crs_y = dem_crs_x, dem_crs_y                
+
+                prj_crs_x, prj_crs_y = self.project_from_dem_to_prj_crs(dem_crs_x, dem_crs_y)
+
                 line.AddPoint(prj_crs_x, prj_crs_y, z)            
                                        
             # create a new feature
@@ -931,11 +942,8 @@ class DemPlaneIntersectionWidget(QWidget):
 
             line_shape.SetField('id', curr_path_id)
             
-            if self.on_the_fly_projection:
-                prj_crs_src_pt_x, prj_crs_src_pt_y = self.project_from_dem_to_prj_crs(self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'])
-            else:
-                prj_crs_src_pt_x, prj_crs_src_pt_y = self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y']            
-                
+            prj_crs_src_pt_x, prj_crs_src_pt_y = self.project_from_dem_to_prj_crs(self.intersections_xprt['point']['x'], self.intersections_xprt['point']['y'])
+
             line_shape.SetField('srcPt_x', prj_crs_src_pt_x)
             line_shape.SetField('srcPt_y', prj_crs_src_pt_y) 
             line_shape.SetField('srcPt_z', self.intersections_xprt['point']['z'])

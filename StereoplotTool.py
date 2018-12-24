@@ -29,7 +29,7 @@ import os
 from builtins import str
 from builtins import map
 
-from .apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
+from .pygsf.embedded.apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
 
 from .auxiliary_windows import *
 from .pygsf.orientations.orientations import Plane as GPlane, Axis as GAxis

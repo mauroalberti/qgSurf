@@ -312,7 +312,7 @@ def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem = No
     :return: the projected x-y coordinates.
     :rtype: tuple of two float values.
     """
-+
+
     if not srcCrs:
         srcCrs = QgsCoordinateReferenceSystem(
             4326,
