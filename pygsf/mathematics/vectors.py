@@ -40,7 +40,7 @@ class Vect(object):
     z axis -> Up
     """
 
-    def __init__(self, x: Number, y: Number, z: Number):
+    def __init__(self, x: Number, y: Number, z: Number = 0.0):
         """
         Vect constructor.
 
@@ -57,6 +57,8 @@ class Vect(object):
           pygsf.mathematics.exceptions.VectorInputException: Input values must be finite
           >>> Vect(0, 0, 0)
           Vect(0.0000, 0.0000, 0.0000)
+          >>> Vect(2.2, -19.7)
+          Vect(2.2000, -19.7000, 0.0000)
         """
 
         vals = [x, y, z]

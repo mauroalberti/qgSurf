@@ -332,7 +332,9 @@ def qgs_project_xy(x: float, y: float, srcCrs: QgsCoordinateReferenceSystem = No
         x,
         y)
 
-    return explode_pt(qgs_pt)
+    x, y = qgs_pt.x(), qgs_pt.y()
+
+    return x, y
 
 
 def project_line_2d(srcLine, srcCrs, destCrs):

@@ -219,7 +219,7 @@ def plane_dem_intersection(
 
     # filter out i-direction points coincident with those of j-direction
 
-    intersection_pts_i = intersection_pts_i[np.where( intersection_pts_i > 1e10-6 )]
+    #intersection_pts_i = intersection_pts_i[np.where( intersection_pts_i > 1e10-6 )]
 
     intersection_pts_i = array2points(
         direction='i',

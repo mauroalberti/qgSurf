@@ -389,6 +389,21 @@ class Point(object):
         else:
             return self.__class__(self.x + sx, self.y + sy, self.z + sz)
 
+    def shiftByVect(self, v: Vect) -> 'Point':
+        """
+        Create a new object shifted from the self instance by given vector.
+
+        Example:
+          >>> Point(1, 1, 1).shiftByVect(Vect(0.5, 1., 1.5))
+          Point(1.5000, 2.0000, 2.5000)
+          >>> Point(1, 2, -1).shiftByVect(Vect(0.5, 1., 1.5))
+          Point(1.5000, 3.0000, 0.5000)
+       """
+
+        sx, sy, sz = v.toXYZ()
+
+        return self.__class__(self.x + sx, self.y + sy, self.z + sz)
+
     def asVect(self) -> 'Vect':
         """
         Create a vector based on the point coordinates

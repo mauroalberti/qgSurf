@@ -51,10 +51,10 @@ from osgeo import ogr
 #from .geosurf.intersections import Intersection_Parameters, Intersections
 
 from .pygsf.topography.plane_intersect import plane_dem_intersection
-from .pygsf.orientations.orientations import Plane
+from .pygsf.orientations.orientations import Plane, Direct
 from .pygsf.libs_utils.gdal.gdal import try_read_raster_band
 from .pygsf.spatial.rasters.geoarray import GeoArray
-from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, qgs_project_xy
+from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, qgs_project_xy, qgs_project_point, qgs_point
 from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
 from .pygsf.spatial.vectorial.vectorial import Point, Segment
 
@@ -681,7 +681,7 @@ class DemPlaneIntersectionWidget(QWidget):
 
         srcpt_prjcrs_x, srcpt_prjcrs_y = self.srcpt_x, self.srcpt_y
 
-        # Calculates dip direction correction with respect to project CRS Y orientation
+        # Calculates dip direction correction with respect to project CRS y-axis orientation
 
         srcpt_epsg4326_lon, srcpt_epsg4326_lat = qgs_project_xy(
             x=srcpt_prjcrs_x,
@@ -719,37 +719,83 @@ class DemPlaneIntersectionWidget(QWidget):
 
         print("Project CRS corrected plane orientation: dip dir. = {}, dip ang. = {}".format(prjcrs_dipdir, prjcrs_dipang))
 
-        return
+        # Correct dip direction and angle by DEM crs
 
-        # source point position in DEM CRS
+        """
+        srcpt_prjcrs_x, srcpt_prjcrs_y = self.srcpt_x, self.srcpt_y
+        prjcrs_dipdir, prjcrs_dipang
+        """
 
-        srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(srcpt_prjcrs_x, srcpt_prjcrs_y)
+        prjcrs_dir_versor = Direct.fromAzPl(
+            az=prjcrs_dipdir,
+            pl=0.0).asVersor()
 
-        dem_crs_source_point = Point(srcpt_demcrs_x, srcpt_demcrs_y, z)
+        dummy_distance = 100  # meters
+
+        prjcrs_dir_vector = prjcrs_dir_versor.scale(dummy_distance)
+
+        # NOTE: it assumes that the project crs is not in lon-lat !!
+
+        prjcrs_srcpt = Point(
+            srcpt_prjcrs_x,
+            srcpt_prjcrs_y)
+
+        endpt_prjcrs_x, endpt_prjcrs_y, _ = prjcrs_srcpt.shiftByVect(prjcrs_dir_vector).toXYZ()
+
+        prjcrs_zeta = dummy_distance * tan(radians(prjcrs_dipang))
+
+        srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(
+            x=srcpt_prjcrs_x,
+            y=srcpt_prjcrs_y)
+
+        dem_crs_source_point = Point(srcpt_demcrs_x, srcpt_demcrs_y)
+
+        endpt_demcrs_x, endpt_demcrs_y = self.project_from_prj_to_dem_crs(
+            x=endpt_prjcrs_x,
+            y=endpt_prjcrs_y)
 
         # geoplane attitude in DEM CRS
 
+        demcrs_vector = Segment(
+            start_pt=dem_crs_source_point,
+            end_pt=Point(endpt_demcrs_x, endpt_demcrs_y)
+          ).vector()
 
-        corr_dip_direction, corr_dip_angle = self.corrected_plane_attitude(src_dip_direction, src_dip_angle)
+        corr_dip_direction = demcrs_vector.azimuth
+
+        demcrs_len = demcrs_vector.len2D
+        demcrs_zeta = prjcrs_zeta
+
+        corr_dip_angle = degrees(atan(demcrs_zeta / demcrs_len))
+
+        print("corrected dummy lenght: {}, corr. dip dir.: {}, corr. dip ang.: {}".format(
+            demcrs_len,
+            corr_dip_direction,
+            corr_dip_angle
+        ))
+
+        #corr_dip_direction, corr_dip_angle = self.corrected_plane_attitude(src_dip_direction, src_dip_angle)
 
         self.srcPlaneAttitude = Plane(corr_dip_direction, corr_dip_angle)
 
         # intersection points
 
+        dem_crs_pt = Point(
+            x=srcpt_demcrs_x,
+            y=srcpt_demcrs_y,
+            z=z)
+
         self.intersection_pts = plane_dem_intersection(
             srcPlaneAttitude=self.srcPlaneAttitude,
-            srcPt=dem_crs_source_point,
+            srcPt=dem_crs_pt,
             geo_array=self.geoarray)
 
         self.plot_intersections()
 
     def plot_intersections(self):
-        
-        if not self.intersections:
-            return
 
-        intersections_x = list(map(lambda pt: pt.x, self.intersections))
-        intersections_y = list(map(lambda pt: pt.y, self.intersections))
+        intersections_x = list(map(lambda pt: pt.x, self.intersection_pts))
+        intersections_y = list(map(lambda pt: pt.y, self.intersection_pts))
 
         current_markers_list = []
         for dem_crs_x, dem_crs_y in zip(intersections_x, intersections_y):
