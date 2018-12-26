@@ -99,15 +99,19 @@ def segment_intersections_array(
     return inters_intracells_residuals
 
 
-def array2points(direction: str, arr: np.ndarray, ij2xy_func: Callable) -> List[Point]:
+def arrayTo2DPts(direction: str, arr: np.ndarray, ij2xy_func: Callable) -> List[Point]:
     """
     Converts an array of along-direction (i- or j-) intra-cell segments [0 -> 1[ into
     a list of 2D points.
 
     :param direction: considered intersection direction: 'i' (for i axis) or 'j' (for j axis).
+    :type direction: basestring.
     :param arr: array of along-direction (i- or j-) intra-cell segments [0 -> 1[.
+    :type arr: numpy ndarray.
     :param ij2xy_func: function to convert from array indices to x-y geographic coordinates.
-    :return: list of Points.:
+    :type ij2xy_func: function.
+    :return: list of 2D points.
+    :rtype: list of Points.
     :raise: Exception when direction is not 'i' or 'j'
     """
 
@@ -124,6 +128,42 @@ def array2points(direction: str, arr: np.ndarray, ij2xy_func: Callable) -> List[
                     raise Exception('Unexpected array direction value: {}'.format(direction))
                 x, y = ij2xy_func(i_int, j_int)
                 pts.append(Point(x, y))
+
+    return pts
+
+
+def arrayTo3DPts(direction: str, arr: np.ndarray, ij2xy_func: Callable, xy2z_func: Callable) -> List[Point]:
+    """
+    Converts an array of along-direction (i- or j-) intra-cell segments [0 -> 1[ into
+    a list of 3D points.
+
+    :param direction: considered intersection direction: 'i' (for i axis) or 'j' (for j axis).
+    :type direction: basestring.
+    :param arr: array of along-direction (i- or j-) intra-cell segments [0 -> 1[.
+    :type arr: numpy ndarray.
+    :param ij2xy_func: function to convert from array indices to x-y geographic coordinates.
+    :type ij2xy_func: function.
+    :param xy2z_func: function that calculates z value given x and y coordinates.
+    :type xy2z_func: function.
+    :return: list of 3D points.
+    :rtype: list of Points.
+    :raise: Exception when direction is not 'i' or 'j'
+    """
+
+    pts = []
+    for i in range(arr.shape[0]):
+        for j in range(arr.shape[1]):
+            val = arr[i, j]
+            if np.isfinite(val):
+                if direction == 'i':
+                    i_int, j_int = i + val, j
+                elif direction == 'j':
+                    i_int, j_int = i, j + val
+                else:
+                    raise Exception('Unexpected array direction value: {}'.format(direction))
+                x, y = ij2xy_func(i_int, j_int)
+                z = xy2z_func(x, y)
+                pts.append(Point(x, y, z))
 
     return pts
 
@@ -170,7 +210,7 @@ def plane_dem_intersection(
         geotransform=geo_array.gt,
         z_transfer_func=plane_z_closure)
 
-    index_multiplier = 100  # large value to ensure a precise slope values
+    index_multiplier = 100  # sufficiently large value to ensure a precise slope values
 
     mi_p = xyarr2segmentslope(
         xy2z_func=plane_z_closure,
@@ -205,10 +245,11 @@ def plane_dem_intersection(
         q_arr2=q_p,
         cell_size=cell_size_j)
 
-    intersection_pts_j = array2points(
+    intersection_pts_j = arrayTo3DPts(
         direction='j',
         arr=intersection_pts_j,
-        ij2xy_func=geo_array.ijArrToxy)
+        ij2xy_func=geo_array.ijArrToxy,
+        xy2z_func=plane_z_closure)
 
     intersection_pts_i = segment_intersections_array(
         m_arr1=mi_d,
@@ -221,10 +262,11 @@ def plane_dem_intersection(
 
     #intersection_pts_i = intersection_pts_i[np.where( intersection_pts_i > 1e10-6 )]
 
-    intersection_pts_i = array2points(
+    intersection_pts_i = arrayTo3DPts(
         direction='i',
         arr=intersection_pts_i,
-        ij2xy_func=geo_array.ijArrToxy)
+        ij2xy_func=geo_array.ijArrToxy,
+        xy2z_func=plane_z_closure)
 
     unique_pts = intersection_pts_j + intersection_pts_i
 
