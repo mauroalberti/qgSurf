@@ -26,19 +26,18 @@
 
 import os
 
-from builtins import str
 from builtins import map
 
 from .pygsf.embedded.apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
 
-from .auxiliary_windows import *
+from .auxiliary_windows.stereonet import *
 from .pygsf.orientations.orientations import Plane as GPlane, Axis as GAxis
 from .pygsf.libs_utils.qgis.qgs_tools import pt_geoms_attrs
 from .pygsf.libs_utils.mpl.save_figure import FigureExportDlg
 from .pygsf.libs_utils.apsg.faults import rake_to_apsg_movsense, movsense_to_apsg_movsense
 from .pygsf.geology.exceptions import RakeInputException
 
-from .base_params import *
+from .config.general_params import *
 
 
 class StereoplotWidget(QWidget):

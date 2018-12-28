@@ -6,7 +6,7 @@
 
                               -------------------
         begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti
+        copyright            : (C) 2011-2019 by Mauro Alberti
         email                : alberti.m65@gmail.com
 
  ***************************************************************************/
@@ -59,9 +59,9 @@ from qgis.PyQt.uic import loadUi
 from qgis.core import *
 from qgis.gui import *
 
-from .base_params import *
+from .config.general_params import *
 from .db_queries.queries import *
-from .config.general import *
+from .config.minor_params import *
 from .messages.msgs import *
 
 from .pygsf.libs_utils.qt.filesystem import define_path_new_file, old_file_path
@@ -229,7 +229,7 @@ class BestFitPlaneMainWidget(QWidget):
     def init_params(self):
 
         texts_params = read_yaml(bfp_text_config_file)
-        self.dem_default_text = texts_params["dem_default_text"]
+        self.dem_default_text = texts_params["layer_default_text"]
         self.ptlnlyr_default_text = texts_params["ptlnlyr_default_text"]
 
         self.reset_dem_input_states()

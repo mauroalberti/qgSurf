@@ -6,7 +6,7 @@
 
                               -------------------
         begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti
+        copyright            : (C) 2011-2019 by Mauro Alberti
         email                : alberti.m65@gmail.com
 
  ***************************************************************************/
@@ -31,16 +31,17 @@ from builtins import object
 
 import os
 
-from . import resources  # DO NOT DELETE, PLEASE, UNLESS YOU WANNA GET MAD ASKING YOURSELF WTF ICONS DISAPPEARED....
-
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 
-from .base_params import *
+from . import resources
+
+from .config.general_params import *
 
 from .BestFitPlaneTool import BestFitPlaneMainWidget
 from .DEMPlaneIntersectionTool import DemPlaneIntersectionWidget
+from .PtsPlnDistances import PtsPlnDistancesWidget
 from .StereoplotTool import StereoplotWidget
 from .AboutDialog import AboutDialog
 
@@ -48,7 +49,7 @@ from .pygsf.libs_utils.qt.tools import *
 from .pygsf.libs_utils.yaml.io import read_yaml
 
 
-class QgsurfGui(object):
+class QgSurfGui(object):
 
     def __init__(self, interface):
 
@@ -78,6 +79,7 @@ class QgsurfGui(object):
         db_params = read_yaml(db_config_file)
         self.sqlite_db_params = db_params["sqlite_db"]
 
+        self.bPtsPlaneDistsWidgetOpen = False
         self.bStereoplotWidgetOpen = False
 
         self.interface = interface
@@ -178,12 +180,29 @@ class QgsurfGui(object):
 
     def RunPointsPlaneDistancesGeoproc(self):
 
-        pass
+        if self.bPtsPlaneDistsWidgetOpen:
+            self.warn("Points-plane distances widget already open")
+            return
 
+        self.wdgtPtsPlnDistances = PtsPlnDistancesWidget(self.canvas, plugin_nm)
+        self.wdgtPtsPlnDistances.sgnWindowClosed.connect(self.ptsplndist_off)
+    
+        settings = QSettings(settings_name, plugin_nm)
+        if settings.contains("PtsPlnDistancesWidget/size") and settings.contains("PtsPlnDistancesWidget/position"):
+            size = settings.value("PtsPlnDistancesWidget/size", None)
+            pos = settings.value("PtsPlnDistancesWidget/position", None)
+            self.wdgtPtsPlnDistances.resize(size)
+            self.wdgtPtsPlnDistances.move(pos)
+            self.wdgtPtsPlnDistances.show()
+        else:
+            self.wdgtPtsPlnDistances.show()
+    
+        self.bPtsPlaneDistsWidgetOpen = True
+    
     def RunStereonetGeoproc(self):
 
         if self.bStereoplotWidgetOpen:
-            self.warn("Geologic stereonets already open")
+            self.warn("Geologic stereonets widget already open")
             return
 
         dwgtStereoplotDockWidget = QDockWidget(
@@ -264,6 +283,18 @@ class QgsurfGui(object):
     def StereoplotCloseEvent(self):
 
         self.bStereoplotWidgetOpen = False
+
+    def ptsplndist_off(self):
+
+        self.bPtsPlaneDistsWidgetOpen = False
+
+    def info(self, msg):
+
+        QMessageBox.information(self, plugin_nm, msg)
+
+    def warn(self, msg):
+
+        QMessageBox.warning(self, plugin_nm, msg)
 
     def unload(self):
 

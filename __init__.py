@@ -6,7 +6,7 @@
  
                               -------------------
         begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti - www.malg.eu
+        copyright            : (C) 2011-2019 by Mauro Alberti - www.malg.eu
         email                : alberti.m65@gmail.com
         
  ***************************************************************************/
@@ -26,8 +26,8 @@ from __future__ import absolute_import
 
 
 def classFactory( iface ):    
-    from .QgsurfGui import QgsurfGui
-    return QgsurfGui(iface)
+    from .QgSurfGui import QgSurfGui
+    return QgSurfGui(iface)
 
 
 

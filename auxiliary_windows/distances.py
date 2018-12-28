@@ -9,7 +9,7 @@ from qgis.PyQt.QtWidgets import *
 
 from qgis.gui import QgsColorButton
 
-from .pygsf.libs_utils.qgis.qgs_tools import loaded_point_layers
+from ..pygsf.libs_utils.qgis.qgs_tools import loaded_point_layers
 
 
 ltInputDataTypes = ("planes", "axes", "planes & axes", "fault planes with slickenline trend, plunge and movement sense", "fault planes with rake")
@@ -22,12 +22,6 @@ ltInputAxisMovSenseTypes = ["mov. sense - N or R"]
 
 tLayerChooseMsg = "choose"
 tFieldUndefined = "---"
-
-ltLineStyles = ["solid", "dashed", "dashdot", "dotted"]
-ltMarkerStyles = OrderedDict([("circle", "o"), ("square", "s"), ("diamond", "D"), ("triangle", "^")])
-
-ltFileFormats = ["pdf", "png", "svg", "tif"]
-liDpiResolutions = [200, 400, 600, 800, 1000, 1200]
 
 
 class StereoplotInputDlg(QDialog):
@@ -554,11 +548,11 @@ class SaveFigureDlg(QDialog):
         self.setWindowTitle("Plot style")
 
 
-class AnglesSrcPtLyrDlg(QDialog):
+class DistancesSrcPtLyrDlg(QDialog):
 
     def __init__(self, parent=None):
 
-        super(AnglesSrcPtLyrDlg, self).__init__(parent)
+        super(DistancesSrcPtLyrDlg, self).__init__(parent)
 
         self.tFieldUndefined = tFieldUndefined
 
@@ -581,25 +575,30 @@ class AnglesSrcPtLyrDlg(QDialog):
 
         # plane values
 
-        grpPlane = QGroupBox("Planar orientation source fields")
+        grpPlane = QGroupBox("Point layer source fields")
         lytPlane = QGridLayout()
 
-        self.cmbInputPlaneOrientAzimType = QComboBox()
-        self.cmbInputPlaneOrientAzimType.addItems(ltInputPlaneAzimuthTypes)
-        lytPlane.addWidget(self.cmbInputPlaneOrientAzimType, 0, 0, 1, 1)
+        lytPlane.addWidget(QLabel("id"), 0, 0, 1, 1)
+        self.cmbIdSrcFld = QComboBox()
+        lytPlane.addWidget(self.cmbIdSrcFld, 0, 1, 1, 1)
 
-        self.cmbInputPlaneAzimSrcFld = QComboBox()
-        lytPlane.addWidget(self.cmbInputPlaneAzimSrcFld, 0, 1, 1, 1)
+        lytPlane.addWidget(QLabel("x"), 1, 0, 1, 1)
+        self.cmbXSrcFld = QComboBox()
+        lytPlane.addWidget(self.cmbXSrcFld, 1, 1, 1, 1)
 
-        self.cmbInputPlaneOrientDipType = QComboBox()
-        self.cmbInputPlaneOrientDipType.addItems(ltInputPlaneDipTypes)
-        lytPlane.addWidget(self.cmbInputPlaneOrientDipType, 1, 0, 1, 1)
+        lytPlane.addWidget(QLabel("y"), 2, 0, 1, 1)
+        self.cmbYSrcFld = QComboBox()
+        lytPlane.addWidget(self.cmbYSrcFld, 2, 1, 1, 1)
 
-        self.cmbInputPlaneDipSrcFld = QComboBox()
-        lytPlane.addWidget(self.cmbInputPlaneDipSrcFld, 1, 1, 1, 1)
+        lytPlane.addWidget(QLabel("z"), 3, 0, 1, 1)
+        self.cmbZSrcFld = QComboBox()
+        lytPlane.addWidget(self.cmbZSrcFld, 3, 1, 1, 1)
 
-        self.lStructuralComboxes = [self.cmbInputPlaneAzimSrcFld,
-                                    self.cmbInputPlaneDipSrcFld]
+        self.lStructuralComboxes = [
+            self.cmbIdSrcFld,
+            self.cmbXSrcFld,
+            self.cmbYSrcFld,
+            self.cmbZSrcFld]
 
         self.refresh_struct_point_lyr_combobox()
 
@@ -610,7 +609,7 @@ class AnglesSrcPtLyrDlg(QDialog):
 
         # target attitude
 
-        grpTargetPlane = QGroupBox("Target plane")
+        grpTargetPlane = QGroupBox("Geological plane")
         lytTargetPlane = QGridLayout()
 
         lytTargetPlane.addWidget(QLabel("Dip dir."), 0, 0, 1, 1)
@@ -619,6 +618,7 @@ class AnglesSrcPtLyrDlg(QDialog):
         self.spnTargetAttDipDir.setMinimum(0.0)
         self.spnTargetAttDipDir.setMaximum(359.9)
         self.spnTargetAttDipDir.setDecimals(1)
+        self.spnTargetAttDipDir.setSingleStep(0.1)
         lytTargetPlane.addWidget(self.spnTargetAttDipDir, 0, 1, 1, 1)
 
         lytTargetPlane.addWidget(QLabel("Dip angle"), 0, 2, 1, 1)
@@ -627,7 +627,22 @@ class AnglesSrcPtLyrDlg(QDialog):
         self.spnTargetAttDipAng.setMinimum(0.0)
         self.spnTargetAttDipAng.setMaximum(90.0)
         self.spnTargetAttDipAng.setDecimals(1)
+        self.spnTargetAttDipAng.setSingleStep(0.1)
         lytTargetPlane.addWidget(self.spnTargetAttDipAng, 0, 3, 1, 1)
+
+        lytTargetPlane.addWidget(QLabel("Source point coordinates"), 1, 0, 1, 4)
+
+        lytTargetPlane.addWidget(QLabel("x"), 2, 0, 1, 1)
+        self.qlndtXPlaneSrcFld = QLineEdit()
+        lytTargetPlane.addWidget(self.qlndtXPlaneSrcFld, 2, 1, 1, 3)
+
+        lytTargetPlane.addWidget(QLabel("y"), 3, 0, 1, 1)
+        self.qlndtYPlaneSrcFld = QLineEdit()
+        lytTargetPlane.addWidget(self.qlndtYPlaneSrcFld, 3, 1, 1, 3)
+
+        lytTargetPlane.addWidget(QLabel("z"), 4, 0, 1, 1)
+        self.qlndtZPlaneSrcFld = QLineEdit()
+        lytTargetPlane.addWidget(self.qlndtZPlaneSrcFld, 4, 1, 1, 3)
 
         grpTargetPlane.setLayout(lytTargetPlane)
         layout.addWidget(grpTargetPlane)

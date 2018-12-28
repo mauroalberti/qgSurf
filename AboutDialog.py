@@ -6,7 +6,7 @@
 
                               -------------------
         begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti
+        copyright            : (C) 2011-2019 by Mauro Alberti
         email                : alberti.m65@gmail.com
 
  ***************************************************************************/
@@ -28,7 +28,7 @@
 
 from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QTextBrowser
 
-from .base_params import *
+#from .config.general_params import *
 
 class AboutDialog(QDialog):
 

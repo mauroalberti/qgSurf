@@ -6,7 +6,7 @@
 
                               -------------------
         begin                : 2011-12-21
-        copyright            : (C) 2011-2018 by Mauro Alberti
+        copyright            : (C) 2011-2019 by Mauro Alberti
         email                : alberti.m65@gmail.com
 
  ***************************************************************************/
@@ -579,7 +579,7 @@ class DemPlaneIntersectionWidget(QWidget):
         if self.geoarray is None:
             return None 
 
-        # get z value from dem
+        # get z value from ptLyr
 
         srcpt_demcrs_x, srcpt_demcrs_y = self.project_from_prj_to_dem_crs(self.srcpt_x, self.srcpt_y)
 
