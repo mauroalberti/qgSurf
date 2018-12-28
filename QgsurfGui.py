@@ -31,6 +31,8 @@ from builtins import object
 
 import os
 
+from . import resources  # DO NOT DELETE, PLEASE, UNLESS YOU WANNA GET MAD ASKING YOURSELF WTF ICONS DISAPPEARED....
+
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
@@ -66,6 +68,7 @@ class QgsurfGui(object):
 
         self.bestfitplane_toolpars = self.tools["bestfitplane_tool_params"]
         self.demplaneinters_toolpars = self.tools["demplaneinters_tool_params"]
+        self.pointsplanedistances_toolpars = self.tools["pointsplanedistances_tool_params"]
         self.stereonet_toolpars = self.tools["stereonet_tool_params"]
         self.about_toolpars = self.tools["about_dlg_params"]
 
@@ -103,6 +106,16 @@ class QgsurfGui(object):
             plugin_nm,
             self.demplaneinters_geoproc)
 
+        self.pointsplanedistances_geoproc = make_qaction(
+            tool_params=self.pointsplanedistances_toolpars,
+            plugin_nm=plugin_nm,
+            icon_fldr=icon_fldr,
+            parent=self.main_window)
+        self.pointsplanedistances_geoproc.triggered.connect(self.RunPointsPlaneDistancesGeoproc)
+        self.interface.addPluginToMenu(
+            plugin_nm,
+            self.pointsplanedistances_geoproc)
+
         self.stereonet_geoproc = make_qaction(
             tool_params=self.stereonet_toolpars,
             plugin_nm=plugin_nm,
@@ -122,6 +135,13 @@ class QgsurfGui(object):
         self.interface.addPluginToMenu(
             plugin_nm,
             self.qgsurf_about)
+
+        self.geoprocessings = [
+            self.bestfitplane_geoproc,
+            self.demplaneinters_geoproc,
+            self.pointsplanedistances_geoproc,
+            self.stereonet_geoproc,
+            self.qgsurf_about]
 
     def RunBestFitPlaneGeoproc(self):
 
@@ -155,6 +175,10 @@ class QgsurfGui(object):
         DemPlaneIntersectionDockWidget.setWidget(self.DemPlaneIntersectionQwidget)
         DemPlaneIntersectionDockWidget.destroyed.connect(self.DemPlaneIntersectionCloseEvent)
         self.interface.addDockWidget(Qt.RightDockWidgetArea, DemPlaneIntersectionDockWidget)
+
+    def RunPointsPlaneDistancesGeoproc(self):
+
+        pass
 
     def RunStereonetGeoproc(self):
 
@@ -243,21 +267,12 @@ class QgsurfGui(object):
 
     def unload(self):
 
-        self.interface.removePluginMenu(
-            plugin_nm,
-            self.bestfitplane_geoproc)
+        for geoprocessing in self.geoprocessings:
 
-        self.interface.removePluginMenu(
-            plugin_nm,
-            self.demplaneinters_geoproc)
+            self.interface.removePluginMenu(
+                plugin_nm,
+                geoprocessing)
 
-        self.interface.removePluginMenu(
-            plugin_nm,
-            self.stereonet_geoproc)
-
-        self.interface.removePluginMenu(
-            plugin_nm,
-            self.qgsurf_about)
 
 
 

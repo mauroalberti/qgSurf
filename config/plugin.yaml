@@ -9,6 +9,10 @@ tools:
     tool_nm: DEM-plane intersection
     icon_nm: qgsurf.png
     whtsths_dscr: Intersection of planar surfaces with topography
+  pointsplanedistances_tool_params:
+    tool_nm: Points-plane distances
+    icon_nm: PointsPlaneDistances.png
+    whtsths_dscr: Distances between points and a geological plane
   stereonet_tool_params:
     tool_nm: Stereonet
     icon_nm: stereoplot.png

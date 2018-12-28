@@ -44,7 +44,8 @@ def error(parent, header, msg):
     """
 
     QMessageBox.error(parent, header, msg)
-    
+
+
 def make_qaction(tool_params: Dict, plugin_nm: str, icon_fldr: str, parent: 'QObject'):
     """
     Creates a QAction instance.
