@@ -46,15 +46,8 @@ from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_point_shapefi
 from .pygsf.libs_utils.qgis.qgs_tools import pt_geoms_attrs, loaded_point_layers
 
 
-def formally_valid_angles_params(structural_input_params):
 
-    for param_key in structural_input_params:
-        if structural_input_params[param_key] is None:
-            return False
-    return True
-
-
-def get_anglecalc_input_params(dialog):
+def get_distances_input_params(dialog):
 
     def parse_field_choice(val, choose_message):
 
@@ -63,28 +56,59 @@ def get_anglecalc_input_params(dialog):
         else:
             return val
 
-    point_layer = dialog.point_layer
+    plyr = dialog.point_layer
 
-    plane_azimuth_type = dialog.cmbInputPlaneOrientAzimType.currentText()
-    plane_azimuth_name_field = parse_field_choice(dialog.cmbInputPlaneAzimSrcFld.currentText(),
-                                                  tFieldUndefined)
+    plyr_id_name_field = parse_field_choice(
+        dialog.cmbIdSrcFld.currentText(),
+        tFieldUndefined)
+    if not plyr_id_name_field:
+        return False, "Incorrect id field choice"
 
-    plane_dip_type = dialog.cmbInputPlaneOrientDipType.currentText()
-    plane_dip_name_field = parse_field_choice(dialog.cmbInputPlaneDipSrcFld.currentText(),
-                                              tFieldUndefined)
+    plyr_x_name_field = parse_field_choice(
+        dialog.cmbXSrcFld.currentText(),
+        tFieldUndefined)
+    if not plyr_x_name_field:
+        return False, "Incorrect x field choice"
 
-    target_dipdir = dialog.spnTargetAttDipDir.value()
-    target_dipangle = dialog.spnTargetAttDipAng.value()
+    plyr_y_name_field = parse_field_choice(
+        dialog.cmbYSrcFld.currentText(),
+        tFieldUndefined)
+    if not plyr_y_name_field:
+        return False, "Incorrect y field choice"
+
+    plyr_z_name_field = parse_field_choice(
+        dialog.cmbZSrcFld.currentText(),
+        tFieldUndefined)
+    if not plyr_z_name_field:
+        return False, "Incorrect z field choice"
+
+    # geological plane parameters section
+
+    gplane_dipdir = dialog.spnTargetAttDipDir.value()
+    gplane_dipangle = dialog.spnTargetAttDipAng.value()
+
+    try:
+        gplane_srcpt_x_coord = float(dialog.qlndtXPlaneSrcFld.text())
+        gplane_srcpt_y_coord = float(dialog.qlndtYPlaneSrcFld.text())
+        gplane_srcpt_z_coord = float(dialog.qlndtZPlaneSrcFld.text())
+    except:
+        return False, "Incorrect source point coordinates"
+
+    # output shapefile
 
     output_shapefile_path = dialog.lnedtOutFilename.text()
+    if not output_shapefile_path:
+        return False, "Missing output shapefile path"
 
-    return point_layer, dict(plane_azimuth_type=plane_azimuth_type,
-                             plane_azimuth_name_field=plane_azimuth_name_field,
-                             plane_dip_type=plane_dip_type,
-                             plane_dip_name_field=plane_dip_name_field,
-                             target_dipdir=target_dipdir,
-                             target_dipangle=target_dipangle,
-                             output_shapefile_path=output_shapefile_path)
+    # returning parameters
+
+    return True, dict(
+        point_layer=plyr,
+        point_layer_flds=(plyr_id_name_field, plyr_x_name_field, plyr_y_name_field, plyr_z_name_field),
+        gplane_params=dict(
+            pl_attitude=(gplane_dipdir, gplane_dipangle),
+            src_pt=(gplane_srcpt_x_coord, gplane_srcpt_y_coord, gplane_srcpt_z_coord)
+        )
 
 
 def get_angle_data_type(structural_input_params):
@@ -188,7 +212,7 @@ class PtsPlnDistancesWidget(QWidget):
         layout = QGridLayout()
 
         self.pshCalculateAngles = QPushButton(self.tr("Calculate"))
-        self.pshCalculateAngles.clicked.connect(self.calculate_angles)
+        self.pshCalculateAngles.clicked.connect(self.calculate_distances)
         layout.addWidget(self.pshCalculateAngles, 0, 0, 1, 1)
 
         grpProcessing.setLayout(layout)
@@ -219,30 +243,23 @@ class PtsPlnDistancesWidget(QWidget):
 
         dialog = DistancesSrcPtLyrDlg()
         if dialog.exec_():
-            try:
-                point_layer, structural_input_params = get_anglecalc_input_params(dialog)
-            except:
-                self.warn("Incorrect definition")
-                return
+            success, cntnt = get_distances_input_params(dialog)
         else:
-            self.warn("Nothing defined")
+            self.warn("No input data defined")
             return
 
-        if not formally_valid_angles_params(structural_input_params):
-            self.warn("Invalid/incomplete parameters")
+        if not success:
+            self.warn(cntnt)
             return
         else:
-            self.info("Input data defined")
+            structural_input_params = cntnt
 
-        self.pointLayer, self.distancesAnalysisParams = point_layer, structural_input_params
+        self.pointLayer = structural_input_params["point_layer"]
+        self.pointLayerFields = structural_input_params["point_layer_flds"]
+        self.gPlaneAttitude = structural_input_params["gplane_params"]["pl_attitude"]
+        self.gPlaneSrcPt = structural_input_params["gplane_params"]["src_pt"]
 
-    def calculate_angles(self):
-
-        # check definition of input point layer
-        if self.pointLayer is None or \
-           self.distancesAnalysisParams is None:
-            self.warn(str("Input point layer/parameters not defined"))
-            return
+    def calculate_distances(self):
 
         # get used field names in the point attribute table 
         lAttitudeFldnms = [self.distancesAnalysisParams["plane_azimuth_name_field"],
