@@ -574,8 +574,7 @@ def try_geosurface_export_shapefile_pt3d(shapefile_path, geodata, fields_dict_li
 
     geosurface_XYZ, _ = geodata
     X, Y, Z = geosurface_XYZ
-    #assert len(X) == len(Y)
-    #assert len(X) == len(Z)
+
     ids = range(len(X))
 
     rec_values_list2 = zip(ids, X, Y, Z)

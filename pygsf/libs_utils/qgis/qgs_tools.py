@@ -1,7 +1,7 @@
 
 from builtins import str
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import numpy as np
 
@@ -71,8 +71,97 @@ def loaded_monoband_raster_layers():
           
     return [layer for layer in loaded_raster_layers() if layer.bandCount() == 1]
        
-           
-def pt_geoms_attrs(pt_layer, field_list=None):
+
+def lyr_attrs(layer, fields: List) -> List:
+    """
+    Get attributes from layer based on provided field names list.
+
+    :param layer: the source layer for attribute extraction.
+    :param fields: a list of field names for attribute extraction.
+    :return: list of table values.
+    """
+
+    if layer.selectedFeatureCount() > 0:
+        features = layer.selectedFeatures()
+    else:
+        features = layer.getFeatures()
+
+    provider = layer.dataProvider()
+    field_indices = [provider.fieldNameIndex(field_name) for field_name in fields]
+
+    # retrieve selected features with relevant attributes
+
+    rec_list = []
+
+    for feature in features:
+
+        attrs = feature.fields().toList()
+
+        # creates feature attribute list
+
+        feat_list = []
+        for field_ndx in field_indices:
+            feat_list.append(feature.attribute(attrs[field_ndx].name()))
+
+        # add to result list
+
+        rec_list.append(feat_list)
+
+    return rec_list
+
+
+def ptlyr_geoms_attrs(pt_layer, fields=None) -> Tuple[List[Tuple[float, float]], List]:
+    """
+    Extract geometry and attribute informatiion from a point layer.
+
+    :param pt_layer: source layer.
+    :param fields: list of field names for information extraction.
+    :return: two lists. the first of point coordinates, the second of record values.
+    """
+
+    if not fields:
+        fields = []
+
+    if pt_layer.selectedFeatureCount() > 0:
+        features = pt_layer.selectedFeatures()
+    else:
+        features = pt_layer.getFeatures()
+
+    provider = pt_layer.dataProvider()
+    field_indices = [provider.fieldNameIndex(field_name) for field_name in fields]
+
+    # retrieve selected features with their geometry and relevant attributes
+    lGeoms = []
+    lAttrs = []
+
+    for feature in features:
+
+        # fetch point geometry
+
+        pt = feature.geometry().asPoint()  # note: it's an x-y point, eventual z is discarded
+        lGeoms.append((pt.x(), pt.y()))
+
+        # get attribute values
+
+        attrs = feature.fields().toList()
+
+        rec_vals = []
+        for field_ndx in field_indices:
+            rec_vals.append(feature.attribute(attrs[field_ndx].name()))
+
+        lAttrs.append(rec_vals)
+
+    return lGeoms, lAttrs
+
+
+def pt_geoms_attrs(pt_layer, field_list=None) -> List:
+    """
+    Deprecated: use instead ptlyr_geoms_attrs.
+
+    :param pt_layer: source layer.
+    :param field_list: list of field names for information extraction.
+    :return: list of values.
+    """
 
     if not field_list:
         field_list = []

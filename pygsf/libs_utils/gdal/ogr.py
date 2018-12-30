@@ -178,8 +178,72 @@ def shapefile_create(path, geom_type, fields_dict_list, crs=None):
     return outShapefile, outShapelayer
 
 
+def try_write_pt_shapefile(point_layer, geoms: List[Tuple[float, float, float]], field_names: List[str], attrs: List[Tuple]) -> Tuple[bool, str]:
+    """
+    Add point records in an existing shapefile, filling attribute values.
+
+    :param point_layer: the existing shapefile layer in which to write.
+    :param geoms: the geometric coordinates of the points.
+    :type geoms: List of x, y, and z coordinates.
+    :param field_names: the field names of the attribute table.
+    :type field_names: list of strings.
+    :param attrs: the values for each record.
+    :type attrs: list of tuple.
+    :return: success status and related messages.
+    :rtype: tuple of a boolean and a string.
+    """
+
+    len_geoms = len(geoms)
+    len_attrs = len(attrs)
+
+    if len_geoms != len_attrs:
+        return False, "Function error: geometries are {} while attributes are {}".format(len_geoms, len_attrs)
+
+    if len_geoms == 0:
+        return True, "No values to be added in shapefile"
+
+    try:
+
+        outshape_featdef = point_layer.GetLayerDefn()
+
+        for ndx_rec in range(len_geoms):
+
+            # pre-processing for new feature in output layer
+
+            curr_Pt_geom = ogr.Geometry(ogr.wkbPoint25D)
+            curr_Pt_geom.AddPoint(*geoms[ndx_rec])
+
+            # create a new feature
+
+            curr_pt_shape = ogr.Feature(outshape_featdef)
+            curr_pt_shape.SetGeometry(curr_Pt_geom)
+
+            rec_attrs = attrs[ndx_rec]
+
+            for ndx_fld, fld_nm in enumerate(field_names):
+
+                curr_pt_shape.SetField(fld_nm, rec_attrs[ndx_fld])
+
+            # add the feature to the output layer
+            point_layer.CreateFeature(curr_pt_shape)
+
+            # destroy no longer used objects
+            curr_Pt_geom.Destroy()
+            curr_pt_shape.Destroy()
+
+        del outshape_featdef
+
+        return True, ""
+
+    except Exception as e:
+
+        return False, "Exception: {}".format(e)
+
+
 def try_write_point_shapefile(path: str, field_names: List[str], values: List[Tuple], ndx_x_val: int) -> Tuple[bool, str]:
     """
+    Note: candidate for future deprecation.
+
     Add point records in an existing shapefile, filling attribute values.
     The point coordinates, i.e. x, y, z start at ndx_x_val index (index is zero-based) and are
     assumed to be sequential in order (i.e., 0, 1, 2 or 3, 4, 5).

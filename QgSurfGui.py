@@ -290,11 +290,11 @@ class QgSurfGui(object):
 
     def info(self, msg):
 
-        QMessageBox.information(self, plugin_nm, msg)
+        QMessageBox.information(None, plugin_nm, msg)
 
     def warn(self, msg):
 
-        QMessageBox.warning(self, plugin_nm, msg)
+        QMessageBox.warning(None, plugin_nm, msg)
 
     def unload(self):
 

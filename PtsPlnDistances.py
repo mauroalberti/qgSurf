@@ -40,11 +40,11 @@ from osgeo import ogr
 from .config.general_params import *
 
 from .auxiliary_windows.distances import DistancesSrcPtLyrDlg, tFieldUndefined
+from .pygsf.spatial.vectorial.vectorial import Point
 from .pygsf.orientations.orientations import Plane as GPlane
-from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_point_shapefile
+from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_pt_shapefile
 
-from .pygsf.libs_utils.qgis.qgs_tools import pt_geoms_attrs, loaded_point_layers
-
+from .pygsf.libs_utils.qgis.qgs_tools import lyr_attrs, loaded_point_layers
 
 
 def get_distances_input_params(dialog):
@@ -107,61 +107,8 @@ def get_distances_input_params(dialog):
         point_layer_flds=(plyr_id_name_field, plyr_x_name_field, plyr_y_name_field, plyr_z_name_field),
         gplane_params=dict(
             pl_attitude=(gplane_dipdir, gplane_dipangle),
-            src_pt=(gplane_srcpt_x_coord, gplane_srcpt_y_coord, gplane_srcpt_z_coord)
-        )
-
-
-def get_angle_data_type(structural_input_params):
-
-    # define type for planar data
-    if structural_input_params["plane_azimuth_name_field"] is not None and \
-                    structural_input_params["plane_dip_name_field"] is not None:
-        planar_data = True
-        if structural_input_params["plane_azimuth_type"] == "dip direction":
-            planar_az_type = "dip_dir"
-        elif structural_input_params["plane_azimuth_type"] == "strike rhr":
-            planar_az_type = "strike_rhr"
-        else:
-            raise Exception("Error with input azimuth type")
-        planar_dip_type = "dip"
-    else:
-        planar_data = False
-        planar_az_type = None
-        planar_dip_type = None
-
-    return dict(planar_data=planar_data,
-                planar_az_type=planar_az_type,
-                planar_dip_type=planar_dip_type)
-
-
-def parse_angles_geodata(input_data_types, structural_data):
-
-    def parse_azimuth_values(azimuths, az_type):
-
-        if az_type == "dip_dir":
-            offset = 0.0
-        elif az_type == "strike_rhr":
-            offset = 90.0
-        else:
-            raise Exception("Invalid azimuth data type")
-
-        return [(val + offset) % 360.0 for val in azimuths]
-
-    xy_vals = [(float(rec[0]), float(rec[1])) for rec in structural_data]
-
-    try:
-        if input_data_types["planar_data"]:
-            azimuths = [float(rec[2]) for rec in structural_data]
-            dipdir_vals = parse_azimuth_values(azimuths,
-                                                input_data_types["planar_az_type"])
-            dipangle_vals = [float(rec[3]) for rec in structural_data]
-            plane_vals = list(zip(dipdir_vals, dipangle_vals))
-        else:
-            plane_vals = None
-    except Exception as e:
-        raise Exception("Error in planar data parsing: {}".format(e))
-
-    return xy_vals, plane_vals
+            src_pt=(gplane_srcpt_x_coord, gplane_srcpt_y_coord, gplane_srcpt_z_coord)),
+        output_shapefile_path=output_shapefile_path)
 
 
 class PtsPlnDistancesWidget(QWidget):
@@ -258,69 +205,79 @@ class PtsPlnDistancesWidget(QWidget):
         self.pointLayerFields = structural_input_params["point_layer_flds"]
         self.gPlaneAttitude = structural_input_params["gplane_params"]["pl_attitude"]
         self.gPlaneSrcPt = structural_input_params["gplane_params"]["src_pt"]
+        self.outputShapefilePath = structural_input_params["output_shapefile_path"]
+
+        self.info("Now results can be calculated")
 
     def calculate_distances(self):
 
-        # get used field names in the point attribute table 
-        lAttitudeFldnms = [self.distancesAnalysisParams["plane_azimuth_name_field"],
-                           self.distancesAnalysisParams["plane_dip_name_field"]]
+        # get input point layer data
 
-        # get input data presence and type
-        structural_data = pt_geoms_attrs(self.pointLayer, lAttitudeFldnms)
-        input_data_types = get_angle_data_type(self.distancesAnalysisParams)
-           
-        try:  
-            xy_coords, plane_orientations = parse_angles_geodata(input_data_types, structural_data)
-        except Exception as msg:
-            self.warn(str(msg))
+        point_layer_data = lyr_attrs(
+            layer=self.pointLayer,
+            fields=self.pointLayerFields)
+
+        len_data = len(point_layer_data)
+
+        if len_data == 0:
+            self.warn("No data to calculate")
             return
 
-        if plane_orientations is None:
-            self.warn("Plane orientations are not available")
+        geoplane_dipdir, geoplane_dipangle = self.gPlaneAttitude
+        geolplane = GPlane(geoplane_dipdir, geoplane_dipangle)
+        cartplane_srcpt = Point(*self.gPlaneSrcPt)
+        cartplane = geolplane.toCPlane(cartplane_srcpt)
+
+        ltAttributes = []
+        ltfGeometries = []
+        for pt_data in point_layer_data:
+
+            id, x, y, z = pt_data
+            pt = Point(x, y, z)
+            distance = cartplane.pointDistance(pt)
+            ltAttributes.append((id, x, y, z, distance))
+            ltfGeometries.append((x, y, z))
+
+        fields_dict_list = [dict(name='id', ogr_type="ogr.OFTInteger"),
+                            dict(name='x', ogr_type="ogr.OFTReal"),
+                            dict(name='y', ogr_type="ogr.OFTReal"),
+                            dict(name='z', ogr_type="ogr.OFTReal"),
+                            dict(name='distance', ogr_type="ogr.OFTReal")]
+
+        ltFieldsNames = [field_dict["name"] for field_dict in fields_dict_list]
+
+        print("Creating output shapefile")
+
+        out_shape_pth = self.outputShapefilePath
+        shapefile_datasource, point_shapelayer = shapefile_create(
+            path=out_shape_pth,
+            geom_type=ogr.wkbPoint25D,
+            fields_dict_list=fields_dict_list)
+
+        print(" - shapefile created")
+
+        if not shapefile_datasource or not point_shapelayer:
+            self.warn("Unable to create output shapefile {}".format(out_shape_pth))
             return
 
-        target_plane_dipdir = self.distancesAnalysisParams["target_dipdir"]
-        target_plane_dipangle = self.distancesAnalysisParams["target_dipangle"]
+        print("writing to shapefile")
+        success, msg = try_write_pt_shapefile(
+            point_layer=point_shapelayer,
+            geoms=ltfGeometries,
+            field_names=ltFieldsNames,
+            attrs=ltAttributes)
 
-        trgt_geolplane = GPlane(target_plane_dipdir, target_plane_dipangle)
-        angles = []
-        for plane_or in plane_orientations:
-            angles.append(trgt_geolplane.angle(GPlane(*plane_or)))
+        try:
+            del point_shapelayer
+            del shapefile_datasource
+        except:
+            pass
 
-        fields_dict_list = [dict(name='id', ogr_type=ogr.OFTInteger),
-                            dict(name='x', ogr_type=ogr.OFTReal),
-                            dict(name='y', ogr_type=ogr.OFTReal),
-                            dict(name='azimuth', ogr_type=ogr.OFTReal),
-                            dict(name='dip_angle', ogr_type=ogr.OFTReal),
-                            dict(name='angle', ogr_type=ogr.OFTReal)]
+        if success:
+            self.info("Results written in output shapefile {}".format(out_shape_pth))
+        else:
+            self.warn(msg)
 
-        point_shapefile, point_shapelayer = shapefile_create(
-            self.distancesAnalysisParams["output_shapefile_path"],
-            ogr.wkbPoint,
-            fields_dict_list)
-
-        lFields = [field_dict["name"] for field_dict in fields_dict_list]
-
-        rngIds = list(range(1, len(angles) + 1))
-        x = [val[0] for val in xy_coords]
-        y = [val[1] for val in xy_coords]
-        plane_az = [val[0] for val in plane_orientations]
-        plane_dip = [val[1] for val in plane_orientations]
-
-        llRecValues = list(zip(rngIds,
-                          x,
-                          y,
-                          plane_az,
-                          plane_dip,
-                          angles))
-
-        try_write_point_shapefile(
-            path=self.distancesAnalysisParams["output_shapefile_path"],
-            field_names=lFields,
-            values=llRecValues,
-            ndx_x_val=4)
-
-        self.info("Output shapefile written")
 
     def info(self, msg):
         

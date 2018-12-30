@@ -567,10 +567,11 @@ class CPlane(object):
         """
         Return intersection versor for two intersecting planes.
 
-        >>> a = CPlane(1, 0, 0, 0)
-        >>> b = CPlane(0, 0, 1, 0)
-        >>> a.intersVersor(b)
-        Vect(0.0000, -1.0000, 0.0000)
+        Examples:
+          >>> a = CPlane(1, 0, 0, 0)
+          >>> b = CPlane(0, 0, 1, 0)
+          >>> a.intersVersor(b)
+          Vect(0.0000, -1.0000, 0.0000)
         """
 
         return self.normVersor().vCross(another.normVersor()).versor()
@@ -580,10 +581,11 @@ class CPlane(object):
         Return point on intersection line (obviously non-unique solution)
         for two planes.
 
-        >>> a = CPlane(1, 0, 0, 0)
-        >>> b = CPlane(0, 0, 1, 0)
-        >>> a.intersPoint(b)
-        Point(0.0000, 0.0000, 0.0000)
+        Examples:
+          >>> a = CPlane(1, 0, 0, 0)
+          >>> b = CPlane(0, 0, 1, 0)
+          >>> a.intersPoint(b)
+          Point(0.0000, 0.0000, 0.0000)
         """
 
         # find a point lying on the intersection line (this is a non-unique solution)
@@ -593,10 +595,38 @@ class CPlane(object):
 
         return Point(x, y, z)
 
+    def pointDistance(self, pt: Point) -> float:
+        """
+        Check whether a point lie in a plane.
+        Distance expression:
+        distance = a * x1 + b * y1 + c * z1 + d
+        where a, b, c and d are plane parameters of the plane equation:
+         a * x + b * y + c * z + d = 0
+        and x1, y1, and z1 are the point coordinates.
+
+        Examples:
+          >>> cpl = CPlane(0, 0, 1, 0)
+          >>> pt = Point(0, 0, 1)
+          >>> cpl.pointDistance(pt)
+          1.0
+          >>> pt = Point(0, 0, 0.5)
+          >>> cpl.pointDistance(pt)
+          0.5
+          >>> pt = Point(0, 0, -0.5)
+          >>> cpl.pointDistance(pt)
+          -0.5
+          >>> pt = Point(10, 20, 0.0)
+          >>> cpl.pointDistance(pt)
+          0.0
+        """
+
+        return self.a * pt.x + self.b * pt.y + self.c * pt.z + self.d
+
     def isPointInPlane(self, pt):
         """
-          Check whether a point lie in a plane.
+        Check whether a point lie in a plane.
 
+        Examples:
           >>> pl = CPlane(0, 0, 1, 0)
           >>> pt = Point(0, 1, 0)
           >>> pl.isPointInPlane(pt)
@@ -637,7 +667,7 @@ class CPlane(object):
         :param angle_tolerance: the maximum allowed divergence angle (in degrees)
         :return: Boolean
 
-         Examples:
+        Examples:
           >>> CPlane(1,0,0,0).isSubParallel(CPlane(1,0,0,0))
           True
           >>> CPlane(1,0,0,0).isSubParallel(CPlane(1,0,1,0))
