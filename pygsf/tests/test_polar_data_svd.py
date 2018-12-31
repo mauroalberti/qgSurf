@@ -31,17 +31,10 @@ print(a.shape)
 
 res = svd(a)
 
-"""
-print(type(res))
-for res_el in res:
-    print(res_el)
-"""
-
 u = res[0]
 s = res[1]
 vh = res[2]
 
-#print(vh)
 
-print("mean", vh[0,:]) # mean value
-print("girdle normal", vh[2, :]) # normal to girdle
+print("mean", vh[0,:])  # mean value
+print("girdle normal", vh[2, :])  # normal to girdle

@@ -123,6 +123,7 @@ class PtsPlnDistancesWidget(QWidget):
         self.pluginName = plugin_name
 
         self.pointLayer = None
+        self.pointLayerFields = []
         self.distancesAnalysisParams = None
 
         self.setup_gui()
@@ -212,6 +213,11 @@ class PtsPlnDistancesWidget(QWidget):
 
     def calculate_distances(self):
 
+        if not self.pointLayer or \
+            not self.pointLayerFields:
+            self.warn("Input data are not defined")
+            return
+
         # get input point layer data
 
         point_layer_data = lyr_attrs(
@@ -257,21 +263,16 @@ class PtsPlnDistancesWidget(QWidget):
 
         ltFieldsNames = [field_dict["name"] for field_dict in fields_dict_list]
 
-        print("Creating output shapefile")
-
         out_shape_pth = self.outputShapefilePath
         shapefile_datasource, point_shapelayer = shapefile_create(
             path=out_shape_pth,
             geom_type=ogr.wkbPoint25D,
             fields_dict_list=fields_dict_list)
 
-        print(" - shapefile created")
-
         if not shapefile_datasource or not point_shapelayer:
             self.warn("Unable to create output shapefile {}".format(out_shape_pth))
             return
 
-        print("writing to shapefile")
         success, msg = try_write_pt_shapefile(
             point_layer=point_shapelayer,
             geoms=ltfGeometries,

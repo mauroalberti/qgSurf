@@ -78,16 +78,13 @@ from .pygsf.libs_utils.sqlite.sqlite3 import try_create_db_tables, try_execute_q
 from .pygsf.libs_utils.qt.databases import try_execute_query_with_qt
 
 bfp_texts_flnm = "texts.yaml"
+bfp_params_flnm = "parameters.yaml"
 
 plugin_folder = os.path.dirname(__file__)
 
 config_fldrpth = os.path.join(
     plugin_folder,
     config_fldr)
-
-bfp_text_config_file = os.path.join(
-    config_fldrpth,
-    bfp_texts_flnm)
 
 
 def get_field_dict(key_val, flds_dicts):
@@ -228,9 +225,24 @@ class BestFitPlaneMainWidget(QWidget):
 
     def init_params(self):
 
-        texts_params = read_yaml(bfp_text_config_file)
+        bfp_text_config_flpth = os.path.join(
+            config_fldrpth,
+            bfp_texts_flnm)
+
+        texts_params = read_yaml(bfp_text_config_flpth)
+
         self.dem_default_text = texts_params["layer_default_text"]
         self.ptlnlyr_default_text = texts_params["ptlnlyr_default_text"]
+
+        bfp_num_config_flpth = os.path.join(
+            config_fldrpth,
+            bfp_params_flnm)
+
+        num_params = read_yaml(
+            file_pth=bfp_num_config_flpth
+        )
+
+        self.ciMaxPointsNumberForBFP = num_params["ciMaxPointsNumberForBFP"]
 
         self.reset_dem_input_states()
         self.previousTool = None        
@@ -405,7 +417,7 @@ class BestFitPlaneMainWidget(QWidget):
         
         main_layout = QGridLayout()
 
-        self.bestfitplane_definepoints_pButton = QPushButton("Define source points in map")
+        self.bestfitplane_definepoints_pButton = QPushButton("Define source points in map (n >= 3)")
         self.bestfitplane_definepoints_pButton.clicked.connect(self.bfp_inpoint_from_map_click)
         main_layout.addWidget(self.bestfitplane_definepoints_pButton, 0, 0, 1, 2)
 
@@ -667,11 +679,11 @@ class BestFitPlaneMainWidget(QWidget):
         else:
             raise VectorIOException("Geometry type of chosen layer is not point or line")
         
-        if len(xypair_list) > ciMaxPointsNumberForBFP:
+        if len(xypair_list) > self.ciMaxPointsNumberForBFP:
             QMessageBox.critical(
                 self,
                 "Input point layer",
-                "More than {} points to handle. Please use less features or modify value in config/parameters.yaml".format(ciMaxPointsNumberForBFP))
+                "More than {} points to handle. Please use less features or modify value in config/parameters.yaml".format(self.ciMaxPointsNumberForBFP))
             return
 
         # for all xy tuples, project to project CRS as a qgis point
@@ -1036,6 +1048,18 @@ class BestFitPlaneMainWidget(QWidget):
             )
             return
 
+        # get selected records attitudes
+
+        selected_ids = get_selected_recs_ids(self.selection_model)
+
+        if not selected_ids or len(selected_ids) == 0:
+            QMessageBox.warning(
+                self,
+                self.tool_nm,
+                "No records to export"
+            )
+            return
+
         dialog = ExportDialog(
             self.get_project_crs())
 
@@ -1082,10 +1106,6 @@ class BestFitPlaneMainWidget(QWidget):
                 geom_type=ogr_geom_type,
                 fields_dict_list=shape_pars,
                 crs=str(self.get_project_crs()))
-
-        # get selected records attitudes
-
-        selected_ids = get_selected_recs_ids(self.selection_model)
 
         # create query string
 

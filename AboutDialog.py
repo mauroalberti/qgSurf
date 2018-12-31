@@ -28,7 +28,8 @@
 
 from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QTextBrowser
 
-#from .config.general_params import *
+from .config.general_params import *
+
 
 class AboutDialog(QDialog):
 
