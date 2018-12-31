@@ -49,6 +49,7 @@ from .pygsf.spatial.rasters.geoarray import GeoArray
 from .pygsf.libs_utils.qgis.qgs_tools import loaded_raster_layers, qgs_project_xy
 from .pygsf.libs_utils.qgis.qgs_tools import PointMapToolEmitPoint
 from .pygsf.spatial.vectorial.vectorial import Point, Segment
+from .pygsf.geography.projections import calculate_azimuth_correction
 
 
 class DemPlaneIntersectionWidget(QWidget):
@@ -689,32 +690,9 @@ class DemPlaneIntersectionWidget(QWidget):
 
         # Calculates dip direction correction with respect to project CRS y-axis orientation
 
-        srcpt_epsg4326_lon, srcpt_epsg4326_lat = qgs_project_xy(
-            x=srcpt_prjcrs_x,
-            y=srcpt_prjcrs_y,
-            srcCrs=self.projectCrs)
-
-        north_dummpy_pt_lon = srcpt_epsg4326_lon  # no change
-        north_dummpy_pt_lat = srcpt_epsg4326_lat + (1.0/1200.0)  # add 3 minute-seconds (approximately 90 meters)
-
-        dummypt_prjcrs_x, dummypt_prjcrs_y = qgs_project_xy(
-            x=north_dummpy_pt_lon,
-            y=north_dummpy_pt_lat,
-            destCrs=self.projectCrs)
-
-        start_pt = Point(
-            srcpt_prjcrs_x,
-            srcpt_prjcrs_y)
-
-        end_pt = Point(
-            dummypt_prjcrs_x,
-            dummypt_prjcrs_y)
-
-        north_vector = Segment(
-            start_pt=start_pt,
-            end_pt=end_pt).vector()
-
-        azimuth_correction = north_vector.azimuth
+        azimuth_correction = calculate_azimuth_correction(
+            src_pt=Point(srcpt_prjcrs_x, srcpt_prjcrs_y),
+            crs=self.projectCrs)
 
         print("Azimuth correction: {}".format(azimuth_correction))
 

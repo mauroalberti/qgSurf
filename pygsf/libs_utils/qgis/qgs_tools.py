@@ -16,7 +16,24 @@ from ...spatial.vectorial.vectorial import Point, Line
 from ...spatial.vectorial.exceptions import VectorIOException
 
 
+def get_project_crs(canvas):
+    """
+    Returns the canvas projection.
+
+    :param canvas:
+    :return:
+    """
+
+    return canvas.mapSettings().destinationCrs()
+
+
 def get_on_the_fly_projection(canvas):
+    """
+    Will be deprecated in following releases.
+
+    :param canvas:
+    :return:
+    """
 
     on_the_fly_projection = True
     if on_the_fly_projection:

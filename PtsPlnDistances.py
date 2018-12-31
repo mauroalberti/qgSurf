@@ -44,7 +44,8 @@ from .pygsf.spatial.vectorial.vectorial import Point
 from .pygsf.orientations.orientations import Plane as GPlane
 from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_pt_shapefile
 
-from .pygsf.libs_utils.qgis.qgs_tools import lyr_attrs, loaded_point_layers
+from .pygsf.libs_utils.qgis.qgs_tools import lyr_attrs, loaded_point_layers, get_project_crs
+from .pygsf.geography.projections import calculate_azimuth_correction
 
 
 def get_distances_input_params(dialog):
@@ -223,10 +224,20 @@ class PtsPlnDistancesWidget(QWidget):
             self.warn("No data to calculate")
             return
 
-        geoplane_dipdir, geoplane_dipangle = self.gPlaneAttitude
-        geolplane = GPlane(geoplane_dipdir, geoplane_dipangle)
         cartplane_srcpt = Point(*self.gPlaneSrcPt)
-        cartplane = geolplane.toCPlane(cartplane_srcpt)
+        projectCrs = get_project_crs(self.mapCanvas)
+
+        geoplane_dipdir, geoplane_dipangle = self.gPlaneAttitude
+
+        azimuth_correction = calculate_azimuth_correction(
+            src_pt=cartplane_srcpt,
+            crs=projectCrs)
+        print("Azimuth correction: {}".format(azimuth_correction))
+
+        geoplane_dipdir_corrected = (geoplane_dipdir + azimuth_correction) % 360.0
+        prj_corrected_geolplane = GPlane(geoplane_dipdir_corrected, geoplane_dipangle)
+
+        cartplane = prj_corrected_geolplane.toCPlane(cartplane_srcpt)
 
         ltAttributes = []
         ltfGeometries = []
@@ -277,7 +288,6 @@ class PtsPlnDistancesWidget(QWidget):
             self.info("Results written in output shapefile {}".format(out_shape_pth))
         else:
             self.warn(msg)
-
 
     def info(self, msg):
         
