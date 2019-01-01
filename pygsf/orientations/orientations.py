@@ -958,7 +958,7 @@ class Direct(object):
         else:
             return self.asVersor().vCross(another.asVersor()).versor()
 
-    def normPlane(self):
+    def normPlane(self) -> 'Plane':
         """
         Return the geological plane that is normal to the direction.
 
@@ -1450,11 +1450,11 @@ class Plane(object):
 
         return self.normDirectFrwrd().upward()
 
-    def normDirect(self):
+    def normDirect(self) -> Direct:
         """
         Wrapper to down_normal_gv.
 
-        :return: OrienM normDirect to the Plane self instance
+        :return: downward-pointing Direct instance normal to the Plane self instance
         """
 
         return self.normDirectDown()

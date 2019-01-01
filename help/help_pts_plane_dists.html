@@ -1,47 +1,84 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>geocouche</title>
+		<title>Distances between geological plane and points - qgSurf</title>
 		<style>
-			body { padding: 10px; }		
-			figure { padding: 10px; }	
-			img { padding: 15px; }
-			figcaption {  font-style: italic;
-			              font-size: 90%;}
+			h5 { font-size: 95%; color: #333; }
+			figcaption {
+			  font-size: 85%; color: #333; font-style: oblique;
+			}
 		</style>
 	<head>
 	
-	<body>
-		<h2>Geological angles</h2>
-	
-		This tool allows to calculate the angles (as degrees) between a reference plane and the (eventually selected) features in a point layer (Fig. 1).
-		<br />It can be applied to determine the degree of misalignement between a reference (for instance, regional) measure and local geological measures.
-		<br /><br />
-		<figure>
-			<img src="ims/angles_fig_01.png" alt="Calculate Angles interface">
-			<br />
-			<figcaption>Fig. 1. Geological angles calculation interface.</figcaption>
-		</figure>		
-		<br /><br />
-		The user has to define the two fields storing the azimuth (dip direction or RHR strike) and the dip angle of each feature,
-		the attitude of the reference plane, and the name of the output shapefile with a new field storing the calculated angle (Fig. 2).
-		<br /><br />
-		<figure>
-			<img src="ims/angles_fig_02.png" alt="Definition of parameters">
-			<br />
-			<figcaption>Fig. 2. Definition of parameters for angle calculation.</figcaption>
-		</figure>
-		<br /><br />
+	<body style="margin: 20px 30px 10px 30px;">
 
+		<h3>Distances between points and a geological plane</h3>
+
+		<div>
+			This tool allows to calculate the perpendicular distances between the points in a layer and a geological plane,
+			expressed via its attitude (dip direction and dip angle) and a point located on it (the "source point").
+			<br/><br/>
+			Its interface is subdivided in three sections (fig. 1):
+		</div>
+		<ul>
+			<li>the input parameter definition</li>
+			<li>result calculation</li>
+			<li>help</li>
+		</ul>
+
+		<br/><br/>
+		<figure>
+			<img src="images/distances/Fig_01.png" alt="Module interface">
+			<br />
+			<figcaption>Fig. 1. Module interface.</figcaption>
+		</figure>
+
+		<h4>Input parameters</h4>
+
+		<div>
+			From the main plugin window it is possible to define the input parameters
+			by clicking on "I/O params" (fig. 1) and filling in the required parameters (fig. 2).
+			<br/><br/>
+			The source point layer must contain four required fields:
+		</div>
+		<ul>
+			<li>id</li>
+			<li>x</li>
+			<li>y</li>
+			<li>z</li>
+		</ul>
+		<div>
+			The geological plane is defined by its attitude (dip direction and dip angle), as well as by
+			a source point, laying on the considered plane, and defined by the three Cartesian coordinates .
+		</div>
+		<br/><br/>
+		<figure>
+			<img src="images/distances/Fig_02.png" alt="Input parameters interface">
+			<br />
+			<figcaption>Fig. 2. Input parameters interface.</figcaption>
+		</figure>
+		<br/><br/>
+		<div>
+			The distances are stored in a new shapefile, with coordinates derived from the source layer
+			<i>x</i>, <i>y</i> and <i>z</i> fields (fig. 3).
+			The output shapefile projection is the same of the current QGIS project.
+		</div>
+		<br/><br/>
+		<figure>
+			<img src="images/distances/Fig_03.png" alt="Output shapefile table">
+			<br />
+			<figcaption>Fig. 3. Example of output shapefile table.</figcaption>
+		</figure>
+		<br/><br/>
 		<div style="font-size: 85%; font-style: italic;">
 		-----
 		<br /><br />
-		Doc version 2018-09-01, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
+		Doc version 2019-01-01, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
 		</div>
 
 		<br /><br />
 		
-	<body>
+	</body>
 
 
 </html>

@@ -31,7 +31,7 @@ from builtins import map
 from .pygsf.embedded.apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
 
 from .auxiliary_windows.stereonet import *
-from .pygsf.orientations.orientations import Plane as GPlane, Axis as GAxis
+from .pygsf.orientations.orientations import Azim, Plunge, Plane, Axis
 from .pygsf.libs_utils.qgis.qgs_tools import pt_geoms_attrs
 from .pygsf.libs_utils.mpl.save_figure import FigureExportDlg
 from .pygsf.libs_utils.apsg.faults import rake_to_apsg_movsense, movsense_to_apsg_movsense
@@ -476,7 +476,7 @@ class StereoplotWidget(QWidget):
 
             def downaxis_from_rake(dipdir, dipang, rk):
 
-                return GPlane(dipdir, dipang).rakeToDirect(float(rk)).downward().d
+                return Plane(dipdir, dipang).rakeToDirect(float(rk)).downward().d
 
             def get_plane_data(struct_vals):
 
@@ -560,16 +560,16 @@ class StereoplotWidget(QWidget):
                 if not plane_data:
                     self.warn("No plane data")
                 else:
-                    for plane in plane_data:
+                    for plane_dda in plane_data:
                         if plot_setts["tPlotPlanesFormat"] == "great circles":
-                            p = aFol(*plane)
+                            p = aFol(*plane_dda)
                             self.stereonet.plane(p,
                                                  linestyle=line_style,
                                                  linewidth=line_width,
                                                  color=line_color,
                                                  alpha=line_alpha)
                         elif plot_setts["tPlotPlanesFormat"] == "normal axes":
-                            line_rec = GPlane(*plane).normDirect().d
+                            line_rec = Plane(*plane_dda).normDirect().d
                             l = aLin(*line_rec)
                             self.stereonet.line(l,
                                                 marker=marker_style,
@@ -616,8 +616,9 @@ class StereoplotWidget(QWidget):
                                                 color=marker_color,
                                                 alpha=marker_transp)
                         elif plot_setts["tPlotAxesFormat"] == "perpendicular planes":
-                            plane = GAxis(*line_rec).normal_gplane.dda
-                            p = aFol(*plane)
+                            az, pl = line_rec
+                            plane_dda = Axis(Azim(az), Plunge(pl)).normPlane().dda
+                            p = aFol(*plane_dda)
                             self.stereonet.plane(p,
                                                  linestyle=line_style,
                                                  linewidth=line_width,
