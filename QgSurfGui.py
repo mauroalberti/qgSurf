@@ -272,8 +272,8 @@ class QgSurfGui(object):
         for mrk in self.DemPlaneIntersectionQwidget.intersections_markers_list:
             self.DemPlaneIntersectionQwidget.canvas.scene().removeItem(mrk)
 
-        if self.DemPlaneIntersectionQwidget.source_point_marker is not None:
-            self.DemPlaneIntersectionQwidget.canvas.scene().removeItem(self.DemPlaneIntersectionQwidget.source_point_marker)
+        for mrk in self.DemPlaneIntersectionQwidget.source_point_marker_list:
+            self.DemPlaneIntersectionQwidget.canvas.scene().removeItem(mrk)
             
         try:
             self.DemPlaneIntersectionQwidget.intersection_PointMapTool.canvasClicked.disconnect(self.DemPlaneIntersectionQwidget.update_intersection_point_pos)
