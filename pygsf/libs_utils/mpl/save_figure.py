@@ -267,7 +267,7 @@ class FigureExportDlg(QDialog):
 
         # output file parameters
 
-        qgbOutputFile = QGroupBox(self.tr("Output file - suggested formats: tif, pdf, svg"))
+        qgbOutputFile = QGroupBox(self.tr("Output file - suggested formats: pdf, svg"))
 
         qlyOutputFile = QGridLayout()
 

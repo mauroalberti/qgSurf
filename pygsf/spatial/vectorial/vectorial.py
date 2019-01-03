@@ -597,7 +597,7 @@ class CPlane(object):
 
     def pointDistance(self, pt: Point) -> float:
         """
-        Check whether a point lie in a plane.
+        Calculate the distance between a point and the cartesian plane.
         Distance expression:
         distance = a * x1 + b * y1 + c * z1 + d
         where a, b, c and d are plane parameters of the plane equation:
