@@ -68,8 +68,8 @@ class DemPlaneIntersectionWidget(QWidget):
         self.tool_nm = tool_nm
         self.canvas, self.plugin = canvas, plugin_qaction
 
+        self.setup_gui()
         self.init_params()
-        self.setup_gui() 
 
     def init_params(self):
 
@@ -77,60 +77,34 @@ class DemPlaneIntersectionWidget(QWidget):
         self.intersection_z_from_dem = False
         self.intersection_PointMapTool = None
 
-        self.reset_full_io_values()
+        self.init_post_dem_change()
 
-    def reset_all(self):
-
-        self.reset_srcpt_intersections()
-        self.reset_input()
-        self.reset_full_io_values()
-
-    def reset_input(self):
+    def init_post_dem_change(self):
 
         self.disable_canvas_tools()
-        self.clear_srcpoint_qlineedits()
+        self.reset_full_io_values()
+
+    def srcpt_resetting_action(self):
+
+        self.intersection_resetsrcpt_pButton.setEnabled(False)
+        self.reset_srcpt_intersections()
 
     def reset_full_io_values(self):
 
         self.reset_full_input_values()
-        self.reset_intersections_lists()
+        self.reset_intersections()
 
     def reset_full_input_values(self):
 
-        self.reset_input_dem()
-        self.reset_input_srcpt()
-        self.reset_input_geoplane()
+        self.nullify_input_dem_vars()
+        self.reset_srcpt()
+        self.nullify_input_geoplane_vars()
 
-    def reset_input_dem(self):
+    def nullify_input_dem_vars(self):
 
+        self.dem = None
         self.geoarray = None
         self.current_z_value = None
-
-    def reset_input_srcpt(self):
-
-        self.srcpt_x = None
-        self.srcpt_y = None
-        self.srcpt_z = None
-
-        self.source_point_marker_list = []
-
-    def reset_input_geoplane(self):
-
-        self.src_dipdir = None
-        self.src_dipang = None
-
-    def reset_intersections_markers_list(self):
-
-        self.intersections_markers_list = []
-
-    def reset_intersections_xyzs_list(self):
-
-        self.intersections_prjcrs_xyz = []
-
-    def reset_intersections_lists(self):
-
-        self.reset_intersections_markers_list()
-        self.reset_intersections_xyzs_list()
 
     def disable_canvas_tools(self):
 
@@ -154,13 +128,40 @@ class DemPlaneIntersectionWidget(QWidget):
 
     def reset_intersections(self):
 
-        self.remove_from_canvas_markers_intersections()
-        self.reset_intersections_lists()
+        if hasattr(self, 'intersections_markers_list'):
+            self.remove_from_canvas_markers_intersections()
+        self.nullify_intersections_vals()
+
+    def nullify_intersections_markers_val(self):
+
+        self.intersections_markers_list = []
+
+    def nullify_intersections_xyzs_val(self):
+
+        self.intersections_prjcrs_xyz = []
+
+    def nullify_intersections_vals(self):
+
+        self.nullify_intersections_markers_val()
+        self.nullify_intersections_xyzs_val()
 
     def reset_srcpt(self):
 
-        self.remove_from_canvas_marker_srcpt()
-        self.reset_input_srcpt()
+        self.clear_srcpoint_qlineedits()
+        if hasattr(self, 'source_point_marker_list'):
+            self.remove_from_canvas_marker_srcpt()
+        self.nullify_srcpt_vars()
+        self.nullify_scrpt_markers_var()
+
+    def nullify_srcpt_vars(self):
+
+        self.srcpt_x = None
+        self.srcpt_y = None
+        self.srcpt_z = None
+
+    def nullify_scrpt_markers_var(self):
+
+        self.source_point_marker_list = []
 
     def remove_from_canvas_markers_intersections(self):
 
@@ -172,6 +173,11 @@ class DemPlaneIntersectionWidget(QWidget):
         for mrk in self.source_point_marker_list:
             self.canvas.scene().removeItem(mrk)
 
+    def nullify_input_geoplane_vars(self):
+
+        self.src_dipdir = None
+        self.src_dipang = None
+
     def refresh_raster_layer_list(self):
 
         try:
@@ -180,8 +186,7 @@ class DemPlaneIntersectionWidget(QWidget):
             pass
 
         try:
-            self.reset_all()
-            self.reset_dem_input_states()
+            self.init_post_dem_change()
         except:
             pass
 
@@ -199,10 +204,6 @@ class DemPlaneIntersectionWidget(QWidget):
             self.define_dem_QComboBox.addItem(layer.name())
 
         self.define_dem_QComboBox.currentIndexChanged[int].connect(self.get_working_dem)
-
-    def reset_dem_input_states(self):
-
-        self.dem, self.geoarray = None, None
 
     def setup_gui(self):
 
@@ -284,7 +285,7 @@ class DemPlaneIntersectionWidget(QWidget):
         inputLayout.addWidget(self.intersection_definepoint_pButton, 0, 0, 1, 3)        
 
         self.intersection_resetsrcpt_pButton = QPushButton("Reset source point")
-        self.intersection_resetsrcpt_pButton.clicked[bool].connect(self.reset_src_point)      
+        self.intersection_resetsrcpt_pButton.clicked[bool].connect(self.srcpt_resetting_action)
         inputLayout.addWidget(self.intersection_resetsrcpt_pButton, 1, 0, 1, 3)        
                       
         inputLayout.addWidget(QLabel("X"), 2, 0, 1, 1)
@@ -307,7 +308,7 @@ class DemPlaneIntersectionWidget(QWidget):
         self.fixz2dem_checkBox.stateChanged[int].connect(self.update_z_value)
         inputLayout.addWidget(self.fixz2dem_checkBox, 5, 0, 1, 3)        
         
-        self.reset_input()
+        #self.reset_input()
         
         inputWidget.setLayout(inputLayout) 
         
@@ -347,13 +348,6 @@ class DemPlaneIntersectionWidget(QWidget):
             
         self.current_z_value = float(self.Pt_z_QLineEdit.text())
 
-    def reset_src_point(self):
-        
-        self.intersection_resetsrcpt_pButton.setEnabled(False)
-        self.clear_srcpoint_qlineedits()
-        self.reset_srcpt_intersections()
-        self.reset_full_io_values()
-                    
     def setup_geologicdata_sect(self):
 
         planeorientationWidget = QWidget()  
@@ -482,7 +476,7 @@ class DemPlaneIntersectionWidget(QWidget):
     def get_working_dem(self, ndx_DEM_file = 0):
 
         self.dem = None        
-        self.reset_all()       
+        self.init_post_dem_change()
         if self.rasterLayers is None or len(self.rasterLayers) == 0: 
             return          
                                 
@@ -584,7 +578,7 @@ class DemPlaneIntersectionWidget(QWidget):
             icon_type=1,
             icon_color=color)
         self.source_point_marker_list = [source_point_marker]
-        print("There is/are {} element(s) in list".format(len(self.source_point_marker_list)))
+
         self.canvas.refresh()
 
     def update_z_value (self):
@@ -825,7 +819,7 @@ class DemPlaneIntersectionWidget(QWidget):
  
         # check for result existence
         
-        if self.intersections_prjcrs_xyz is None:
+        if not self.intersections_prjcrs_xyz:
             QMessageBox.critical(self, "Save results", "No results available") 
             return            
             
