@@ -14,7 +14,7 @@ It allows to examine the relationships between geological attitudes and topograp
 - plotting geological data in stereonet (tool imported from geocouche of the same author).
 
 
-###Contacts:
+### Contacts:
 
 Mauro Alberti 
 
