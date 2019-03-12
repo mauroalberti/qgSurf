@@ -385,14 +385,15 @@ class DemPlaneIntersectionWidget(QWidget):
         planeorientationLayout.addWidget(self.DAngle_verticalSlider, 1, 2, 1, 1)
 
         self.DDirection_spinBox = QSpinBox()
-        self.DDirection_spinBox.setRange(0,360)
+        self.DDirection_spinBox.setRange(0, 360)
         self.DDirection_spinBox.setSingleStep(1)
-        self.DDirection_spinBox.valueChanged[int].connect(self.update_dipdir_slider)
+        self.DDirection_spinBox.valueChanged[float].connect(self.update_dipdir_slider)
         planeorientationLayout.addWidget(self.DDirection_spinBox, 2, 0, 1, 2)        
          
-        self.DAngle_spinBox = QSpinBox()
-        self.DAngle_spinBox.setRange(0,90)
-        self.DAngle_spinBox.setSingleStep(1)
+        self.DAngle_spinBox = QDoubleSpinBox()
+        self.DAngle_spinBox.setRange(0.0, 90.0)
+        self.DAngle_spinBox.setDecimals(1)
+        self.DAngle_spinBox.setSingleStep(0.1)
         self.DAngle_spinBox.setProperty("value", 45) 
         self.DAngle_spinBox.valueChanged[int].connect(self.update_dipang_slider)
         planeorientationLayout.addWidget(self.DAngle_spinBox, 2, 2, 1, 1)
@@ -710,7 +711,7 @@ class DemPlaneIntersectionWidget(QWidget):
         print("Azimuth correction: {}".format(azimuth_correction))
 
         self.src_dipdir = self.DDirection_spinBox.value()
-        self.src_dipang = self.DAngle_verticalSlider.value()
+        self.src_dipang = self.DAngle_spinBox.value()
 
         prjcrs_dipdir = (self.src_dipdir + azimuth_correction) % 360.0
         prjcrs_dipang = self.src_dipang
