@@ -214,7 +214,7 @@ class PtsPlnDistancesWidget(QWidget):
     def calculate_distances(self):
 
         if not self.pointLayer or \
-            not self.pointLayerFields:
+           not self.pointLayerFields:
             self.warn("Input data are not defined")
             return
 
