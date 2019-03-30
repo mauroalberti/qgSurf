@@ -387,7 +387,7 @@ class DemPlaneIntersectionWidget(QWidget):
         self.DDirection_spinBox = QSpinBox()
         self.DDirection_spinBox.setRange(0, 360)
         self.DDirection_spinBox.setSingleStep(1)
-        self.DDirection_spinBox.valueChanged[float].connect(self.update_dipdir_slider)
+        self.DDirection_spinBox.valueChanged[int].connect(self.update_dipdir_slider)
         planeorientationLayout.addWidget(self.DDirection_spinBox, 2, 0, 1, 2)        
          
         self.DAngle_spinBox = QDoubleSpinBox()
@@ -395,7 +395,7 @@ class DemPlaneIntersectionWidget(QWidget):
         self.DAngle_spinBox.setDecimals(1)
         self.DAngle_spinBox.setSingleStep(0.1)
         self.DAngle_spinBox.setProperty("value", 45) 
-        self.DAngle_spinBox.valueChanged[int].connect(self.update_dipang_slider)
+        self.DAngle_spinBox.valueChanged[float].connect(self.update_dipang_slider)
         planeorientationLayout.addWidget(self.DAngle_spinBox, 2, 2, 1, 1)
  
         self.Intersection_calculate_pushButton = QPushButton("Calculate intersection")
