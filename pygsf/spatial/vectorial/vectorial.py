@@ -621,6 +621,78 @@ class CPlane(object):
         """
 
         return self.a * pt.x + self.b * pt.y + self.c * pt.z + self.d
+    def pointProjection(self, pt: Point) -> Point:
+        """
+        Calculate the orthogonal point projection onto the plane.
+
+        theoretical bases from: http://www.nabla.hr/Z_MemoHU-024.htm
+
+        plane: ax + by + cz + d = 0
+        external point: x0, y0, z0
+
+        projection on plane:
+        x = x0 + at
+        y = y0 + bt
+        z = z0 + ct
+
+        a(x0 + at) + b(y0 + bt) + c(z0 + ct) + d = 0
+        a x0 + t a^2 + b y0 + t b^2 + c z0 + t c^2 + d = 0
+        (a^2 + b^2 + c^2) t = - (a x0 + b y0 + c z0 + d)
+        t = - (ax0 + by0 + cz0 + d) / (a^2 + b^2 + c^2)
+
+        :param pt: point for which the orthogonal projection on the plane is calculated.
+        :type pt: Point.
+        :return: the point lying on the plane and on the plane normal passing through the external point.
+        :rtype: Point.
+
+        Examples:
+          >>> cpl = CPlane(0, 0, 1, 0)
+          >>> pt = Point(0, 0, 1)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 0.0000, 0.0000, 0.0000, '')
+          >>> pt = Point(0, 0, 1000)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 0.0000, 0.0000, 0.0000, '')
+          >>> pt = Point(0, 0, 0)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 0.0000, 0.0000, 0.0000, '')
+          >>> pt = Point(1, 1, 1)
+          >>> cpl.pointProjection(pt)
+          Point(1.0000, 1.0000, 0.0000, 0.0000, '')
+          >>> cpl = CPlane(1, 0, 0, 0)
+          >>> pt = Point(1, 5.6, 17.2)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 5.6000, 17.2000, 0.0000, '')
+          >>> pt = Point(-1, 5.6, 17.2)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 5.6000, 17.2000, 0.0000, '')
+          >>> cpl = CPlane(1, 0, 0, 5)
+          >>> pt = Point(1, 5.6, 17.2)
+          >>> cpl.pointProjection(pt)
+          Point(-5.0000, 5.6000, 17.2000, 0.0000, '')
+          >>> cpl = CPlane(1, 0, 0, -15.2)
+          >>> pt = Point(1, 5.6, 17.2)
+          >>> cpl.pointProjection(pt)
+          Point(15.2000, 5.6000, 17.2000, 0.0000, '')
+          >>> cpl = CPlane(1, 0, 1, 0)
+          >>> pt = Point(1, 0, 1)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, 0.0000, 0.0000, 0.0000, '')
+          >>> pt = Point(15.2, -7.2, 15.2)
+          >>> cpl.pointProjection(pt)
+          Point(0.0000, -7.2000, 0.0000, 0.0000, '')
+        """
+
+        a, b, c, d = self.v
+        x0, y0, z0 = pt.toXYZ()
+
+        t = - (a*x0 + b*y0 + c*z0 + d) / (a**2 + b**2 + c**2)
+
+        x = x0 + a*t
+        y = y0 + b*t
+        z = z0 + c*t
+
+        return Point(x, y, z)
 
     def isPointInPlane(self, pt):
         """

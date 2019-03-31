@@ -38,9 +38,10 @@ from qgis.PyQt.QtWidgets import *
 from osgeo import ogr
 
 from .config.general_params import *
+from .config.plane_points_distances_params import output_table_fields_pars
 
 from .auxiliary_windows.distances import DistancesSrcPtLyrDlg, tFieldUndefined
-from .pygsf.spatial.vectorial.vectorial import Point
+from .pygsf.spatial.vectorial.vectorial import Point, Segment
 from .pygsf.orientations.orientations import Plane as GPlane
 from .pygsf.libs_utils.gdal.ogr import shapefile_create, try_write_pt_shapefile
 
@@ -247,27 +248,58 @@ class PtsPlnDistancesWidget(QWidget):
 
         ltAttributes = []
         ltfGeometries = []
-        for pt_data in point_layer_data:
+        for geog_pt_data in point_layer_data:
 
-            id, x, y, z = pt_data
-            pt = Point(x, y, z)
-            distance = cartplane.pointDistance(pt)
-            ltAttributes.append((id, x, y, z, distance))
-            ltfGeometries.append((x, y, z))
+            id, geog_x, geog_y, geog_z = geog_pt_data
+            geog_pt = Point(geog_x, geog_y, geog_z)
 
-        fields_dict_list = [dict(name='id', ogr_type="ogr.OFTInteger"),
-                            dict(name='x', ogr_type="ogr.OFTReal"),
-                            dict(name='y', ogr_type="ogr.OFTReal"),
-                            dict(name='z', ogr_type="ogr.OFTReal"),
-                            dict(name='distance', ogr_type="ogr.OFTReal")]
+            prj_pt = cartplane.pointProjection(geog_pt)
+            prj_x, prj_y, prj_z = prj_pt.toXYZ()
 
-        ltFieldsNames = [field_dict["name"] for field_dict in fields_dict_list]
+            geo_prj_ds = cartplane.pointDistance(geog_pt)
+
+            src_geog_vect = Segment(
+                start_pt=cartplane_srcpt,
+                end_pt=geog_pt).vector()
+
+            src_prj_vect = Segment(
+                start_pt=cartplane_srcpt,
+                end_pt=prj_pt).vector()
+
+            src_geo_ds = src_geog_vect.len3D
+            src_prj_ds = src_prj_vect.len3D
+
+            src_geo_az = src_geog_vect.azimuth
+            src_prj_az = src_prj_vect.azimuth
+
+            prj_geo_an = src_geog_vect.angle(src_prj_vect)
+
+            vals = (
+                id,
+                geog_x,
+                geog_y,
+                geog_z,
+                prj_x,
+                prj_y,
+                prj_z,
+                geo_prj_ds,
+                src_geo_ds,
+                src_geo_az,
+                src_prj_ds,
+                src_prj_az,
+                prj_geo_an
+            )
+
+            ltAttributes.append(vals)
+            ltfGeometries.append((geog_x, geog_y, geog_z))
+
+        ltFieldsNames = [field_dict["name"] for field_dict in output_table_fields_pars]
 
         out_shape_pth = self.outputShapefilePath
         shapefile_datasource, point_shapelayer = shapefile_create(
             path=out_shape_pth,
             geom_type=ogr.wkbPoint25D,
-            fields_dict_list=fields_dict_list)
+            fields_dict_list=output_table_fields_pars)
 
         if not shapefile_datasource or not point_shapelayer:
             self.warn("Unable to create output shapefile {}".format(out_shape_pth))
