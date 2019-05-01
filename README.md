@@ -14,6 +14,15 @@ It allows to examine the relationships between geological attitudes and topograp
 - plotting geological data in stereonet (tool imported from geocouche of the same author).
 
 
+
+### Preprint:
+
+Alberti M. 2019. GIS analysis of geological surfaces orientations: the qgSurf plugin for QGIS. PeerJ Preprints 7:e27694v1 https://doi.org/10.7287/peerj.preprints.27694v1
+
+### QGIS Python plugin repository
+
+https://plugins.qgis.org/plugins/qgSurf/
+
 ### Contacts:
 
 Mauro Alberti 
