@@ -21,19 +21,21 @@
 			when located on the plane.
 			<br/><br/>
 			Its interface is subdivided in three sections (fig. 1):
-		</div>
-		<ul>
-			<li>the input parameter definition</li>
-			<li>result calculation</li>
-			<li>help</li>
-		</ul>
 
-		<br/><br/>
-		<figure>
-			<img src="images/distances/Fig_01.png" alt="Module interface">
-			<br />
-			<figcaption>Fig. 1. Module interface.</figcaption>
-		</figure>
+			<ul>
+				<li>the input parameter definition</li>
+				<li>result calculation</li>
+				<li>help</li>
+			</ul>
+
+			<br/><br/>
+			<figure>
+				<img src="images/distances/Fig_01.png" alt="Module interface">
+				<br />
+				<figcaption>Fig. 1. Module interface.</figcaption>
+			</figure>
+
+		</div>
 
 		<h4>Input parameters</h4>
 
@@ -41,7 +43,7 @@
 			From the main plugin window it is possible to define the input parameters
 			by clicking on "I/O params" (fig. 1) and filling in the required parameters (fig. 2).
 			<br/><br/>
-			The source point layer must contain four required fields:
+			The input point layer must contain four required fields:
 		</div>
 		<ul>
 			<li>id</li>
@@ -51,7 +53,7 @@
 		</ul>
 		<div>
 			The geological plane is defined by its attitude (dip direction and dip angle), as well as by
-			a source point, laying on the considered plane, and defined by the three Cartesian coordinates .
+			a "source point", laying on the considered plane, and defined through its Cartesian coordinates.
 		</div>
 		<br/><br/>
 		<figure>
@@ -61,11 +63,29 @@
 		</figure>
 		<br/><br/>
 		<div>
-			The distances are stored in a new shapefile, with coordinates derived from the source layer
+			The resulting variables are stored in a new shapefile, with coordinates derived from the source layer
 			<i>x</i>, <i>y</i> and <i>z</i> fields (fig. 3).
+
+			For each point ("trace point") in the input point layer, a record is produced with the following parameters:
+			<ul>
+				<li><i>id</i>: record identifier</li>
+				<li><i>geog_x</i>: x coordinate of trace point</li>
+				<li><i>geog_y</i>: y coordinate of trace point</li>
+				<li><i>geog_z</i>: z coordinate of trace point</li>
+				<li><i>prj_x</i>: x coordinate of the orthogonal projection on the geological plane of the trace point</li>
+				<li><i>prj_y</i>: y coordinate of the orthogonal projection on the geological plane of the trace point</li>
+				<li><i>prj_z</i>: z coordinate of the orthogonal projection on the geological plane of the trace point</li>
+				<li><i>geo_prj_ds</i>: distance between trace point and its orthogonal projection on the geological plane (positive: trace point above geological plane, negative: below)</li>
+				<li><i>src_geo_ds</i>: distance between trace point and the source point</li>
+				<li><i>src_geo_az</i>: North azimuth of the vector defined by the source point as start point and trace point as end point</li>
+				<li><i>src_prj_ds</i>: distance between source point and the  orthogonal projection of the trace point on the geological plane</li>
+				<li><i>src_prj_az</i>: North azimuth of the vector with the source point as start and the plane-projected trace point as end</li>
+				<li><i>prj_geo_an</i>: angle between the source point-trace point vector and the source point-projected trace point vector</li>
+			</ul>
+
 			The output shapefile projection is the same of the current QGIS project.
 		</div>
-		<br/><br/>
+		<br/>
 		<figure>
 			<img src="images/distances/Fig_03.png" alt="Output shapefile table">
 			<br />
@@ -75,7 +95,7 @@
 		<div style="font-size: 85%; font-style: italic;">
 		-----
 		<br /><br />
-		Doc version 2019-01-01, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
+		Doc version 2019-05-01, by Mauro Alberti - <a href="mailto:alberti.m65@gmail.com">alberti.m65@gmail.com</a>
 		</div>
 
 		<br /><br />
