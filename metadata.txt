@@ -12,7 +12,8 @@ icon=./icons/qgsurf.png
 
 ; start of optional metadata
 changelog=
-  2.1.0: [20190312] in DEM-plane intersection dip angle is decimal (with one digit)
+  2.1.0: [20190312] in DEM-plane intersection, dip angle is decimal (with one digit)
+         [20190501] in Geological Plane - Points Distances, more variables for each point are calculated
   2.0.0: added stereonet tool from geocouche; added module for calculation of distance between points and a geological plane; improved best-fit plane module;code refactoring; removed old modules dependences
   1.0.0: added pygsf; minor modifications to GUI and help for best-fit-plane calculations
   0.5.0: porting to QGIS 3
