@@ -445,6 +445,7 @@ class StereoplotWidget(QWidget):
 
             lSrcStructuralVals = []
             for rec in structural_data:
+
                 dRecord = dict()
                 for ndx, (key, func) in enumerate(data_types_to_extract):
                     dRecord[key] = func(rec[ndx])
@@ -604,8 +605,9 @@ class StereoplotWidget(QWidget):
 
             if plot_setts["bPlotAxes"]:
                 line_data = get_line_data(structural_values)
+
                 if not line_data:
-                    self.warn(("No line data"))
+                    self.warn("No line data")
                 else:
                     for line_rec in line_data:
                         if plot_setts["tPlotAxesFormat"] == "poles":
@@ -631,18 +633,24 @@ class StereoplotWidget(QWidget):
             self.warn("No data to plot")
             return
         elif self.dLyrSrcParams["LayerSrcData"] and self.dTxtSrcParams["TextSrcData"]:
-            raise Exception("Debug: both layer and text sources defined")
+            raise Exception("Both layer and text sources defined")
         else:
             pass
 
         if self.dLyrSrcParams["LayerSrcData"]:
+
             lGeoStructurData = pt_geoms_attrs(self.dLyrSrcParams["SrcLayer"],
                                               self.dLyrSrcParams["AttidudeFldNames"])
+
             lStructuralValues = parse_layer_data(self.dLyrSrcParams["InputDataTypes"],
                                                  lGeoStructurData)
+
         elif self.dTxtSrcParams["TextSrcData"]:
+
             lStructuralValues = self.dTxtSrcParams["GestructuralData"]
+
         else:
+
             raise Exception("Unknown data type source")
 
         dialog = PlotStereonetDlg()

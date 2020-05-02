@@ -180,25 +180,25 @@ def pt_geoms_attrs(pt_layer, field_list=None) -> List:
     :return: list of values.
     """
 
-    if not field_list:
+    if field_list is None:
         field_list = []
-    
+
     if pt_layer.selectedFeatureCount() > 0:
         features = pt_layer.selectedFeatures()
     else:
-        features = pt_layer.getFeatures() 
-    
-    provider = pt_layer.dataProvider()    
-    field_indices = [provider.fieldNameIndex(field_name) for field_name in field_list]
+        features = pt_layer.getFeatures()
+
+    provider = pt_layer.dataProvider()
+    field_indices = [provider.fieldNameIndex(field_name) for field_name in field_list if field_name]
 
     # retrieve selected features with their geometry and relevant attributes
-    rec_list = [] 
+    rec_list = []
     for feature in features:
-             
+
         # fetch point geometry
         pt = feature.geometry().asPoint()
 
-        attrs = feature.fields().toList() 
+        attrs = feature.fields().toList()
 
         # creates feature attribute list
         feat_list = [pt.x(), pt.y()]
@@ -207,7 +207,7 @@ def pt_geoms_attrs(pt_layer, field_list=None) -> List:
 
         # add to result list
         rec_list.append(feat_list)
-        
+
     return rec_list
 
 

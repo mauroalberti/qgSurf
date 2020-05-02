@@ -327,7 +327,10 @@ class StereoNet(object):
             y = []
             for azi, inc in obj.dd.T:
                 xx, yy = self._cone(
-                    p2v(azi, inc), l2v(azi, inc), limit=89.9999, res=cosd(inc) * 179 + 2
+                    p2v(azi, inc), 
+                    l2v(azi, inc), 
+                    limit=89.9999, 
+                    res=int(cosd(inc) * 179 + 2)
                 )
                 x = np.hstack((x, xx, np.nan))
                 y = np.hstack((y, yy, np.nan))
@@ -336,7 +339,10 @@ class StereoNet(object):
         else:
             azi, inc = obj.dd
             x, y = self._cone(
-                p2v(azi, inc), l2v(azi, inc), limit=89.9999, res=cosd(inc) * 179 + 2
+                p2v(azi, inc), 
+                l2v(azi, inc), 
+                limit=89.9999, 
+                res=int(cosd(inc) * 179 + 2)
             )
         h = self.fig.axes[self.active].plot(x, y, *args, **kwargs)
         if animate:
