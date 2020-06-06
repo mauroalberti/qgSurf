@@ -1,6 +1,0 @@
-include README.rst LICENSE
-include examples/*.py
-include examples/*.txt
-include tests/test_files/*.png
-include tests/test_files/*.txt
-include tests/*.py

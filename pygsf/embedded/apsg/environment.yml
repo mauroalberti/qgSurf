@@ -1,5 +1,0 @@
-name: apsg
-dependencies:
-  - numpy
-  - matplotlib
-  - scipy

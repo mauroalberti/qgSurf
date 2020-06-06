@@ -28,7 +28,7 @@ import os
 
 from builtins import map
 
-from .pygsf.embedded.apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
+from .pygsf.embedded.apsg import StereoGrid, Lin as aLin, Fol as aFol, Fault as aFault
 
 from .auxiliary_windows.stereonet import *
 from .pygsf.orientations.orientations import Azim, Plunge, Plane, Axis
