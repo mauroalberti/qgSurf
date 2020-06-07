@@ -28,7 +28,7 @@ import os
 
 from builtins import map
 
-from .pygsf.embedded.apsg import StereoGrid, Lin as aLin, Fol as aFol, Fault as aFault
+from .pygsf.embedded.apsg import StereoNet, Lin as aLin, Fol as aFol, Fault as aFault
 
 from .auxiliary_windows.stereonet import *
 from .pygsf.orientations.orientations import Azim, Plunge, Plane, Axis
@@ -446,10 +446,13 @@ class StereoplotWidget(QWidget):
             lSrcStructuralVals = []
             for rec in structural_data:
 
-                dRecord = dict()
-                for ndx, (key, func) in enumerate(data_types_to_extract):
-                    dRecord[key] = func(rec[ndx])
-                lSrcStructuralVals.append(dRecord)
+                try:
+                    dRecord = dict()
+                    for ndx, (key, func) in enumerate(data_types_to_extract):
+                        dRecord[key] = func(rec[ndx])
+                    lSrcStructuralVals.append(dRecord)
+                except:
+                    pass
 
             return lSrcStructuralVals
 
