@@ -5,7 +5,11 @@ from typing import Any, Tuple, Dict, Optional, Union
 
 import numpy as np
 
-import gdal
+try:
+    from osgeo import gdal
+except ImportError:
+    import gdal
+
 
 from .exceptions import *
 

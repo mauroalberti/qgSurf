@@ -39,8 +39,11 @@ from qgis.PyQt.QtWidgets import *
 
 from qgis.core import *
 from qgis.gui import *
-    
-from osgeo import ogr
+
+try:
+    from osgeo import ogr
+except ImportError:
+    import ogr
 
 from .pygsf.topography.plane_intersect import plane_dem_intersection
 from .pygsf.orientations.orientations import Plane, Direct

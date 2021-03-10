@@ -47,7 +47,10 @@ from datetime import datetime as dt
 
 import sqlite3
 
-from osgeo import ogr
+try:
+    from osgeo import ogr
+except ImportError:
+    import ogr
 
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *

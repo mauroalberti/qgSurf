@@ -35,7 +35,10 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 
-from osgeo import ogr
+try:
+    from osgeo import ogr
+except ImportError:
+    import ogr
 
 from .config.general_params import *
 from .config.plane_points_distances_params import output_table_fields_pars

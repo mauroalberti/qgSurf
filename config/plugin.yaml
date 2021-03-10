@@ -1,5 +1,5 @@
 
-version: 2.1.1
+version: 2.1.2
 tools:
   bestfitplane_tool_params:
     tool_nm: Best fit plane

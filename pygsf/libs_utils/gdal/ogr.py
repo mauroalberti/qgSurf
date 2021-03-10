@@ -3,7 +3,10 @@
 import os
 from typing import Dict, Tuple, Union, List
 
-from osgeo import ogr, osr
+try:
+    from osgeo import ogr, osr
+except ImportError:
+    import ogr, osr
 
 from .exceptions import *
 
