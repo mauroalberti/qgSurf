@@ -1,5 +1,12 @@
 # qgSurf
 
+
+NOTE: as of 2022/02/27, this repository is archived and read-only. The current repository is available at gitlab:
+https://gitlab.com/mauroalberti/qgSurf
+
+
+
+
 qgSurf is a QGIS plugin for the processing of geological planes and surfaces.
 
 
